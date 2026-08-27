@@ -41,6 +41,7 @@ dependencies {
     implementation("androidx.media3:media3-datasource:1.9.0")
     implementation("androidx.media3:media3-database:1.9.0")
     implementation("androidx.core:core-ktx:1.18.0")
+    implementation("androidx.media:media:1.7.0")
     // yt-dlp is isolated in :data so platform extraction never leaks into UI.
     implementation("dev.ffmpegkit-maintained:yt-dlp-android:2.0.2")
     // Native libmpv multimedia engine
@@ -48,6 +49,7 @@ dependencies {
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.robolectric:robolectric:4.16")
+    testImplementation("androidx.test.ext:junit:1.2.1")
     testImplementation("androidx.test:core:1.6.1")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
 }

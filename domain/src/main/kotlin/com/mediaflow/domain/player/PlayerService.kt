@@ -251,6 +251,17 @@ class PlayerService(
         }
     }
 
+    fun stop() {
+        if (isReleased) return
+        engine.stop()
+        serviceScope.launch {
+            saveCurrentProgressNow(isEof = false)
+            _uiState.value = _uiState.value.copy(
+                playbackState = EnginePlaybackState.IDLE,
+            )
+        }
+    }
+
     fun seekTo(positionMs: Long) {
         if (isReleased) return
         engine.seekTo(positionMs)

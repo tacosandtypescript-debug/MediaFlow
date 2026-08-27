@@ -26,6 +26,8 @@ data class PlayerUiState(
     val seekFeedback: SeekFeedbackEvent? = null,
     val isScrubbing: Boolean = false,
     val scrubPositionMs: Long = 0L,
+    val liveEndState: com.mediaflow.domain.live.LiveSpaceEndState = com.mediaflow.domain.live.LiveSpaceEndState.ActiveLive,
+    val isAutoDownloadEnabled: Boolean = false,
 ) {
     val isPlaying: Boolean
         get() = serviceState.isPlaying

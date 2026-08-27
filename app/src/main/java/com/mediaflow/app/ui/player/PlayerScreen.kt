@@ -39,6 +39,9 @@ import com.mediaflow.app.ui.player.components.PlayerControls
 import com.mediaflow.app.ui.player.components.PlayerSurface
 import com.mediaflow.app.ui.player.components.SeekFeedback
 import com.mediaflow.app.ui.player.gestures.playerGestures
+import com.mediaflow.app.ui.player.live.AutoDownloadToggle
+import com.mediaflow.app.ui.player.live.LiveEndedContent
+import com.mediaflow.domain.live.LiveSpaceEndState
 
 /**
  * Native, embedded multimedia player powered by libmpv and modern Jetpack Compose UI/UX.
@@ -152,7 +155,28 @@ fun PlayerScreen(
                 modifier = Modifier.fillMaxSize(),
             )
 
-            // 4. Error Display Card
+            // 4. Auto Download Toggle when listening Live
+            if (uiState.isLive && uiState.liveEndState is LiveSpaceEndState.ActiveLive && uiState.isControlsVisible) {
+                AutoDownloadToggle(
+                    enabled = uiState.isAutoDownloadEnabled,
+                    onToggle = { viewModel.toggleAutoDownload() },
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 120.dp),
+                )
+            }
+
+            // 5. Post-Live Ended Replay Overlay Card
+            if (uiState.liveEndState !is LiveSpaceEndState.ActiveLive) {
+                LiveEndedContent(
+                    endState = uiState.liveEndState,
+                    onDownloadReplay = viewModel::downloadSpaceReplay,
+                    onCheckReplayAgain = viewModel::checkReplayAgain,
+                    modifier = Modifier.align(Alignment.Center),
+                )
+            }
+
+            // 6. Error Display Card
             AnimatedVisibility(
                 visible = uiState.isError,
                 enter = fadeIn(),
@@ -185,7 +209,7 @@ fun PlayerScreen(
                 }
             }
 
-            // 5. Player Controls Overlay
+            // 7. Player Controls Overlay
             PlayerControls(
                 visible = uiState.isControlsVisible,
                 title = displayTitle,
