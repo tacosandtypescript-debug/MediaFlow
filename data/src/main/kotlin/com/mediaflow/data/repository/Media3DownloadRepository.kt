@@ -22,6 +22,9 @@ import com.mediaflow.data.download.YtDlpPlatformDownloader
 import com.mediaflow.data.media.MediaStorePublisher
 import com.mediaflow.data.media.MediaFileValidator
 import com.mediaflow.data.media.MediaFlowLibraryStore
+import com.mediaflow.data.media.metadata.DefaultMediaMetadataWriter
+import com.mediaflow.data.media.metadata.MediaMetadata
+import com.mediaflow.data.media.metadata.MediaMetadataWriter
 import com.mediaflow.data.resolver.PlatformUrlSupport
 import com.mediaflow.domain.repository.DownloadRepository
 import com.mediaflow.domain.repository.DownloadRequest
@@ -47,11 +50,12 @@ import java.security.MessageDigest
 @OptIn(markerClass = [UnstableApi::class])
 class Media3DownloadRepository private constructor(
     private val context: Context,
+    private val mediaMetadataWriter: MediaMetadataWriter = DefaultMediaMetadataWriter(),
 ) : DownloadRepository {
     private val infrastructure = Media3DownloadInfrastructure.get(context)
     private val manager = infrastructure.downloadManager
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val platformDownloader = YtDlpPlatformDownloader(context)
+    private val platformDownloader = YtDlpPlatformDownloader(context, mediaMetadataWriter)
     private val _downloads = MutableStateFlow<List<DownloadItem>>(emptyList())
     private val publishedUris = java.util.concurrent.ConcurrentHashMap<String, String>()
     private val ownership = MediaFlowLibraryStore(context)
@@ -225,6 +229,17 @@ class Media3DownloadRepository private constructor(
                 .getOrElse { validationError ->
                     throw IllegalStateException("La validación multimedia falló: ${validationError.message}")
                 }
+
+            // Attempt non-blocking metadata embedding
+            runCatching {
+                val mediaMetadata = MediaMetadata(
+                    title = safeName.substringBeforeLast('.').ifBlank { null },
+                )
+                mediaMetadataWriter.writeMetadata(output, mediaMetadata)
+            }.onFailure { error ->
+                android.util.Log.w("Media3DownloadRepository", "No se pudieron incrustar metadatos en ${output.name}: ${error.message}")
+            }
+
             MediaStorePublisher.publishIfMissing(context, output, mimeType, output.name)?.let {
                 publishedUris[download.request.id] = it.toString()
                 ownership.add(it)

@@ -12,6 +12,10 @@ import com.mediaflow.data.media.MediaStorePublisher
 import com.mediaflow.data.media.MediaFileValidator
 import com.mediaflow.data.media.MediaFlowLibraryStore
 import com.mediaflow.data.media.MediaTrackMuxer
+import com.mediaflow.data.media.metadata.DefaultMediaMetadataWriter
+import com.mediaflow.data.media.metadata.MediaMetadata
+import com.mediaflow.data.media.metadata.MediaMetadataWriter
+import com.mediaflow.data.provider.x.spaces.XSpaceStore
 import dev.ffmpegkit_maintained.ytdlp.YtDlp
 import dev.ffmpegkit_maintained.ytdlp.YtDlpException
 import dev.ffmpegkit_maintained.ytdlp.YtDlpRequest
@@ -26,9 +30,13 @@ import java.net.URL
 import java.util.concurrent.Future
 
 /** Runs yt-dlp for supported platform pages and exposes truthful progress. */
-class YtDlpPlatformDownloader(private val context: Context) {
+class YtDlpPlatformDownloader(
+    private val context: Context,
+    private val mediaMetadataWriter: MediaMetadataWriter = DefaultMediaMetadataWriter(),
+) {
     private val outputDirectory = File(context.filesDir, "downloads").apply { mkdirs() }
     private val store = PlatformDownloadStore(context)
+    private val xSpaceStore = XSpaceStore(context)
     private val ownership = MediaFlowLibraryStore(context)
     private val sessions = LinkedHashMap<String, Session>()
     private val _items = MutableStateFlow(store.load())
@@ -149,6 +157,20 @@ class YtDlpPlatformDownloader(private val context: Context) {
                 updateFailed(id, error, request.mediaType)
                 return
             }
+
+        // Attempt non-blocking metadata embedding
+        runCatching {
+            val space = xSpaceStore.loadAllSync()[current.sourceUrl]
+                ?: xSpaceStore.loadAllSync().values.firstOrNull { it.url == current.sourceUrl || it.id in current.sourceUrl }
+            val metadata = space?.let { s -> MediaMetadata.fromXSpace(s) }
+                ?: MediaMetadata(
+                    title = request.fileName?.substringBeforeLast('.')?.ifBlank { null } ?: current.title?.ifBlank { null },
+                )
+            mediaMetadataWriter.writeMetadata(output, metadata)
+        }.onFailure { error ->
+            android.util.Log.w("YtDlpPlatformDownloader", "No se pudieron incrustar metadatos en ${output.name}: ${error.message}")
+        }
+
         val publishedUri = MediaStorePublisher.publishIfMissing(context, output, mimeType, output.name)
         publishedUri?.let(ownership::add)
         update(current.copy(
@@ -406,6 +428,20 @@ class YtDlpPlatformDownloader(private val context: Context) {
                 updateFailed(id, error, request.mediaType)
                 return
             }
+
+        // Attempt non-blocking metadata embedding
+        runCatching {
+            val space = xSpaceStore.loadAllSync()[current.sourceUrl]
+                ?: xSpaceStore.loadAllSync().values.firstOrNull { it.url == current.sourceUrl || it.id in current.sourceUrl }
+            val metadata = space?.let { s -> MediaMetadata.fromXSpace(s) }
+                ?: MediaMetadata(
+                    title = request.fileName?.substringBeforeLast('.')?.ifBlank { null } ?: current.title?.ifBlank { null },
+                )
+            mediaMetadataWriter.writeMetadata(output, metadata)
+        }.onFailure { error ->
+            android.util.Log.w("YtDlpPlatformDownloader", "No se pudieron incrustar metadatos en ${output.name}: ${error.message}")
+        }
+
         update(current.copy(
             fileName = output.name,
             title = output.nameWithoutExtension,
