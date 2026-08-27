@@ -51,6 +51,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.net.URL
 
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import com.mediaflow.app.ui.player.components.LiveStatusBadge
+
 /**
  * Dedicated visual card rendered on the Home screen when an X Space URL is analyzed.
  */
@@ -59,6 +63,7 @@ import java.net.URL
 fun XSpaceCard(
     space: XSpace,
     modifier: Modifier = Modifier,
+    onPlayLive: ((XSpace) -> Unit)? = null,
 ) {
     Card(
         modifier = modifier.fillMaxWidth(),
@@ -67,7 +72,7 @@ fun XSpaceCard(
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
     ) {
         Column(modifier = Modifier.padding(18.dp)) {
-            // Header Row: Space Badge + Recording availability
+            // Header Row: Space Badge + State Badge
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -95,32 +100,61 @@ fun XSpaceCard(
                     }
                 }
 
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = if (space.recordingAvailable) {
-                        MaterialTheme.colorScheme.secondaryContainer
-                    } else {
-                        MaterialTheme.colorScheme.errorContainer
-                    },
-                    contentColor = if (space.recordingAvailable) {
-                        MaterialTheme.colorScheme.onSecondaryContainer
-                    } else {
-                        MaterialTheme.colorScheme.onErrorContainer
-                    },
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
+                if (space.isLive) {
+                    LiveStatusBadge(
+                        liveListenersCount = space.liveListenersCount,
+                        isLive = true,
+                    )
+                } else if (space.isScheduled) {
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.tertiaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
                     ) {
-                        Icon(
-                            imageVector = if (space.recordingAvailable) Icons.Outlined.CheckCircle else Icons.Outlined.WarningAmber,
-                            contentDescription = null,
-                            modifier = Modifier.size(14.dp).padding(end = 4.dp),
-                        )
-                        Text(
-                            text = if (space.recordingAvailable) "Grabación disponible" else "Grabación no disponible",
-                            style = MaterialTheme.typography.labelSmall,
-                        )
+                        Row(
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.Schedule,
+                                contentDescription = null,
+                                modifier = Modifier.size(14.dp).padding(end = 4.dp),
+                            )
+                            Text(
+                                text = "PROGRAMADO",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                            )
+                        }
+                    }
+                } else {
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = if (space.recordingAvailable) {
+                            MaterialTheme.colorScheme.secondaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.errorContainer
+                        },
+                        contentColor = if (space.recordingAvailable) {
+                            MaterialTheme.colorScheme.onSecondaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.onErrorContainer
+                        },
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(
+                                imageVector = if (space.recordingAvailable) Icons.Outlined.CheckCircle else Icons.Outlined.WarningAmber,
+                                contentDescription = null,
+                                modifier = Modifier.size(14.dp).padding(end = 4.dp),
+                            )
+                            Text(
+                                text = if (space.recordingAvailable) "Grabación disponible" else "Finalizado (Sin grabación)",
+                                style = MaterialTheme.typography.labelSmall,
+                            )
+                        }
                     }
                 }
             }
@@ -263,6 +297,38 @@ fun XSpaceCard(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                }
+            }
+
+            // Primary Live Action Button
+            if (space.isLive && onPlayLive != null) {
+                Button(
+                    onClick = { onPlayLive(space) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 16.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFFE53935),
+                        contentColor = Color.White,
+                    ),
+                    shape = RoundedCornerShape(14.dp),
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.padding(vertical = 4.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Headphones,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp),
+                        )
+                        Text(
+                            text = "Escuchar en vivo",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                        )
+                    }
                 }
             }
         }

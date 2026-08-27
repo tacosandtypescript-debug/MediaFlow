@@ -17,7 +17,7 @@ object XUrlParser {
         "fixupx.com",
     )
 
-    private val SPACE_PATH_REGEX = Regex("""^/i/spaces/([0-9a-zA-Z]{12,14})""", RegexOption.IGNORE_CASE)
+    private val SPACE_PATH_REGEX = Regex("""^/i/spaces/([0-9a-zA-Z]{10,20})""", RegexOption.IGNORE_CASE)
     private val STATUS_PATH_REGEX = Regex("""^/[^/]+/status/([0-9]+)""", RegexOption.IGNORE_CASE)
 
     fun isXUrl(url: String): Boolean {

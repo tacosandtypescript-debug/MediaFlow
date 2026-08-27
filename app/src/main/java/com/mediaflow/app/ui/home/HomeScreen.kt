@@ -72,12 +72,14 @@ fun HomeScreen(
     viewModel: HomeViewModel = viewModel(),
     sourceResolver: SourceResolver? = null,
     onDownloadRequested: ((HomeUiState) -> DownloadStartResult)? = null,
+    onPlayLive: ((String) -> Unit)? = null,
 ) {
     val state by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val pendingDownloadMessage = stringResource(R.string.home_info_download_pending)
     val downloadAcceptedMessage = stringResource(R.string.home_info_download_started)
+    val directLivePlaybackMessage = "Iniciando reproducción en directo..."
 
     var entered by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { entered = true }
@@ -165,6 +167,13 @@ fun HomeScreen(
                 XSpaceCard(
                     space = spaceMetadata,
                     modifier = Modifier.padding(bottom = 18.dp),
+                    onPlayLive = { space ->
+                        val streamUrl = space.audioStreamUrl
+                        if (streamUrl != null) {
+                            scope.launch { snackbarHostState.showSnackbar(directLivePlaybackMessage) }
+                            onPlayLive?.invoke(streamUrl)
+                        }
+                    },
                 )
             }
 

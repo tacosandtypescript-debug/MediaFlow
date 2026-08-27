@@ -94,16 +94,19 @@ class PlayerViewModel(
         }
     }
 
-    fun open(mediaUri: String, title: String? = null) {
+    fun open(mediaUri: String, title: String? = null, isLive: Boolean = false) {
         viewModelScope.launch {
-            currentSpace.value = spaceRepository.getSpaceForMedia(mediaUri)
+            val space = spaceRepository.getSpaceForMedia(mediaUri)
+            currentSpace.value = space
+            val effectiveLive = isLive || space?.isLive == true || (mediaUri.startsWith("http", ignoreCase = true) && space?.isEnded != true && !mediaUri.endsWith(".mp4", ignoreCase = true) && !mediaUri.endsWith(".m4a", ignoreCase = true))
+            playerService.openMedia(
+                mediaId = mediaUri,
+                filePath = mediaUri,
+                title = space?.title ?: title,
+                autoPlay = true,
+                isLive = effectiveLive,
+            )
         }
-        playerService.openMedia(
-            mediaId = mediaUri,
-            filePath = mediaUri,
-            title = title,
-            autoPlay = true,
-        )
     }
 
     fun togglePlayPause() {

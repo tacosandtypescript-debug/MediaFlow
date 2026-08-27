@@ -57,4 +57,13 @@ data class XSpace(
      */
     val speakersSummary: String
         get() = allSpeakers.joinToString(", ") { it.formattedHandle }
+
+    val isLive: Boolean
+        get() = state == XSpaceState.LIVE
+
+    val isScheduled: Boolean
+        get() = state == XSpaceState.UPCOMING
+
+    val isEnded: Boolean
+        get() = state == XSpaceState.ENDED || state == XSpaceState.TIMED_OUT
 }

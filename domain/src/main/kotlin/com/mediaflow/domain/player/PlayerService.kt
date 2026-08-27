@@ -36,6 +36,7 @@ data class PlayerServiceState(
     val isVideoAvailable: Boolean = false,
     val status: PlaybackStatus = PlaybackStatus.NEW,
     val errorMessage: String? = null,
+    val isLive: Boolean = false,
 ) {
     val isPlaying: Boolean
         get() = playbackState == EnginePlaybackState.PLAYING
@@ -50,7 +51,7 @@ data class PlayerServiceState(
         get() = playbackState == EnginePlaybackState.ERROR
 
     val progressFraction: Float
-        get() = if (durationMs > 0L) (currentPositionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f) else 0f
+        get() = if (!isLive && durationMs > 0L) (currentPositionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f) else 0f
 }
 
 /**
@@ -108,6 +109,10 @@ class PlayerService(
         // Forward engine events
         serviceScope.launch {
             engine.events.collect { event ->
+                if (_uiState.value.isLive) {
+                    _events.emit(event)
+                    return@collect
+                }
                 when (event) {
                     is PlaybackEvent.PositionChanged -> {
                         val isComplete = completionPolicy.isCompleted(
@@ -141,14 +146,30 @@ class PlayerService(
         filePath: String,
         title: String? = null,
         autoPlay: Boolean = true,
+        isLive: Boolean = false,
     ) {
         if (isReleased) return
 
         serviceScope.launch {
             mutex.withLock {
                 // If another media was active, save its progress before opening new one
-                if (_uiState.value.mediaId != null && _uiState.value.mediaId != mediaId) {
+                if (_uiState.value.mediaId != null && _uiState.value.mediaId != mediaId && !_uiState.value.isLive) {
                     saveCurrentProgressNow()
+                }
+
+                if (isLive) {
+                    _uiState.value = PlayerServiceState(
+                        mediaId = mediaId,
+                        filePath = filePath,
+                        title = title ?: filePath.substringAfterLast('/'),
+                        playbackState = EnginePlaybackState.PREPARING,
+                        currentPositionMs = 0L,
+                        durationMs = 0L,
+                        status = PlaybackStatus.IN_PROGRESS,
+                        isLive = true,
+                    )
+                    engine.load(mediaSource = filePath, startPositionMs = 0L, autoPlay = autoPlay)
+                    return@withLock
                 }
 
                 val saved = progressRepository.getProgress(mediaId)
@@ -180,6 +201,7 @@ class PlayerService(
                     currentPositionMs = startPos,
                     durationMs = saved?.totalDurationMs ?: 0L,
                     status = initialStatus,
+                    isLive = false,
                 )
 
                 engine.load(mediaSource = filePath, startPositionMs = startPos, autoPlay = autoPlay)
@@ -278,6 +300,7 @@ class PlayerService(
     }
 
     private fun startPeriodicSave() {
+        if (_uiState.value.isLive) return
         if (periodicSaveJob?.isActive == true) return
         periodicSaveJob = serviceScope.launch {
             while (isActive) {
@@ -294,6 +317,7 @@ class PlayerService(
 
     private suspend fun saveCurrentProgressNow(isEof: Boolean = false) {
         val state = _uiState.value
+        if (state.isLive) return
         val mediaId = state.mediaId ?: return
         val filePath = state.filePath ?: mediaId
         val pos = state.currentPositionMs
@@ -324,7 +348,7 @@ class PlayerService(
         // Flush last progress before releasing
         val state = _uiState.value
         val mediaId = state.mediaId
-        if (mediaId != null) {
+        if (mediaId != null && !state.isLive) {
             val status = completionPolicy.determineStatus(state.currentPositionMs, state.durationMs)
             val finalProgress = PlaybackProgress(
                 mediaId = mediaId,

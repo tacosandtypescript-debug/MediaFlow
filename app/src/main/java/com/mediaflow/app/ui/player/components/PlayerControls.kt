@@ -78,6 +78,8 @@ fun PlayerControls(
     bufferedMs: Long = 0L,
     onScrubbingChanged: (Boolean) -> Unit = {},
     isAudioOnly: Boolean = false,
+    isLive: Boolean = false,
+    spaceMetadata: com.mediaflow.core.model.XSpace? = null,
 ) {
     var showSpeedMenu by remember { mutableStateOf(false) }
 
@@ -117,25 +119,37 @@ fun PlayerControls(
                     )
                 }
 
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Color.White,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
+                Column(
                     modifier = Modifier
                         .weight(1f)
                         .padding(horizontal = 8.dp),
-                )
-
-                // Restart from start
-                IconButton(onClick = onRestart) {
-                    Icon(
-                        imageVector = Icons.Outlined.RestartAlt,
-                        contentDescription = "Reiniciar",
-                        tint = Color.White.copy(alpha = 0.9f),
+                ) {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color.White,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
+                    if (isLive) {
+                        LiveStatusBadge(
+                            liveListenersCount = spaceMetadata?.liveListenersCount ?: 0,
+                            isLive = isLive,
+                            modifier = Modifier.padding(top = 2.dp),
+                        )
+                    }
+                }
+
+                // Restart from start (only for recorded / local files)
+                if (!isLive) {
+                    IconButton(onClick = onRestart) {
+                        Icon(
+                            imageVector = Icons.Outlined.RestartAlt,
+                            contentDescription = "Reiniciar",
+                            tint = Color.White.copy(alpha = 0.9f),
+                        )
+                    }
                 }
 
                 // Speed Selector Pill
@@ -187,17 +201,19 @@ fun PlayerControls(
                 horizontalArrangement = Arrangement.spacedBy(32.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                // Seek backward 10s
-                IconButton(
-                    onClick = { onSeekTo((currentPositionMs - 10_000L).coerceAtLeast(0L)) },
-                    modifier = Modifier.size(52.dp),
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.FastRewind,
-                        contentDescription = "Retroceder 10s",
-                        tint = Color.White.copy(alpha = 0.95f),
-                        modifier = Modifier.size(34.dp),
-                    )
+                if (!isLive) {
+                    // Seek backward 10s
+                    IconButton(
+                        onClick = { onSeekTo((currentPositionMs - 10_000L).coerceAtLeast(0L)) },
+                        modifier = Modifier.size(52.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.FastRewind,
+                            contentDescription = "Retroceder 10s",
+                            tint = Color.White.copy(alpha = 0.95f),
+                            modifier = Modifier.size(34.dp),
+                        )
+                    }
                 }
 
                 // Primary Play/Pause Button with scale microinteraction
@@ -206,20 +222,22 @@ fun PlayerControls(
                     onClick = onPlayPause,
                 )
 
-                // Seek forward 10s
-                IconButton(
-                    onClick = {
-                        val maxPos = if (durationMs > 0L) durationMs else Long.MAX_VALUE
-                        onSeekTo((currentPositionMs + 10_000L).coerceAtMost(maxPos))
-                    },
-                    modifier = Modifier.size(52.dp),
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.FastForward,
-                        contentDescription = "Avanzar 10s",
-                        tint = Color.White.copy(alpha = 0.95f),
-                        modifier = Modifier.size(34.dp),
-                    )
+                if (!isLive) {
+                    // Seek forward 10s
+                    IconButton(
+                        onClick = {
+                            val maxPos = if (durationMs > 0L) durationMs else Long.MAX_VALUE
+                            onSeekTo((currentPositionMs + 10_000L).coerceAtMost(maxPos))
+                        },
+                        modifier = Modifier.size(52.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.FastForward,
+                            contentDescription = "Avanzar 10s",
+                            tint = Color.White.copy(alpha = 0.95f),
+                            modifier = Modifier.size(34.dp),
+                        )
+                    }
                 }
             }
 
@@ -230,14 +248,31 @@ fun PlayerControls(
                     .align(Alignment.BottomCenter)
                     .padding(horizontal = 16.dp, vertical = 10.dp),
             ) {
-                // Custom Timeline with decoupled scrubbing & dynamic thumb
-                PlayerTimeline(
-                    currentPositionMs = currentPositionMs,
-                    durationMs = durationMs,
-                    bufferedMs = bufferedMs,
-                    onSeekTo = onSeekTo,
-                    onScrubbingChanged = onScrubbingChanged,
-                )
+                if (!isLive) {
+                    // Custom Timeline with decoupled scrubbing & dynamic thumb
+                    PlayerTimeline(
+                        currentPositionMs = currentPositionMs,
+                        durationMs = durationMs,
+                        bufferedMs = bufferedMs,
+                        onSeekTo = onSeekTo,
+                        onScrubbingChanged = onScrubbingChanged,
+                    )
+                } else {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center,
+                    ) {
+                        Text(
+                            text = "🔴 Transmisión de audio en directo",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color.White.copy(alpha = 0.75f),
+                            fontWeight = FontWeight.Medium,
+                        )
+                    }
+                }
 
                 // Bottom Secondary Controls Row
                 Row(

@@ -65,4 +65,7 @@ data class PlayerUiState(
 
     val isAudioOnly: Boolean
         get() = serviceState.isAudioOnly
+
+    val isLive: Boolean
+        get() = serviceState.isLive || spaceMetadata?.isLive == true
 }

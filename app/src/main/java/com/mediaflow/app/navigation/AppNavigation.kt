@@ -179,6 +179,11 @@ fun AppNavigation(
                     ) {
                         HomeScreen(
                             sourceResolver = sourceResolver,
+                            onPlayLive = { liveStreamUrl ->
+                                navController.navigate(
+                                    MediaFlowDestination.Player.routeFor(Uri.encode(liveStreamUrl)),
+                                )
+                            },
                             onDownloadRequested = { state ->
                                 if (requestNotificationPermission == null) {
                                     downloadViewModel.start(state)

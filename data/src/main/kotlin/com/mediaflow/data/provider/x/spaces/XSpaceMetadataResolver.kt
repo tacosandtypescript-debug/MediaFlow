@@ -21,7 +21,7 @@ import java.net.URLEncoder
  * Resolves comprehensive X Space public metadata by combining public X GraphQL
  * endpoints (AudioSpaceById, TweetResultByRestId, live_video_stream) with yt-dlp extracted media formats.
  */
-class XSpaceMetadataResolver(
+open class XSpaceMetadataResolver(
     private val connectTimeoutMs: Int = 10_000,
     private val readTimeoutMs: Int = 15_000,
 ) {
@@ -42,7 +42,7 @@ class XSpaceMetadataResolver(
     /**
      * Resolves an [XSpace] from any X URL (direct Space URL or Status Tweet URL).
      */
-    suspend fun resolveFromUrl(
+    open suspend fun resolveFromUrl(
         url: String,
         ytDlpJson: JSONObject? = null,
     ): XSpace? = withContext(Dispatchers.IO) {
@@ -60,7 +60,7 @@ class XSpaceMetadataResolver(
     /**
      * Resolves an [XSpace] from a Space ID, original URL, and optional yt-dlp JSON.
      */
-    suspend fun resolve(
+    open suspend fun resolve(
         spaceId: String,
         originalUrl: String,
         ytDlpJson: JSONObject? = null,

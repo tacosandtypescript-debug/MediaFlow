@@ -197,6 +197,8 @@ fun PlayerScreen(
                 isMuted = uiState.isMuted,
                 isFullscreen = uiState.isFullscreen,
                 isAudioOnly = uiState.isAudioOnly,
+                isLive = uiState.isLive,
+                spaceMetadata = uiState.spaceMetadata,
                 onPlayPause = viewModel::togglePlayPause,
                 onSeekTo = viewModel::seekTo,
                 onSpeedChange = viewModel::setSpeed,

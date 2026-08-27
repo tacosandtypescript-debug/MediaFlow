@@ -4,6 +4,7 @@ import android.content.Context
 import com.mediaflow.core.model.MediaFormat
 import com.mediaflow.core.model.MediaType
 import com.mediaflow.core.model.XSpace
+import com.mediaflow.core.model.XSpaceState
 import com.mediaflow.data.provider.x.XContentDetector
 import com.mediaflow.data.provider.x.XUrlParser
 import com.mediaflow.data.provider.x.spaces.XSpaceMetadataResolver
@@ -49,6 +50,16 @@ class YtDlpSourceResolver(
             if (space != null) {
                 spaceRepository.saveSpace(space)
                 val formats = spaceResolver.createMediaFormats(space)
+                val statusMessage = when (space.state) {
+                    XSpaceState.UPCOMING -> "Este Space todavía no ha comenzado (Programado)."
+                    XSpaceState.ENDED, XSpaceState.TIMED_OUT -> if (!space.recordingAvailable && formats.isEmpty()) {
+                        "La grabación de este Space no está disponible o fue desactivada."
+                    } else null
+                    XSpaceState.LIVE -> if (space.audioStreamUrl == null) {
+                        "El stream en vivo no está disponible en este momento."
+                    } else null
+                    else -> null
+                }
                 return@withContext SourceInfo(
                     sourceUrl = trimmed,
                     title = space.title,
@@ -56,9 +67,7 @@ class YtDlpSourceResolver(
                     durationSeconds = space.durationSeconds.takeIf { it > 0 },
                     availableFormats = formats,
                     spaceMetadata = space,
-                    errorMessage = if (!space.recordingAvailable && formats.isEmpty()) {
-                        "La grabación de este Space no está disponible o fue desactivada."
-                    } else null,
+                    errorMessage = statusMessage,
                 )
             }
         }
@@ -105,6 +114,16 @@ class YtDlpSourceResolver(
                 if (space != null) {
                     spaceRepository.saveSpace(space)
                     val formats = spaceResolver.createMediaFormats(space)
+                    val statusMessage = when (space.state) {
+                        XSpaceState.UPCOMING -> "Este Space todavía no ha comenzado (Programado)."
+                        XSpaceState.ENDED, XSpaceState.TIMED_OUT -> if (!space.recordingAvailable && formats.isEmpty()) {
+                            "La grabación de este Space no está disponible o fue desactivada."
+                        } else null
+                        XSpaceState.LIVE -> if (space.audioStreamUrl == null) {
+                            "El stream en vivo no está disponible en este momento."
+                        } else null
+                        else -> null
+                    }
                     return@withContext SourceInfo(
                         sourceUrl = trimmed,
                         title = space.title,
@@ -112,9 +131,7 @@ class YtDlpSourceResolver(
                         durationSeconds = space.durationSeconds.takeIf { it > 0 },
                         availableFormats = formats,
                         spaceMetadata = space,
-                        errorMessage = if (!space.recordingAvailable && formats.isEmpty()) {
-                            "La grabación de este Space no está disponible o fue desactivada."
-                        } else null,
+                        errorMessage = statusMessage,
                     )
                 }
             }
