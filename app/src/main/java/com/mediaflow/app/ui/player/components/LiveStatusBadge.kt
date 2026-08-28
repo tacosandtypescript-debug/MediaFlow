@@ -27,6 +27,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.mediaflow.app.ui.theme.customColors
 
 /**
  * Animated glowing badge for live broadcast streams with real-time listeners count.
@@ -56,8 +57,8 @@ fun LiveStatusBadge(
         // Red LIVE Pill
         Surface(
             shape = RoundedCornerShape(20.dp),
-            color = if (isLive) Color(0xFFE53935) else MaterialTheme.colorScheme.surfaceVariant,
-            contentColor = Color.White,
+            color = if (isLive) MaterialTheme.customColors.live else MaterialTheme.colorScheme.surfaceVariant,
+            contentColor = if (isLive) MaterialTheme.customColors.onLive else MaterialTheme.colorScheme.onSurfaceVariant,
         ) {
             Row(
                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
@@ -69,14 +70,14 @@ fun LiveStatusBadge(
                         modifier = Modifier
                             .size(8.dp)
                             .alpha(alphaAnim)
-                            .background(Color.White, CircleShape),
+                            .background(MaterialTheme.customColors.onLive, CircleShape),
                     )
                 }
                 Text(
                     text = if (isLive) "EN VIVO" else "FINALIZADO",
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Black,
-                    color = if (isLive) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = if (isLive) MaterialTheme.customColors.onLive else MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }

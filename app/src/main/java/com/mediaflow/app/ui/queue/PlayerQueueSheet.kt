@@ -32,6 +32,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.mediaflow.app.ui.theme.customColors
 import com.mediaflow.app.ui.common.media.AnimatedSoundWaves
 import com.mediaflow.app.ui.common.media.MediaArtwork
 import com.mediaflow.core.model.PlaybackQueueItem
@@ -54,7 +55,8 @@ fun PlayerQueueSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+        containerColor = MaterialTheme.customColors.bottomSheetBackground,
+        scrimColor = MaterialTheme.colorScheme.scrim,
         modifier = Modifier.testTag("player_queue_sheet"),
     ) {
         Column(

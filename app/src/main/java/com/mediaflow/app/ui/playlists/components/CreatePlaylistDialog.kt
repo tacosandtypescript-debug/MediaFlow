@@ -20,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.mediaflow.app.ui.theme.customColors
 
 /**
  * Modern Material 3 Dialog for creating or renaming a playlist.
@@ -37,6 +38,7 @@ fun CreatePlaylistDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.customColors.dialogBackground,
         title = {
             Text(
                 text = title,

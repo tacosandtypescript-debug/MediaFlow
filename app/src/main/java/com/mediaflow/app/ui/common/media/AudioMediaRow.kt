@@ -38,6 +38,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.mediaflow.app.ui.theme.customColors
 
 /**
  * Modern, clean media row representing an audio track or X Space in the library,
@@ -61,13 +62,19 @@ fun AudioMediaRow(
     modifier: Modifier = Modifier,
 ) {
     val rowBackground = if (isPlaying) {
-        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f)
+        MaterialTheme.customColors.libraryRowPlaying
     } else {
         Color.Transparent
+    }
+    val rowBorder = if (isPlaying) {
+        androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.customColors.libraryRowPlayingBorder)
+    } else {
+        null
     }
 
     Surface(
         color = rowBackground,
+        border = rowBorder,
         shape = RoundedCornerShape(14.dp),
         modifier = modifier
             .fillMaxWidth()

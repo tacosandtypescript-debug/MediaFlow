@@ -34,6 +34,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.mediaflow.app.ui.theme.customColors
 import com.mediaflow.app.ui.common.media.AudioMediaRow
 import com.mediaflow.app.ui.library.components.EmptyLibraryState
 import com.mediaflow.core.model.DownloadItem
@@ -88,12 +89,7 @@ fun FavoritesView(
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 12.dp),
             ) {
-                val heartGradient = Brush.linearGradient(
-                    colors = listOf(
-                        MaterialTheme.colorScheme.error,
-                        MaterialTheme.colorScheme.primary,
-                    )
-                )
+                val heartGradient = MaterialTheme.customColors.favoriteGradient
 
                 Box(
                     modifier = Modifier
@@ -105,7 +101,7 @@ fun FavoritesView(
                     Icon(
                         imageVector = Icons.Filled.Favorite,
                         contentDescription = null,
-                        tint = Color.White,
+                        tint = MaterialTheme.colorScheme.onPrimary,
                         modifier = Modifier.size(40.dp),
                     )
                 }

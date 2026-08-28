@@ -36,6 +36,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.mediaflow.app.ui.theme.customColors
 import com.mediaflow.app.ui.common.media.MediaArtwork
 import com.mediaflow.app.ui.player.components.LiveStatusBadge
 import com.mediaflow.domain.player.EnginePlaybackState
@@ -66,7 +67,8 @@ fun MiniPlayer(
         val author = serviceState.artistOrHost ?: if (serviceState.isLive) "Space en vivo" else "Audio"
 
         Surface(
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            color = MaterialTheme.customColors.miniPlayerBackground,
+            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.customColors.miniPlayerBorder),
             tonalElevation = 6.dp,
             shadowElevation = 8.dp,
             shape = RoundedCornerShape(16.dp),

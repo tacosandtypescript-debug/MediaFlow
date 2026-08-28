@@ -25,9 +25,16 @@ fun MediaFlowBackground(
     // system setting, so a manual LIGHT/DARK choice is respected.
     val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
     val gradientColors = if (isDark) {
-        listOf(Color(0xFF10151D), Color(0xFF1B2234), Color(0xFF123331))
+        listOf(
+            MaterialTheme.colorScheme.background,
+            MaterialTheme.colorScheme.surface,
+            MaterialTheme.colorScheme.surfaceVariant,
+        )
     } else {
-        listOf(Color(0xFFE7F0FF), Color(0xFFF0E9FF), Color(0xFFDFF6F1))
+        listOf(
+            MaterialTheme.colorScheme.background,
+            MaterialTheme.colorScheme.surfaceVariant,
+        )
     }
 
     Box(

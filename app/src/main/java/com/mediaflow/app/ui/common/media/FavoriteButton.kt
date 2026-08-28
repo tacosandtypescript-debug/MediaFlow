@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.testTag
+import com.mediaflow.app.ui.theme.customColors
 
 /**
  * Animated Heart button toggling favorite state with tactile scale animation.
@@ -31,7 +32,8 @@ fun FavoriteButton(
         label = "favorite_scale",
     )
 
-    val activeColor = tint ?: MaterialTheme.colorScheme.error
+    val activeColor = tint ?: MaterialTheme.customColors.favorite
+    val inactiveColor = MaterialTheme.customColors.favoriteInactive
 
     IconButton(
         onClick = onToggle,
@@ -52,7 +54,7 @@ fun FavoriteButton(
             Icon(
                 imageVector = Icons.Outlined.FavoriteBorder,
                 contentDescription = "Añadir a favoritos",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                tint = inactiveColor,
             )
         }
     }

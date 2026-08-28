@@ -31,6 +31,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.mediaflow.app.ui.theme.customColors
 import com.mediaflow.app.ui.player.SeekFeedbackEvent
 
 /**
@@ -55,8 +56,8 @@ fun SeekFeedback(
         ) {
             Surface(
                 shape = CircleShape,
-                color = Color.Black.copy(alpha = 0.72f),
-                contentColor = Color.White,
+                color = MaterialTheme.customColors.dialogBackground.copy(alpha = 0.88f),
+                contentColor = MaterialTheme.colorScheme.onSurface,
                 tonalElevation = 6.dp,
                 shadowElevation = 8.dp,
             ) {
@@ -91,8 +92,8 @@ fun SeekFeedback(
         ) {
             Surface(
                 shape = CircleShape,
-                color = Color.Black.copy(alpha = 0.72f),
-                contentColor = Color.White,
+                color = MaterialTheme.customColors.dialogBackground.copy(alpha = 0.88f),
+                contentColor = MaterialTheme.colorScheme.onSurface,
                 tonalElevation = 6.dp,
                 shadowElevation = 8.dp,
             ) {

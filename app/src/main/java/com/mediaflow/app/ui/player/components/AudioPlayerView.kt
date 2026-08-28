@@ -79,8 +79,8 @@ fun AudioPlayerView(
                 Brush.radialGradient(
                     colors = listOf(
                         MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f),
-                        Color(0xFF101418),
-                        Color(0xFF090C0E),
+                        MaterialTheme.colorScheme.surface,
+                        MaterialTheme.colorScheme.background,
                     ),
                 ),
             ),
@@ -102,7 +102,7 @@ fun AudioPlayerView(
                     .clip(CircleShape)
                     .then(if (isPlaying) Modifier.rotate(rotation) else Modifier),
                 shape = CircleShape,
-                color = Color(0xFF1E1E1E),
+                color = MaterialTheme.colorScheme.surfaceContainerHighest,
                 tonalElevation = 10.dp,
                 shadowElevation = 12.dp,
             ) {
@@ -113,21 +113,21 @@ fun AudioPlayerView(
                         .background(
                             Brush.sweepGradient(
                                 colors = listOf(
-                                    Color(0xFF1A1A1A),
-                                    Color(0xFF333333),
-                                    Color(0xFF141414),
-                                    Color(0xFF333333),
-                                    Color(0xFF1A1A1A),
+                                    MaterialTheme.colorScheme.surfaceContainerHigh,
+                                    MaterialTheme.colorScheme.surfaceVariant,
+                                    MaterialTheme.colorScheme.surfaceContainerLowest,
+                                    MaterialTheme.colorScheme.surfaceVariant,
+                                    MaterialTheme.colorScheme.surfaceContainerHigh,
                                 ),
                             ),
                         )
-                        .border(4.dp, Color(0xFF2B2B2B), CircleShape),
+                        .border(4.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape),
                 ) {
                     // Outer Groove Ring
                     Box(
                         modifier = Modifier
                             .size(150.dp)
-                            .border(1.dp, Color.White.copy(alpha = 0.08f), CircleShape),
+                            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f), CircleShape),
                     )
 
                     // Center label / Avatar circle
@@ -217,7 +217,7 @@ fun AudioPlayerView(
                 text = title,
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
-                color = Color.White,
+                color = MaterialTheme.colorScheme.onSurface,
                 textAlign = TextAlign.Center,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
@@ -248,8 +248,8 @@ fun AudioPlayerView(
                         otherSpeakers.take(4).forEach { speaker ->
                             Surface(
                                 shape = RoundedCornerShape(8.dp),
-                                color = Color.White.copy(alpha = 0.12f),
-                                contentColor = Color.White.copy(alpha = 0.9f),
+                                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                contentColor = MaterialTheme.colorScheme.onSurface,
                                 modifier = Modifier.padding(2.dp),
                             ) {
                                 Row(
@@ -276,7 +276,7 @@ fun AudioPlayerView(
                 Text(
                     text = subtitle,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = Color.White.copy(alpha = 0.7f),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,

@@ -19,6 +19,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -58,6 +59,7 @@ import com.mediaflow.app.ui.player.miniplayer.MiniPlayer
 import com.mediaflow.app.ui.settings.SettingsScreen
 import com.mediaflow.app.ui.theme.MediaFlowTheme
 import com.mediaflow.app.ui.theme.ThemeViewModel
+import com.mediaflow.app.ui.theme.customColors
 import com.mediaflow.data.player.background.PlayerSessionHolder
 import com.mediaflow.data.resolver.YtDlpSourceResolver
 import kotlinx.coroutines.launch
@@ -151,7 +153,7 @@ fun AppNavigation(
                             )
 
                             NavigationBar(
-                                containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                                containerColor = MaterialTheme.customColors.navigationBackground,
                                 tonalElevation = 8.dp,
                             ) {
                                 MediaFlowDestination.bottomBarItems.forEach { destination ->
@@ -173,6 +175,13 @@ fun AppNavigation(
                                                 restoreState = true
                                             }
                                         },
+                                        colors = NavigationBarItemDefaults.colors(
+                                            selectedIconColor = MaterialTheme.customColors.navigationSelected,
+                                            selectedTextColor = MaterialTheme.customColors.navigationSelected,
+                                            unselectedIconColor = MaterialTheme.customColors.navigationUnselected,
+                                            unselectedTextColor = MaterialTheme.customColors.navigationUnselected,
+                                            indicatorColor = MaterialTheme.customColors.navigationIndicator,
+                                        ),
                                         icon = {
                                             Icon(
                                                 imageVector = destination.icon!!,

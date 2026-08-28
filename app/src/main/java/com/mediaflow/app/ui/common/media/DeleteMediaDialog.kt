@@ -23,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.mediaflow.app.ui.theme.customColors
 
 /**
  * Modern Material 3 destructive confirmation dialog for removing media files.
@@ -36,11 +37,12 @@ fun DeleteMediaDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.customColors.dialogBackground,
         icon = {
             Icon(
                 imageVector = Icons.Outlined.DeleteOutline,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.error,
+                tint = MaterialTheme.customColors.error,
                 modifier = Modifier.size(32.dp),
             )
         },
@@ -82,11 +84,13 @@ fun DeleteMediaDialog(
             }
         },
         confirmButton = {
-            TextButton(
+            androidx.compose.material3.Button(
                 onClick = onConfirm,
-                colors = ButtonDefaults.textButtonColors(
-                    contentColor = MaterialTheme.colorScheme.error,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.customColors.error,
+                    contentColor = MaterialTheme.colorScheme.onError,
                 ),
+                shape = RoundedCornerShape(12.dp),
             ) {
                 Text("Eliminar", fontWeight = FontWeight.Bold)
             }

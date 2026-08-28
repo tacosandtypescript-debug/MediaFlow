@@ -31,6 +31,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
+import com.mediaflow.app.ui.theme.customColors
 import java.util.Locale
 
 /**
@@ -74,10 +75,10 @@ fun PlayerTimeline(
         label = "thumbRadius",
     )
 
-    val primaryColor = MaterialTheme.colorScheme.primary
-    val tertiaryColor = MaterialTheme.colorScheme.tertiary
-    val inactiveTrackColor = Color.White.copy(alpha = 0.22f)
-    val bufferedTrackColor = Color.White.copy(alpha = 0.45f)
+    val primaryColor = MaterialTheme.customColors.progressPlayed
+    val tertiaryColor = MaterialTheme.customColors.progressThumb
+    val inactiveTrackColor = MaterialTheme.customColors.progressTrack
+    val bufferedTrackColor = MaterialTheme.customColors.progressTrack.copy(alpha = 0.7f)
 
     Column(
         modifier = modifier.fillMaxWidth(),
@@ -92,8 +93,8 @@ fun PlayerTimeline(
             ) {
                 Surface(
                     shape = RoundedCornerShape(12.dp),
-                    color = Color.Black.copy(alpha = 0.85f),
-                    contentColor = Color.White,
+                    color = MaterialTheme.customColors.dialogBackground,
+                    contentColor = MaterialTheme.colorScheme.onSurface,
                     tonalElevation = 4.dp,
                 ) {
                     Text(
@@ -223,7 +224,7 @@ fun PlayerTimeline(
 
                 // Main Thumb Circle
                 drawCircle(
-                    color = Color.White,
+                    color = tertiaryColor,
                     radius = thumbRadiusPx,
                     center = Offset(thumbCenterX, centerY),
                 )
@@ -241,12 +242,12 @@ fun PlayerTimeline(
             Text(
                 text = formatPlayerTime(displayPositionMs),
                 style = MaterialTheme.typography.bodySmall,
-                color = Color.White.copy(alpha = 0.9f),
+                color = MaterialTheme.colorScheme.onSurface,
             )
             Text(
                 text = formatPlayerTime(effectiveDuration),
                 style = MaterialTheme.typography.bodySmall,
-                color = Color.White.copy(alpha = 0.7f),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }

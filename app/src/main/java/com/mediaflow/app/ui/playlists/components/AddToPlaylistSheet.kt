@@ -36,6 +36,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.mediaflow.app.ui.theme.customColors
 import com.mediaflow.core.model.Playlist
 
 /**
@@ -57,7 +58,8 @@ fun AddToPlaylistSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+        containerColor = MaterialTheme.customColors.bottomSheetBackground,
+        scrimColor = MaterialTheme.colorScheme.scrim,
         modifier = Modifier.testTag("add_to_playlist_sheet"),
     ) {
         Column(

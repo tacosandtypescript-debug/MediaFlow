@@ -29,6 +29,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import com.mediaflow.app.ui.theme.customColors
 
 /**
  * Non-intrusive, elegant buffering and loading indicator that keeps the underlying frame visible.
@@ -58,8 +59,8 @@ fun BufferingIndicator(
     ) {
         Surface(
             shape = RoundedCornerShape(24.dp),
-            color = Color.Black.copy(alpha = 0.72f),
-            contentColor = Color.White,
+            color = MaterialTheme.customColors.dialogBackground.copy(alpha = 0.88f),
+            contentColor = MaterialTheme.colorScheme.onSurface,
             tonalElevation = 6.dp,
             shadowElevation = 8.dp,
         ) {
@@ -72,15 +73,15 @@ fun BufferingIndicator(
                 CircularProgressIndicator(
                     modifier = Modifier.size(18.dp),
                     strokeWidth = 2.5.dp,
-                    color = MaterialTheme.colorScheme.primary,
-                    trackColor = Color.White.copy(alpha = 0.2f),
+                    color = MaterialTheme.customColors.buffering,
+                    trackColor = MaterialTheme.customColors.progressTrack,
                 )
                 if (!label.isNullOrBlank()) {
                     Spacer(Modifier.width(10.dp))
                     Text(
                         text = label,
                         style = MaterialTheme.typography.labelMedium,
-                        color = Color.White,
+                        color = MaterialTheme.colorScheme.onSurface,
                     )
                 }
             }

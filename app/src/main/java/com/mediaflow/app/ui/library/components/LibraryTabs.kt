@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.mediaflow.app.ui.theme.customColors
 
 /**
  * Sub-category tabs within the Audio library.
@@ -51,10 +52,10 @@ fun LibraryTabs(
                 },
                 shape = RoundedCornerShape(12.dp),
                 colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = MaterialTheme.colorScheme.primary,
-                    selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
-                    containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                    labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    selectedContainerColor = MaterialTheme.customColors.chipSelectedBackground,
+                    selectedLabelColor = MaterialTheme.customColors.chipSelectedText,
+                    containerColor = MaterialTheme.customColors.chipBackground,
+                    labelColor = MaterialTheme.customColors.chipText,
                 ),
                 border = null,
                 modifier = Modifier.testTag("tab_${tab.name.lowercase()}"),

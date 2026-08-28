@@ -12,6 +12,8 @@ import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
@@ -19,61 +21,78 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-// MediaFlow brand colors (fallback when Dynamic Color is unavailable).
-internal val BrandPrimary = Color(0xFF0B4F46)
-internal val BrandPrimaryDark = Color(0xFF7FDCC8)
+// -------------------------------------------------------------------------
+// Material 3 Color Schemes using Canonical Tokens
+// -------------------------------------------------------------------------
 
 private val LightColors = lightColorScheme(
-    primary = Color(0xFF006B5B),
-    onPrimary = Color(0xFFFFFFFF),
-    primaryContainer = Color(0xFF9CF1DE),
-    onPrimaryContainer = Color(0xFF00201B),
-    secondary = Color(0xFF4E635D),
-    onSecondary = Color(0xFFFFFFFF),
-    secondaryContainer = Color(0xFFD0E8DF),
-    onSecondaryContainer = Color(0xFF0A1F1A),
-    tertiary = Color(0xFF9A405A),
-    onTertiary = Color(0xFFFFFFFF),
-    tertiaryContainer = Color(0xFFFFD9E2),
-    onTertiaryContainer = Color(0xFF3F0018),
-    background = Color(0xFFF8FBF8),
-    onBackground = Color(0xFF191D1B),
-    surface = Color(0xFFF8FBF8),
-    onSurface = Color(0xFF191D1B),
-    surfaceVariant = Color(0xFFDCE5E0),
-    onSurfaceVariant = Color(0xFF404944),
-    outline = Color(0xFF707974),
-    outlineVariant = Color(0xFFC0C9C4),
+    primary = PrimaryLight,
+    onPrimary = OnPrimaryLight,
+    primaryContainer = PrimaryContainerLight,
+    onPrimaryContainer = Color(0xFF260058),
+    inversePrimary = PrimaryBrightLight,
+    secondary = PrimaryBrightLight,
+    onSecondary = OnPrimaryLight,
+    secondaryContainer = Color(0xFFE8DDFF),
+    onSecondaryContainer = Color(0xFF23005C),
+    tertiary = FavoriteLight,
+    onTertiary = OnPrimaryLight,
+    tertiaryContainer = Color(0xFFFFD8E4),
+    onTertiaryContainer = Color(0xFF3B071D),
+    background = BackgroundLight,
+    onBackground = TextPrimaryLight,
+    surface = SurfaceLight,
+    onSurface = TextPrimaryLight,
+    surfaceVariant = SurfaceVariantLight,
+    onSurfaceVariant = TextSecondaryLight,
+    surfaceContainerLowest = Color(0xFFFFFFFF),
+    surfaceContainerLow = Color(0xFFF7F7FA),
+    surfaceContainer = Color(0xFFF0EEF5),
+    surfaceContainerHigh = Color(0xFFEAE6F0),
+    surfaceContainerHighest = Color(0xFFE4DFEC),
+    outline = OutlineLight,
+    outlineVariant = OutlineSoftLight,
+    error = ErrorRed,
+    onError = OnErrorColor,
+    errorContainer = Color(0xFFFFDAD6),
+    onErrorContainer = Color(0xFF410002),
+    scrim = ScrimColor,
 )
 
 private val DarkColors = darkColorScheme(
-    primary = Color(0xFF8BE7D1),
-    onPrimary = Color(0xFF00382F),
-    primaryContainer = Color(0xFF145A50),
-    onPrimaryContainer = Color(0xFFB0F5E5),
-    secondary = Color(0xFFB9CCC6),
-    onSecondary = Color(0xFF24332F),
-    secondaryContainer = Color(0xFF3B4B46),
-    onSecondaryContainer = Color(0xFFD5E9E2),
-    tertiary = Color(0xFFB7D4E4),
-    onTertiary = Color(0xFF20343D),
-    tertiaryContainer = Color(0xFF354D58),
-    onTertiaryContainer = Color(0xFFD3ECF7),
-    background = Color(0xFF10151D),
-    onBackground = Color(0xFFE4EAF2),
-    surface = Color(0xFF10151D),
-    onSurface = Color(0xFFE4EAF2),
-    surfaceVariant = Color(0xFF3E4752),
-    onSurfaceVariant = Color(0xFFC1CAD5),
-    surfaceContainerLowest = Color(0xFF0B0F15),
-    surfaceContainerLow = Color(0xFF151B24),
-    surfaceContainer = Color(0xFF1A222C),
-    surfaceContainerHigh = Color(0xFF232C37),
-    surfaceContainerHighest = Color(0xFF2D3743),
-    outline = Color(0xFF8B96A3),
-    outlineVariant = Color(0xFF414B57),
-    inverseSurface = Color(0xFFE4EAF2),
-    inverseOnSurface = Color(0xFF293039),
+    primary = PrimaryPurple,
+    onPrimary = OnPrimaryPurple,
+    primaryContainer = PrimaryContainerPurple,
+    onPrimaryContainer = TextPrimaryDark,
+    inversePrimary = PrimaryBrightPurple,
+    secondary = PrimaryBrightPurple,
+    onSecondary = OnPrimaryPurple,
+    secondaryContainer = PrimaryContainerPurple,
+    onSecondaryContainer = TextPrimaryDark,
+    tertiary = FavoritePink,
+    onTertiary = OnPrimaryPurple,
+    tertiaryContainer = LiveContainerDark,
+    onTertiaryContainer = Color(0xFFFFD9E2),
+    background = BackgroundDark,
+    onBackground = TextPrimaryDark,
+    surface = SurfaceDark,
+    onSurface = TextPrimaryDark,
+    surfaceVariant = SurfaceVariantDark,
+    onSurfaceVariant = TextSecondaryDark,
+    surfaceContainerLowest = Color(0xFF07090E),
+    surfaceContainerLow = Color(0xFF0E121C),
+    surfaceContainer = SurfaceDark,
+    surfaceContainerHigh = SurfaceElevatedDark,
+    surfaceContainerHighest = SurfaceSelectedDark,
+    outline = OutlineDark,
+    outlineVariant = OutlineSoftDark,
+    error = ErrorRed,
+    onError = OnErrorColor,
+    errorContainer = ErrorContainerDark,
+    onErrorContainer = Color(0xFFFFDAD6),
+    inverseSurface = TextPrimaryDark,
+    inverseOnSurface = BackgroundDark,
+    scrim = ScrimColor,
 )
 
 /** Expressive rounded shapes for the whole app. */
@@ -139,12 +158,15 @@ private fun lerpSchemes(a: ColorScheme, b: ColorScheme, t: Float): ColorScheme =
 )
 
 /**
- * Global Material 3 theme for MediaFlow.
- *
- * Uses Dynamic Color on Android 12+ with a brand fallback, animates the color
- * transition on theme change, and applies expressive shapes and typography.
- * The [ThemeMode] resolution always respects the manual LIGHT/DARK choice:
- * Dynamic Color only selects the palette, never overrides light/dark.
+ * Accessor for extended MediaFlow custom color tokens.
+ */
+val MaterialTheme.customColors: MediaFlowCustomColors
+    @Composable
+    @ReadOnlyComposable
+    get() = LocalMediaFlowColors.current
+
+/**
+ * Global Material 3 theme for MediaFlow with animated light/dark transition.
  */
 @Composable
 fun MediaFlowTheme(
@@ -158,12 +180,7 @@ fun MediaFlowTheme(
         ThemeMode.DARK -> true
     }
 
-    // Keep the MediaFlow palette recognizable across devices; system dark/light
-    // still controls contrast while the app identity remains stable.
     val lightScheme = LightColors
-    // Keep the dark palette branded and deliberately layered. Dynamic Color is
-    // still used for light mode, while dark mode avoids a flat black system
-    // palette that reduces surface and icon contrast.
     val darkScheme = DarkColors
 
     val progress by animateFloatAsState(
@@ -172,11 +189,14 @@ fun MediaFlowTheme(
         label = "themeProgress",
     )
     val colorScheme = lerpSchemes(lightScheme, darkScheme, progress)
+    val customColors = if (darkTheme) DarkCustomColors else LightCustomColors
 
-    MaterialTheme(
-        colorScheme = colorScheme,
-        shapes = MediaFlowShapes,
-        typography = MediaFlowTypography,
-        content = content,
-    )
+    CompositionLocalProvider(LocalMediaFlowColors provides customColors) {
+        MaterialTheme(
+            colorScheme = colorScheme,
+            shapes = MediaFlowShapes,
+            typography = MediaFlowTypography,
+            content = content,
+        )
+    }
 }

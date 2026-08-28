@@ -32,6 +32,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.mediaflow.app.ui.theme.customColors
 import com.mediaflow.app.ui.common.media.MediaArtwork
 import com.mediaflow.app.ui.common.media.MediaOverflowMenu
 import com.mediaflow.core.model.DownloadItem
@@ -99,7 +100,7 @@ fun VideoLibraryView(
                                 val sec = s % 60
                                 val dur = String.format("%02d:%02d", m, sec)
                                 Surface(
-                                    color = Color.Black.copy(alpha = 0.7f),
+                                    color = MaterialTheme.customColors.dialogBackground.copy(alpha = 0.8f),
                                     shape = RoundedCornerShape(6.dp),
                                     modifier = Modifier
                                         .align(Alignment.BottomEnd)
@@ -108,7 +109,7 @@ fun VideoLibraryView(
                                     Text(
                                         text = dur,
                                         style = MaterialTheme.typography.labelSmall,
-                                        color = Color.White,
+                                        color = MaterialTheme.colorScheme.onSurface,
                                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                                     )
                                 }
