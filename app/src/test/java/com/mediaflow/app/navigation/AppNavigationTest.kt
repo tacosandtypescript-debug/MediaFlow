@@ -36,8 +36,8 @@ class AppNavigationTest {
     @Test
     fun bottomBarIsVisible() {
         composeRule.onNodeWithText("Inicio").assertIsDisplayed()
+        composeRule.onNodeWithText("Biblioteca").assertIsDisplayed()
         composeRule.onNodeWithText("Descargas").assertIsDisplayed()
-        composeRule.onNodeWithText("Galería").assertIsDisplayed()
         composeRule.onNodeWithText("Ajustes").assertIsDisplayed()
     }
 
@@ -49,11 +49,11 @@ class AppNavigationTest {
     }
 
     @Test
-    fun canNavigateToGallery() {
+    fun canNavigateToLibrary() {
         composeRule.onNodeWithTag("tab_gallery").performClick()
-        // Android Q+ uses the app-owned MediaStore path and does not request
-        // broad media permissions. An empty owned collection is truthful.
-        composeRule.onNodeWithText("Tu galería aparecerá aquí").assertIsDisplayed()
+        composeRule.onNodeWithText("Tu biblioteca").assertIsDisplayed()
+        composeRule.onNodeWithText("Audio").assertIsDisplayed()
+        composeRule.onNodeWithText("Video").assertIsDisplayed()
     }
 
     @Test

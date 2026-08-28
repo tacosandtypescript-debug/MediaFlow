@@ -108,6 +108,10 @@ fun PlayerControls(
                 modifier = Modifier
                     .fillMaxWidth()
                     .align(Alignment.TopCenter)
+                    .background(
+                        Color.Black.copy(alpha = 0.34f),
+                        RoundedCornerShape(bottomStart = 22.dp, bottomEnd = 22.dp),
+                    )
                     .padding(horizontal = 12.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -246,7 +250,11 @@ fun PlayerControls(
                 modifier = Modifier
                     .fillMaxWidth()
                     .align(Alignment.BottomCenter)
-                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                    .background(
+                        Color.Black.copy(alpha = 0.78f),
+                        RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+                    )
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
             ) {
                 if (!isLive) {
                     // Custom Timeline with decoupled scrubbing & dynamic thumb

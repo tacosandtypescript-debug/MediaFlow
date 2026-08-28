@@ -4,7 +4,7 @@ import androidx.annotation.StringRes
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.Home
-import androidx.compose.material.icons.outlined.Photo
+import androidx.compose.material.icons.outlined.LibraryMusic
 import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -26,16 +26,16 @@ sealed class MediaFlowDestination(
         icon = Icons.Outlined.Home,
     )
 
+    data object Gallery : MediaFlowDestination(
+        route = "gallery",
+        labelRes = R.string.nav_library,
+        icon = Icons.Outlined.LibraryMusic,
+    )
+
     data object Downloads : MediaFlowDestination(
         route = "downloads",
         labelRes = R.string.nav_downloads,
         icon = Icons.Outlined.Download,
-    )
-
-    data object Gallery : MediaFlowDestination(
-        route = "gallery",
-        labelRes = R.string.nav_gallery,
-        icon = Icons.Outlined.Photo,
     )
 
     data object Settings : MediaFlowDestination(
@@ -56,7 +56,7 @@ sealed class MediaFlowDestination(
     companion object {
         /** Destinations shown in the bottom navigation bar. */
         val bottomBarItems: List<MediaFlowDestination> =
-            listOf(Home, Downloads, Gallery, Settings)
+            listOf(Home, Gallery, Downloads, Settings)
 
         /**
          * Returns the bottom-bar destination matching a route string, or null

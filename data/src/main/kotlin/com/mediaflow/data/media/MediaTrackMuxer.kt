@@ -107,7 +107,11 @@ object MediaTrackMuxer {
             if (sampleFlags and MediaExtractor.SAMPLE_FLAG_SYNC != 0) {
                 info.flags = info.flags or MediaCodec.BUFFER_FLAG_KEY_FRAME
             }
-            if (sampleFlags and MediaExtractor.SAMPLE_FLAG_PARTIAL_FRAME != 0) {
+            // SAMPLE_FLAG_PARTIAL_FRAME was added in API 26. The muxer runs
+            // on minSdk 24, so do not read/use it on older devices.
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
+                sampleFlags and MediaExtractor.SAMPLE_FLAG_PARTIAL_FRAME != 0
+            ) {
                 info.flags = info.flags or MediaCodec.BUFFER_FLAG_PARTIAL_FRAME
             }
             muxer.writeSampleData(targetTrack, buffer, info)

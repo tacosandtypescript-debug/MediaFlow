@@ -1,6 +1,7 @@
 package com.mediaflow.domain.player
 
 import com.mediaflow.core.model.PlaybackProgress
+import com.mediaflow.core.model.PlaybackQueueItem
 import com.mediaflow.core.model.PlaybackStatus
 import com.mediaflow.domain.repository.ProgressRepository
 import kotlinx.coroutines.CoroutineDispatcher
@@ -26,6 +27,8 @@ data class PlayerServiceState(
     val mediaId: String? = null,
     val filePath: String? = null,
     val title: String? = null,
+    val artistOrHost: String? = null,
+    val artworkUrl: String? = null,
     val playbackState: EnginePlaybackState = EnginePlaybackState.IDLE,
     val currentPositionMs: Long = 0L,
     val durationMs: Long = 0L,
@@ -37,6 +40,9 @@ data class PlayerServiceState(
     val status: PlaybackStatus = PlaybackStatus.NEW,
     val errorMessage: String? = null,
     val isLive: Boolean = false,
+    val queue: List<PlaybackQueueItem> = emptyList(),
+    val queueIndex: Int = -1,
+    val playbackContext: String? = null,
 ) {
     val isPlaying: Boolean
         get() = playbackState == EnginePlaybackState.PLAYING
@@ -52,11 +58,20 @@ data class PlayerServiceState(
 
     val progressFraction: Float
         get() = if (!isLive && durationMs > 0L) (currentPositionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f) else 0f
+
+    val currentQueueItem: PlaybackQueueItem?
+        get() = if (queueIndex in queue.indices) queue[queueIndex] else null
+
+    val hasNext: Boolean
+        get() = queueIndex in 0 until queue.lastIndex
+
+    val hasPrevious: Boolean
+        get() = queueIndex > 0
 }
 
 /**
  * Service managing media sessions, engine interactions, periodic progress persistence,
- * smart resumption, and lifecycle-safe shutdown.
+ * smart resumption, queue orchestration, and lifecycle-safe shutdown.
  */
 class PlayerService(
     private val engine: PlaybackEngine,
@@ -106,7 +121,7 @@ class PlayerService(
             }
         }
 
-        // Forward engine events
+        // Forward engine events and handle automatic queue progression
         serviceScope.launch {
             engine.events.collect { event ->
                 if (_uiState.value.isLive) {
@@ -127,6 +142,12 @@ class PlayerService(
                     is PlaybackEvent.PlaybackFinished -> {
                         _uiState.value = _uiState.value.copy(status = PlaybackStatus.COMPLETED)
                         saveCurrentProgressNow(isEof = true)
+
+                        // Auto-advance in queue if available
+                        val currentState = _uiState.value
+                        if (currentState.hasNext) {
+                            playNext()
+                        }
                     }
                     is PlaybackEvent.PlaybackPaused -> {
                         saveCurrentProgressNow(isEof = false)
@@ -139,12 +160,45 @@ class PlayerService(
     }
 
     /**
+     * Plays an entire queue starting from [startIndex] within [playbackContext].
+     */
+    fun playQueue(
+        items: List<PlaybackQueueItem>,
+        startIndex: Int = 0,
+        context: String? = null,
+    ) {
+        if (items.isEmpty() || isReleased) return
+        val validIndex = startIndex.coerceIn(0, items.lastIndex)
+        val target = items[validIndex]
+
+        _uiState.value = _uiState.value.copy(
+            queue = items,
+            queueIndex = validIndex,
+            playbackContext = context,
+            artistOrHost = target.artistOrHost,
+            artworkUrl = target.artworkUrl,
+        )
+
+        openMedia(
+            mediaId = target.mediaUri,
+            filePath = target.mediaUri,
+            title = target.title,
+            artistOrHost = target.artistOrHost,
+            artworkUrl = target.artworkUrl,
+            autoPlay = true,
+            isLive = target.isLive,
+        )
+    }
+
+    /**
      * Opens a media item, resolving saved progress and configuring smart resumption.
      */
     fun openMedia(
         mediaId: String,
         filePath: String,
         title: String? = null,
+        artistOrHost: String? = null,
+        artworkUrl: String? = null,
         autoPlay: Boolean = true,
         isLive: Boolean = false,
     ) {
@@ -158,10 +212,12 @@ class PlayerService(
                 }
 
                 if (isLive) {
-                    _uiState.value = PlayerServiceState(
+                    _uiState.value = _uiState.value.copy(
                         mediaId = mediaId,
                         filePath = filePath,
                         title = title ?: filePath.substringAfterLast('/'),
+                        artistOrHost = artistOrHost,
+                        artworkUrl = artworkUrl,
                         playbackState = EnginePlaybackState.PREPARING,
                         currentPositionMs = 0L,
                         durationMs = 0L,
@@ -183,7 +239,11 @@ class PlayerService(
                 } else 0L
 
                 val nextPlayCount = (saved?.playCount ?: 0) + 1
-                val initialStatus = if (currentStatus == PlaybackStatus.COMPLETED) PlaybackStatus.COMPLETED else PlaybackStatus.IN_PROGRESS
+                val initialStatus = if (currentStatus == PlaybackStatus.COMPLETED) {
+                    PlaybackStatus.COMPLETED
+                } else {
+                    PlaybackStatus.IN_PROGRESS
+                }
 
                 val initialProgress = (saved ?: PlaybackProgress.new(mediaId, filePath)).copy(
                     currentPositionMs = startPos,
@@ -193,10 +253,12 @@ class PlayerService(
                 )
                 progressRepository.saveProgress(initialProgress)
 
-                _uiState.value = PlayerServiceState(
+                _uiState.value = _uiState.value.copy(
                     mediaId = mediaId,
                     filePath = filePath,
                     title = title ?: filePath.substringAfterLast('/'),
+                    artistOrHost = artistOrHost,
+                    artworkUrl = artworkUrl,
                     playbackState = EnginePlaybackState.PREPARING,
                     currentPositionMs = startPos,
                     durationMs = saved?.totalDurationMs ?: 0L,
@@ -260,6 +322,71 @@ class PlayerService(
                 playbackState = EnginePlaybackState.IDLE,
             )
         }
+    }
+
+    fun playNext() {
+        val current = _uiState.value
+        if (current.hasNext) {
+            val nextIndex = current.queueIndex + 1
+            skipToIndex(nextIndex)
+        }
+    }
+
+    fun playPrevious() {
+        val current = _uiState.value
+        if (current.currentPositionMs > 3_000L) {
+            // Seek to start of current song if already played > 3 seconds
+            seekTo(0L)
+        } else if (current.hasPrevious) {
+            val prevIndex = current.queueIndex - 1
+            skipToIndex(prevIndex)
+        } else {
+            seekTo(0L)
+        }
+    }
+
+    fun skipToIndex(index: Int) {
+        val current = _uiState.value
+        if (index !in current.queue.indices || isReleased) return
+        val item = current.queue[index]
+        _uiState.value = current.copy(
+            queueIndex = index,
+            artistOrHost = item.artistOrHost,
+            artworkUrl = item.artworkUrl,
+        )
+        openMedia(
+            mediaId = item.mediaUri,
+            filePath = item.mediaUri,
+            title = item.title,
+            artistOrHost = item.artistOrHost,
+            artworkUrl = item.artworkUrl,
+            autoPlay = true,
+            isLive = item.isLive,
+        )
+    }
+
+    fun addToQueue(item: PlaybackQueueItem) {
+        val current = _uiState.value
+        val updatedQueue = current.queue.toMutableList().apply { add(item) }
+        val newIndex = if (current.queueIndex == -1) 0 else current.queueIndex
+        _uiState.value = current.copy(queue = updatedQueue, queueIndex = newIndex)
+    }
+
+    fun removeFromQueue(index: Int) {
+        val current = _uiState.value
+        if (index !in current.queue.indices) return
+        val updatedQueue = current.queue.toMutableList().apply { removeAt(index) }
+        val newIndex = when {
+            updatedQueue.isEmpty() -> -1
+            index < current.queueIndex -> current.queueIndex - 1
+            index == current.queueIndex -> current.queueIndex.coerceAtMost(updatedQueue.lastIndex)
+            else -> current.queueIndex
+        }
+        _uiState.value = current.copy(queue = updatedQueue, queueIndex = newIndex)
+    }
+
+    fun setPlaybackContext(context: String?) {
+        _uiState.value = _uiState.value.copy(playbackContext = context)
     }
 
     fun seekTo(positionMs: Long) {
@@ -343,6 +470,7 @@ class PlayerService(
             status = status,
             lastPlayedAt = System.currentTimeMillis(),
         )
+
         progressRepository.saveProgress(progress)
         _uiState.value = _uiState.value.copy(status = status)
     }
@@ -353,7 +481,6 @@ class PlayerService(
     fun release() {
         if (isReleased) return
         isReleased = true
-
         stopPeriodicSave()
 
         // Flush last progress before releasing
@@ -369,7 +496,6 @@ class PlayerService(
                 status = status,
                 lastPlayedAt = System.currentTimeMillis(),
             )
-            // Use runBlocking or launch before cancelling scope to guarantee write
             serviceScope.launch {
                 progressRepository.saveProgress(finalProgress)
             }

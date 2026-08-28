@@ -83,7 +83,10 @@ fun HomeScreen(
 
     var entered by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { entered = true }
-    LaunchedEffect(state.url, state.mediaType, sourceResolver) {
+    // Analyze once per URL. A Space is normalized to AUDIO after a successful
+    // analysis; including mediaType here would immediately cancel that result
+    // and start a second analysis, making the card disappear and reappear.
+    LaunchedEffect(state.url, sourceResolver) {
         if (sourceResolver != null && state.validationState == ValidationState.Valid) {
             delay(500)
             viewModel.analyze(sourceResolver)

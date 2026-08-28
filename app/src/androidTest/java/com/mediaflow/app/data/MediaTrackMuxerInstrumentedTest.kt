@@ -27,6 +27,14 @@ class MediaTrackMuxerInstrumentedTest {
         val audio = File(directory, "audio.m4a")
         val output = File(directory, "combined.mp4")
         try {
+            directory.mkdirs()
+            val testAssets = InstrumentationRegistry.getInstrumentation().context.assets
+            testAssets.open("video.mp4").use { input ->
+                video.outputStream().use { input.copyTo(it) }
+            }
+            testAssets.open("audio.m4a").use { input ->
+                audio.outputStream().use { input.copyTo(it) }
+            }
             assertTrue("video fixture was not staged", video.isFile && video.length() > 0L)
             assertTrue("audio fixture was not staged", audio.isFile && audio.length() > 0L)
             MediaTrackMuxer.mergeMp4(video, audio, output).getOrThrow()

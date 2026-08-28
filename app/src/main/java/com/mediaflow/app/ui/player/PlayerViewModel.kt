@@ -7,6 +7,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.mediaflow.core.model.MediaType
+import com.mediaflow.core.model.Playlist
 import com.mediaflow.core.model.XSpace
 import com.mediaflow.core.model.XSpaceState
 import com.mediaflow.data.player.MpvPlaybackEngine
@@ -15,7 +16,10 @@ import com.mediaflow.data.player.background.PlayerSessionHolder
 import com.mediaflow.data.provider.x.live.LiveSpaceEndMonitor
 import com.mediaflow.data.provider.x.live.PendingLiveDownloadRepositoryImpl
 import com.mediaflow.data.provider.x.live.XSpaceReplayResolver
+import com.mediaflow.data.repository.FavoritesRepositoryImpl
 import com.mediaflow.data.repository.Media3DownloadRepository
+import com.mediaflow.data.repository.MediaStoreGalleryRepository
+import com.mediaflow.data.repository.PlaylistRepositoryImpl
 import com.mediaflow.data.repository.ProgressRepositoryImpl
 import com.mediaflow.data.repository.XSpaceRepositoryImpl
 import com.mediaflow.domain.live.LiveSpaceEndState
@@ -28,14 +32,19 @@ import com.mediaflow.domain.player.PlaybackEvent
 import com.mediaflow.domain.player.PlayerService
 import com.mediaflow.domain.player.PlayerServiceState
 import com.mediaflow.domain.repository.DownloadRequest
+import com.mediaflow.domain.repository.FavoritesRepository
+import com.mediaflow.domain.repository.GalleryRepository
+import com.mediaflow.domain.repository.PlaylistRepository
 import com.mediaflow.domain.repository.ProgressRepository
 import com.mediaflow.domain.repository.XSpaceRepository
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -46,12 +55,18 @@ class PlayerViewModel(
     private val app: Application,
     private val playerService: PlayerService,
     private val spaceRepository: XSpaceRepository = XSpaceRepositoryImpl(app),
+    private val favoritesRepository: FavoritesRepository = FavoritesRepositoryImpl(app),
+    private val playlistRepository: PlaylistRepository = PlaylistRepositoryImpl(app),
+    private val galleryRepository: GalleryRepository = MediaStoreGalleryRepository(app),
 ) : AndroidViewModel(app) {
 
     constructor(application: Application) : this(
         app = application,
         playerService = PlayerSessionHolder.get(application),
         spaceRepository = XSpaceRepositoryImpl(application),
+        favoritesRepository = FavoritesRepositoryImpl(application),
+        playlistRepository = PlaylistRepositoryImpl(application),
+        galleryRepository = MediaStoreGalleryRepository(application),
     )
 
     private val isControlsVisible = MutableStateFlow(true)
@@ -69,6 +84,7 @@ class PlayerViewModel(
 
     private var hideControlsJob: Job? = null
     private var seekFeedbackJob: Job? = null
+    private var openJob: Job? = null
 
     val uiState: StateFlow<PlayerUiState> = combine(
         playerService.uiState,
@@ -79,6 +95,8 @@ class PlayerViewModel(
         isScrubbing,
         liveEndState,
         isAutoDownloadEnabled,
+        favoritesRepository.observeFavoriteMediaUris().flowOn(Dispatchers.IO),
+        playlistRepository.observePlaylists().flowOn(Dispatchers.IO),
     ) { args: Array<Any?> ->
         val service = args[0] as PlayerServiceState
         val controls = args[1] as Boolean
@@ -88,10 +106,17 @@ class PlayerViewModel(
         val scrubbing = args[5] as Boolean
         val endState = args[6] as LiveSpaceEndState
         val autoDownload = args[7] as Boolean
+        @Suppress("UNCHECKED_CAST")
+        val favoriteUris = args[8] as Set<String>
+        @Suppress("UNCHECKED_CAST")
+        val playlists = args[9] as List<Playlist>
+
+        val uri = service.filePath.orEmpty()
+        val isFav = favoriteUris.contains(uri) || (service.mediaId != null && favoriteUris.contains(service.mediaId))
 
         PlayerUiState(
-            mediaUri = service.filePath.orEmpty(),
-            title = space?.title ?: service.title ?: service.filePath?.substringAfterLast('/').orEmpty(),
+            mediaUri = uri,
+            title = space?.title ?: service.title ?: uri.substringAfterLast('/'),
             serviceState = service,
             isControlsVisible = controls,
             isFullscreen = fullscreen,
@@ -101,6 +126,8 @@ class PlayerViewModel(
             scrubPositionMs = scrubPositionMs.value,
             liveEndState = endState,
             isAutoDownloadEnabled = autoDownload,
+            isFavorite = isFav,
+            playlists = playlists,
         )
     }.stateIn(viewModelScope, SharingStarted.Eagerly, PlayerUiState())
 
@@ -119,7 +146,7 @@ class PlayerViewModel(
         viewModelScope.launch {
             playerService.events.collect { event ->
                 when (event) {
-                    is PlaybackEvent.PlaybackFinished, is PlaybackEvent.PlaybackError -> {
+                    is PlaybackEvent.PlaybackError -> {
                         val state = playerService.uiState.value
                         val space = currentSpace.value
                         if (state.isLive || space?.isLive == true) {
@@ -133,7 +160,8 @@ class PlayerViewModel(
     }
 
     fun open(mediaUri: String, title: String? = null, isLive: Boolean = false) {
-        viewModelScope.launch {
+        openJob?.cancel()
+        openJob = viewModelScope.launch {
             val space = spaceRepository.getSpaceForMedia(mediaUri)
             currentSpace.value = space
             val effectiveLive = isLive || space?.isLive == true || (mediaUri.startsWith("http", ignoreCase = true) && space?.isEnded != true && !mediaUri.endsWith(".mp4", ignoreCase = true) && !mediaUri.endsWith(".m4a", ignoreCase = true))
@@ -145,8 +173,11 @@ class PlayerViewModel(
             // Check if this media is already open and playing/paused
             val activeState = playerService.uiState.value
             if (activeState.mediaId == mediaUri && activeState.playbackState != EnginePlaybackState.IDLE) {
-                // Reconnecting to already active playback session
                 return@launch
+            }
+
+            if (activeState.mediaId != null && activeState.mediaId != mediaUri) {
+                playerService.stop()
             }
 
             playerService.openMedia(
@@ -167,6 +198,147 @@ class PlayerViewModel(
                 spaceUrl = space?.url,
                 autoDownloadAfterEnd = isAutoDownloadEnabled.value,
             )
+        }
+    }
+
+    fun togglePlayPause() {
+        showControlsTemporarily()
+        if (uiState.value.serviceState.isPlaying) {
+            playerService.pause()
+        } else {
+            playerService.play()
+        }
+    }
+
+    fun seekTo(positionMs: Long) {
+        showControlsTemporarily()
+        playerService.seekTo(positionMs)
+    }
+
+    fun seekRelative(offsetMs: Long) {
+        val current = playerService.uiState.value.currentPositionMs
+        val duration = playerService.uiState.value.durationMs
+        val target = if (duration > 0L) {
+            (current + offsetMs).coerceIn(0L, duration)
+        } else {
+            (current + offsetMs).coerceAtLeast(0L)
+        }
+        seekTo(target)
+
+        val event = if (offsetMs >= 0) {
+            SeekFeedbackEvent.Forward((offsetMs / 1000).toInt())
+        } else {
+            SeekFeedbackEvent.Rewind((-offsetMs / 1000).toInt())
+        }
+        seekFeedback.value = event
+
+        seekFeedbackJob?.cancel()
+        seekFeedbackJob = viewModelScope.launch {
+            delay(700)
+            seekFeedback.value = null
+        }
+    }
+
+    fun setSpeed(speed: Float) {
+        playerService.setSpeed(speed)
+    }
+
+    fun setVolume(volume: Int) {
+        playerService.setVolume(volume)
+    }
+
+    fun toggleMute() {
+        val muted = playerService.uiState.value.isMuted
+        playerService.setMute(!muted)
+    }
+
+    fun setScrubbing(scrubbing: Boolean, positionMs: Long = 0L) {
+        isScrubbing.value = scrubbing
+        if (scrubbing) {
+            scrubPositionMs.value = positionMs
+            cancelHideControls()
+        } else {
+            seekTo(positionMs)
+            if (uiState.value.isPlaying) scheduleHideControls()
+        }
+    }
+
+    fun toggleFullscreen() {
+        isFullscreen.value = !isFullscreen.value
+    }
+
+    fun toggleControlsVisibility() {
+        if (isControlsVisible.value) {
+            cancelHideControls()
+            isControlsVisible.value = false
+        } else {
+            showControlsTemporarily()
+        }
+    }
+
+    fun restart() {
+        showControlsTemporarily()
+        playerService.restartFromBeginning()
+    }
+
+    fun onSurfaceAvailable(surface: Surface) {
+        playerService.attachSurface(surface)
+    }
+
+    fun onSurfaceDestroyed() {
+        playerService.detachSurface()
+    }
+
+    fun toggleFavorite() {
+        val mediaUri = uiState.value.mediaUri
+        if (mediaUri.isNotBlank()) {
+            viewModelScope.launch {
+                favoritesRepository.toggleFavorite(mediaUri)
+            }
+        }
+    }
+
+    fun playNext() {
+        playerService.playNext()
+    }
+
+    fun playPrevious() {
+        playerService.playPrevious()
+    }
+
+    fun skipToIndex(index: Int) {
+        playerService.skipToIndex(index)
+    }
+
+    fun removeFromQueue(index: Int) {
+        playerService.removeFromQueue(index)
+    }
+
+    fun toggleMediaInPlaylist(playlistId: String, isIn: Boolean) {
+        val uri = uiState.value.mediaUri
+        if (uri.isNotBlank()) {
+            viewModelScope.launch {
+                if (isIn) {
+                    playlistRepository.removeMediaFromPlaylist(playlistId, uri)
+                } else {
+                    playlistRepository.addMediaToPlaylist(playlistId, uri)
+                }
+            }
+        }
+    }
+
+    fun createPlaylist(name: String) {
+        viewModelScope.launch {
+            playlistRepository.createPlaylist(name)
+        }
+    }
+
+    fun deleteCurrentMedia(onDeleted: () -> Unit) {
+        val mediaUri = uiState.value.mediaUri
+        viewModelScope.launch {
+            playerService.stop()
+            galleryRepository.deleteItem(mediaUri)
+            onDeleted()
         }
     }
 
@@ -243,113 +415,18 @@ class PlayerViewModel(
         }
     }
 
-    fun togglePlayPause() {
-        showControlsTemporarily()
-        if (uiState.value.serviceState.isPlaying) {
-            playerService.pause()
-        } else {
-            playerService.play()
-        }
-    }
-
-    fun seekTo(positionMs: Long) {
-        showControlsTemporarily()
-        playerService.seekTo(positionMs)
-    }
-
-    fun seekRelative(offsetMs: Long) {
-        showControlsTemporarily()
-        val current = playerService.uiState.value.currentPositionMs
-        val duration = playerService.uiState.value.durationMs
-        val maxPos = if (duration > 0L) duration else Long.MAX_VALUE
-        val target = (current + offsetMs).coerceIn(0L, maxPos)
-        
-        // Trigger Seek Feedback animation
-        if (offsetMs > 0) {
-            triggerSeekFeedback(SeekFeedbackEvent.Forward())
-        } else {
-            triggerSeekFeedback(SeekFeedbackEvent.Rewind())
-        }
-
-        playerService.seekTo(target)
-    }
-
-    fun setScrubbing(scrubbing: Boolean, positionMs: Long = 0L) {
-        isScrubbing.value = scrubbing
-        if (scrubbing) {
-            scrubPositionMs.value = positionMs
-            cancelHideControls()
-            isControlsVisible.value = true
-        } else {
-            if (uiState.value.isPlaying) {
-                scheduleHideControls()
-            }
-        }
-    }
-
-    fun setSpeed(speed: Float) {
-        showControlsTemporarily()
-        playerService.setSpeed(speed)
-    }
-
-    fun setVolume(volume: Int) {
-        showControlsTemporarily()
-        playerService.setVolume(volume)
-    }
-
-    fun toggleMute() {
-        showControlsTemporarily()
-        playerService.setMute(!uiState.value.serviceState.isMuted)
-    }
-
-    fun toggleFullscreen() {
-        isFullscreen.value = !isFullscreen.value
-        showControlsTemporarily()
-    }
-
-    fun restart() {
-        showControlsTemporarily()
-        playerService.restartFromBeginning()
-    }
-
-    fun toggleControlsVisibility() {
-        if (isControlsVisible.value) {
-            cancelHideControls()
-            isControlsVisible.value = false
-        } else {
-            showControlsTemporarily()
-        }
-    }
-
-    fun onSurfaceAvailable(surface: Surface) {
-        playerService.attachSurface(surface)
-    }
-
-    fun onSurfaceDestroyed() {
-        playerService.detachSurface()
-    }
-
-    fun showControlsTemporarily() {
+    private fun showControlsTemporarily() {
         isControlsVisible.value = true
-        if (uiState.value.serviceState.isPlaying && !isScrubbing.value) {
+        if (uiState.value.isPlaying && !isScrubbing.value) {
             scheduleHideControls()
-        }
-    }
-
-    private fun triggerSeekFeedback(event: SeekFeedbackEvent) {
-        seekFeedbackJob?.cancel()
-        seekFeedback.value = event
-        seekFeedbackJob = viewModelScope.launch {
-            delay(650L)
-            seekFeedback.value = null
         }
     }
 
     private fun scheduleHideControls() {
         cancelHideControls()
         hideControlsJob = viewModelScope.launch {
-            delay(3_500L)
-            if (uiState.value.serviceState.isPlaying && !isScrubbing.value) {
+            delay(4000)
+            if (uiState.value.isPlaying && !isScrubbing.value) {
                 isControlsVisible.value = false
             }
         }
@@ -361,26 +438,30 @@ class PlayerViewModel(
     }
 
     override fun onCleared() {
-        super.onCleared()
         cancelHideControls()
         seekFeedbackJob?.cancel()
-        playerService.release()
+        openJob?.cancel()
+        super.onCleared()
     }
 
     class Factory(
         private val application: Application,
         private val playerService: PlayerService? = null,
         private val spaceRepository: XSpaceRepository? = null,
+        private val favoritesRepository: FavoritesRepository? = null,
+        private val playlistRepository: PlaylistRepository? = null,
+        private val galleryRepository: GalleryRepository? = null,
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
-            return if (playerService != null && spaceRepository != null) {
-                PlayerViewModel(application, playerService, spaceRepository) as T
-            } else if (playerService != null) {
-                PlayerViewModel(application, playerService) as T
-            } else {
-                PlayerViewModel(application) as T
-            }
+            return PlayerViewModel(
+                app = application,
+                playerService = playerService ?: PlayerSessionHolder.get(application),
+                spaceRepository = spaceRepository ?: XSpaceRepositoryImpl(application),
+                favoritesRepository = favoritesRepository ?: FavoritesRepositoryImpl(application),
+                playlistRepository = playlistRepository ?: PlaylistRepositoryImpl(application),
+                galleryRepository = galleryRepository ?: MediaStoreGalleryRepository(application),
+            ) as T
         }
     }
 }

@@ -6,11 +6,14 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
@@ -24,6 +27,9 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -33,18 +39,23 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.mediaflow.app.ui.common.media.DeleteMediaDialog
 import com.mediaflow.app.ui.player.components.AudioPlayerView
 import com.mediaflow.app.ui.player.components.BufferingIndicator
-import com.mediaflow.app.ui.player.components.PlayerControls
+import com.mediaflow.app.ui.player.components.LivePlayerView
+import com.mediaflow.app.ui.player.components.PlaybackControls
+import com.mediaflow.app.ui.player.components.PlayerHeaderContext
+import com.mediaflow.app.ui.player.components.PlayerMetadataSection
+import com.mediaflow.app.ui.player.components.PlayerSecondaryActions
 import com.mediaflow.app.ui.player.components.PlayerSurface
+import com.mediaflow.app.ui.player.components.PlayerTimeline
 import com.mediaflow.app.ui.player.components.SeekFeedback
 import com.mediaflow.app.ui.player.gestures.playerGestures
-import com.mediaflow.app.ui.player.live.AutoDownloadToggle
-import com.mediaflow.app.ui.player.live.LiveEndedContent
-import com.mediaflow.domain.live.LiveSpaceEndState
+import com.mediaflow.app.ui.playlists.components.AddToPlaylistSheet
+import com.mediaflow.app.ui.queue.PlayerQueueSheet
 
 /**
- * Native, embedded multimedia player powered by libmpv and modern Jetpack Compose UI/UX.
+ * Modern, decoupled native multimedia player powered by libmpv and Material 3 Jetpack Compose.
  */
 @Composable
 fun PlayerScreen(
@@ -61,6 +72,10 @@ fun PlayerScreen(
     val uiState by viewModel.uiState.collectAsState()
     val activity = context as? Activity
 
+    var showQueueSheet by remember { mutableStateOf(false) }
+    var showAddToPlaylistSheet by remember { mutableStateOf(false) }
+    var showDeleteDialog by remember { mutableStateOf(false) }
+
     LaunchedEffect(mediaUri) {
         if (mediaUri.isNotBlank()) {
             val title = mediaUri.substringAfterLast('/').ifBlank { null }
@@ -68,7 +83,7 @@ fun PlayerScreen(
         }
     }
 
-    // Handle full screen system bar insets and translucent navigation
+    // Handle full screen system bar insets for videos
     DisposableEffect(uiState.isFullscreen) {
         if (activity != null) {
             val window = activity.window
@@ -101,7 +116,7 @@ fun PlayerScreen(
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
-        containerColor = Color.Black,
+        containerColor = MaterialTheme.colorScheme.background,
     ) { innerPadding ->
         Box(
             modifier = Modifier
@@ -115,68 +130,136 @@ fun PlayerScreen(
                 ),
             contentAlignment = Alignment.Center,
         ) {
-            // 1. Media Surface (Audio Disc or Native Video Surface)
-            if (uiState.isAudioOnly) {
-                val spaceSubtitle = uiState.spaceMetadata?.let { space ->
-                    val hostText = "Host: ${space.host.formattedHandle}"
-                    val otherSpeakers = space.allSpeakers.filter { !it.cleanUsername.equals(space.host.cleanUsername, ignoreCase = true) }
-                    if (otherSpeakers.isNotEmpty()) {
-                        "$hostText · Speakers: ${otherSpeakers.joinToString(", ") { it.formattedHandle }}"
-                    } else {
-                        hostText
-                    }
+            if (uiState.isLive) {
+                // Dedicated Live Space Player Variant
+                Column(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    PlayerHeaderContext(
+                        contextText = "X Space en vivo",
+                        isLive = true,
+                        onBack = onBack,
+                    )
+
+                    LivePlayerView(
+                        space = uiState.spaceMetadata,
+                        playbackState = uiState.serviceState.playbackState,
+                        liveEndState = uiState.liveEndState,
+                        isAutoDownloadEnabled = uiState.isAutoDownloadEnabled,
+                        onTogglePlayPause = viewModel::togglePlayPause,
+                        onToggleAutoDownload = viewModel::toggleAutoDownload,
+                        onDownloadReplay = viewModel::downloadSpaceReplay,
+                        onCheckReplayAgain = viewModel::checkReplayAgain,
+                        modifier = Modifier.weight(1f),
+                    )
+
+                    Spacer(Modifier.height(16.dp))
                 }
-                AudioPlayerView(
-                    title = displayTitle,
-                    space = uiState.spaceMetadata,
-                    subtitle = spaceSubtitle,
-                    isPlaying = uiState.isPlaying,
-                    modifier = Modifier.fillMaxSize(),
-                )
             } else {
-                PlayerSurface(
-                    onSurfaceCreated = viewModel::onSurfaceAvailable,
-                    onSurfaceDestroyed = viewModel::onSurfaceDestroyed,
-                    isFullscreen = uiState.isFullscreen,
+                // Audio & Video Player Composition
+                Column(
                     modifier = Modifier.fillMaxSize(),
-                )
+                    verticalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    // 1. Header Context
+                    PlayerHeaderContext(
+                        contextText = uiState.playbackContext ?: "Reproduciendo",
+                        isLive = false,
+                        onBack = onBack,
+                    )
+
+                    // 2. Center Art / Surface
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth(),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        if (uiState.isAudioOnly) {
+                            val spaceSubtitle = uiState.spaceMetadata?.let { space ->
+                                "Host: ${space.host.formattedHandle}"
+                            }
+                            AudioPlayerView(
+                                title = displayTitle,
+                                space = uiState.spaceMetadata,
+                                subtitle = spaceSubtitle,
+                                isPlaying = uiState.isPlaying,
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        } else {
+                            PlayerSurface(
+                                onSurfaceCreated = viewModel::onSurfaceAvailable,
+                                onSurfaceDestroyed = viewModel::onSurfaceDestroyed,
+                                isFullscreen = uiState.isFullscreen,
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        }
+                    }
+
+                    // 3. Metadata Section (Title, Host/Artist, Heart)
+                    PlayerMetadataSection(
+                        title = displayTitle,
+                        subtitle = uiState.spaceMetadata?.let { "Host: ${it.host.formattedHandle}" }
+                            ?: uiState.serviceState.artistOrHost ?: "Audio",
+                        isSpace = uiState.spaceMetadata != null,
+                        isFavorite = uiState.isFavorite,
+                        onToggleFavorite = viewModel::toggleFavorite,
+                    )
+
+                    // 4. Timeline
+                    PlayerTimeline(
+                        currentPositionMs = uiState.currentPositionMs,
+                        durationMs = uiState.durationMs,
+                        onSeekTo = viewModel::seekTo,
+                        onScrubbingChanged = { scrubbing ->
+                            viewModel.setScrubbing(scrubbing)
+                        },
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 2.dp),
+                    )
+
+                    // 5. Dominant Transport Controls
+                    PlaybackControls(
+                        playbackState = uiState.serviceState.playbackState,
+                        hasNext = uiState.hasNext,
+                        hasPrevious = uiState.hasPrevious,
+                        isLive = false,
+                        onPlayPause = viewModel::togglePlayPause,
+                        onPrevious = viewModel::playPrevious,
+                        onNext = viewModel::playNext,
+                        onRewind10 = { viewModel.seekRelative(-10_000L) },
+                        onForward10 = { viewModel.seekRelative(10_000L) },
+                    )
+
+                    // 6. Secondary Actions (Queue, Add to Playlist, Speed, Delete)
+                    PlayerSecondaryActions(
+                        speed = uiState.speed,
+                        queueCount = uiState.queue.size,
+                        isLive = false,
+                        onSpeedChange = viewModel::setSpeed,
+                        onAddToPlaylist = { showAddToPlaylistSheet = true },
+                        onOpenQueue = { showQueueSheet = true },
+                        onDelete = { showDeleteDialog = true },
+                    )
+
+                    Spacer(Modifier.height(8.dp))
+                }
             }
 
-            // 2. Buffering / Loading Indicator
+            // Buffering / Loading Indicator
             BufferingIndicator(
                 visible = uiState.isBuffering,
                 modifier = Modifier.align(Alignment.Center),
                 label = if (uiState.isPreparing) "Cargando..." else "Buffering...",
             )
 
-            // 3. Double-tap ±10s Seek Feedback Overlay
+            // Double-tap ±10s Seek Feedback Overlay
             SeekFeedback(
                 event = uiState.seekFeedback,
                 modifier = Modifier.fillMaxSize(),
             )
 
-            // 4. Auto Download Toggle when listening Live
-            if (uiState.isLive && uiState.liveEndState is LiveSpaceEndState.ActiveLive && uiState.isControlsVisible) {
-                AutoDownloadToggle(
-                    enabled = uiState.isAutoDownloadEnabled,
-                    onToggle = { viewModel.toggleAutoDownload() },
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(bottom = 120.dp),
-                )
-            }
-
-            // 5. Post-Live Ended Replay Overlay Card
-            if (uiState.liveEndState !is LiveSpaceEndState.ActiveLive) {
-                LiveEndedContent(
-                    endState = uiState.liveEndState,
-                    onDownloadReplay = viewModel::downloadSpaceReplay,
-                    onCheckReplayAgain = viewModel::checkReplayAgain,
-                    modifier = Modifier.align(Alignment.Center),
-                )
-            }
-
-            // 6. Error Display Card
+            // Error Display Card
             AnimatedVisibility(
                 visible = uiState.isError,
                 enter = fadeIn(),
@@ -208,35 +291,47 @@ fun PlayerScreen(
                     }
                 }
             }
-
-            // 7. Player Controls Overlay
-            PlayerControls(
-                visible = uiState.isControlsVisible,
-                title = displayTitle,
-                playbackState = uiState.serviceState.playbackState,
-                currentPositionMs = uiState.currentPositionMs,
-                durationMs = uiState.durationMs,
-                speed = uiState.speed,
-                volume = uiState.volume,
-                isMuted = uiState.isMuted,
-                isFullscreen = uiState.isFullscreen,
-                isAudioOnly = uiState.isAudioOnly,
-                isLive = uiState.isLive,
-                spaceMetadata = uiState.spaceMetadata,
-                onPlayPause = viewModel::togglePlayPause,
-                onSeekTo = viewModel::seekTo,
-                onSpeedChange = viewModel::setSpeed,
-                onVolumeChange = viewModel::setVolume,
-                onToggleMute = viewModel::toggleMute,
-                onToggleFullscreen = viewModel::toggleFullscreen,
-                onRestart = viewModel::restart,
-                onBack = {
-                    if (uiState.isFullscreen) viewModel.toggleFullscreen() else onBack()
-                },
-                onScrubbingChanged = { isScrubbing ->
-                    viewModel.setScrubbing(isScrubbing)
-                },
-            )
         }
+    }
+
+    // Queue ModalBottomSheet
+    if (showQueueSheet) {
+        PlayerQueueSheet(
+            queue = uiState.queue,
+            currentIndex = uiState.queueIndex,
+            isPlaying = uiState.isPlaying,
+            onSkipToIndex = { index -> viewModel.skipToIndex(index) },
+            onRemoveFromQueue = { index -> viewModel.removeFromQueue(index) },
+            onDismiss = { showQueueSheet = false },
+        )
+    }
+
+    // Add To Playlist ModalBottomSheet
+    if (showAddToPlaylistSheet) {
+        val uri = uiState.mediaUri
+        AddToPlaylistSheet(
+            targetMediaUri = uri,
+            playlists = uiState.playlists,
+            onToggleMediaInPlaylist = { playlistId, isIn ->
+                viewModel.toggleMediaInPlaylist(playlistId, isIn)
+            },
+            onCreateNewPlaylist = { name ->
+                viewModel.createPlaylist(name)
+            },
+            onDismiss = { showAddToPlaylistSheet = false },
+        )
+    }
+
+    // Delete Media Dialog
+    if (showDeleteDialog) {
+        DeleteMediaDialog(
+            title = displayTitle,
+            artworkUrl = uiState.spaceMetadata?.host?.avatarUrl ?: uiState.mediaUri,
+            onConfirm = {
+                viewModel.deleteCurrentMedia(onDeleted = onBack)
+                showDeleteDialog = false
+            },
+            onDismiss = { showDeleteDialog = false },
+        )
     }
 }

@@ -1,17 +1,19 @@
 package com.mediaflow.app.navigation
 
+import android.net.Uri
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -49,15 +51,16 @@ import com.mediaflow.app.ui.downloads.DownloadEvent
 import com.mediaflow.app.ui.downloads.DownloadStartResult
 import com.mediaflow.app.ui.downloads.DownloadViewModel
 import com.mediaflow.app.ui.downloads.DownloadsScreen
-import com.mediaflow.app.ui.gallery.GalleryScreen
 import com.mediaflow.app.ui.home.HomeScreen
+import com.mediaflow.app.ui.library.LibraryScreen
 import com.mediaflow.app.ui.player.PlayerScreen
+import com.mediaflow.app.ui.player.miniplayer.MiniPlayer
 import com.mediaflow.app.ui.settings.SettingsScreen
 import com.mediaflow.app.ui.theme.MediaFlowTheme
 import com.mediaflow.app.ui.theme.ThemeViewModel
+import com.mediaflow.data.player.background.PlayerSessionHolder
 import com.mediaflow.data.resolver.YtDlpSourceResolver
 import kotlinx.coroutines.launch
-import android.net.Uri
 
 private val navEnter: AnimatedContentTransitionScope<NavBackStackEntry>.() -> EnterTransition? = {
     fadeIn(tween(250)) + slideInVertically(tween(250)) { it / 12 }
@@ -72,7 +75,7 @@ private val navPopExit: AnimatedContentTransitionScope<NavBackStackEntry>.() -> 
     fadeOut(tween(150)) + slideOutVertically(tween(250)) { it / 12 }
 }
 
-/** Root navigation and app-level download/theme state wiring. */
+/** Root navigation, mini player integration, and app-level download/theme state wiring. */
 @Composable
 fun AppNavigation(
     requestNotificationPermission: (((Boolean) -> Unit) -> Unit)? = null,
@@ -91,6 +94,9 @@ fun AppNavigation(
     val snackbarHostState = remember { SnackbarHostState() }
     val snackbarScope = rememberCoroutineScope()
     val notificationDeniedMessage = stringResource(R.string.download_notifications_denied)
+
+    val playerService = remember(application) { PlayerSessionHolder.get(application) }
+    val playerServiceState by playerService.uiState.collectAsState()
 
     LaunchedEffect(downloadViewModel) {
         downloadViewModel.events.collect { event ->
@@ -123,43 +129,65 @@ fun AppNavigation(
                 },
                 bottomBar = {
                     if (showBottomBar) {
-                        NavigationBar(
-                            containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                            tonalElevation = 8.dp,
-                        ) {
-                            MediaFlowDestination.bottomBarItems.forEach { destination ->
-                                val selected = destination.route == currentRoute
-                                val iconScale by animateFloatAsState(
-                                    targetValue = if (selected) 1.12f else 1f,
-                                    animationSpec = tween(220),
-                                    label = "navIconScale",
-                                )
-                                NavigationBarItem(
-                                    selected = selected,
-                                    modifier = Modifier.testTag("tab_${destination.route}"),
-                                    onClick = {
-                                        navController.navigate(destination.route) {
-                                            popUpTo(navController.graph.findStartDestination().id) {
-                                                saveState = true
+                        Column {
+                            // Persistent Mini Player above NavigationBar
+                            MiniPlayer(
+                                serviceState = playerServiceState,
+                                onOpenPlayer = { mediaUri ->
+                                    navController.navigate(
+                                        MediaFlowDestination.Player.routeFor(Uri.encode(mediaUri)),
+                                    )
+                                },
+                                onTogglePlayPause = {
+                                    if (playerServiceState.isPlaying) {
+                                        playerService.pause()
+                                    } else {
+                                        playerService.play()
+                                    }
+                                },
+                                onSkipNext = {
+                                    playerService.playNext()
+                                },
+                            )
+
+                            NavigationBar(
+                                containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                                tonalElevation = 8.dp,
+                            ) {
+                                MediaFlowDestination.bottomBarItems.forEach { destination ->
+                                    val selected = destination.route == currentRoute
+                                    val iconScale by animateFloatAsState(
+                                        targetValue = if (selected) 1.12f else 1f,
+                                        animationSpec = tween(220),
+                                        label = "navIconScale",
+                                    )
+                                    NavigationBarItem(
+                                        selected = selected,
+                                        modifier = Modifier.testTag("tab_${destination.route}"),
+                                        onClick = {
+                                            navController.navigate(destination.route) {
+                                                popUpTo(navController.graph.findStartDestination().id) {
+                                                    saveState = true
+                                                }
+                                                launchSingleTop = true
+                                                restoreState = true
                                             }
-                                            launchSingleTop = true
-                                            restoreState = true
-                                        }
-                                    },
-                                    icon = {
-                                        Icon(
-                                            imageVector = destination.icon!!,
-                                            contentDescription = stringResource(destination.labelRes),
-                                            modifier = Modifier
-                                                .size(24.dp)
-                                                .graphicsLayer {
-                                                    scaleX = iconScale
-                                                    scaleY = iconScale
-                                                },
-                                        )
-                                    },
-                                    label = { Text(stringResource(destination.labelRes)) },
-                                )
+                                        },
+                                        icon = {
+                                            Icon(
+                                                imageVector = destination.icon!!,
+                                                contentDescription = stringResource(destination.labelRes),
+                                                modifier = Modifier
+                                                    .size(24.dp)
+                                                    .graphicsLayer {
+                                                        scaleX = iconScale
+                                                        scaleY = iconScale
+                                                    },
+                                            )
+                                        },
+                                        label = { Text(stringResource(destination.labelRes)) },
+                                    )
+                                }
                             }
                         }
                     }
@@ -179,41 +207,32 @@ fun AppNavigation(
                     ) {
                         HomeScreen(
                             sourceResolver = sourceResolver,
-                            onPlayLive = { liveStreamUrl ->
+                            onPlayLive = { liveUrl ->
                                 navController.navigate(
-                                    MediaFlowDestination.Player.routeFor(Uri.encode(liveStreamUrl)),
+                                    MediaFlowDestination.Player.routeFor(Uri.encode(liveUrl)),
                                 )
                             },
-                            onDownloadRequested = { state ->
-                                if (requestNotificationPermission == null) {
-                                    downloadViewModel.start(state)
-                                } else {
-                                    requestNotificationPermission { granted ->
-                                        if (granted) {
-                                            when (val result = downloadViewModel.start(state)) {
-                                                DownloadStartResult.Accepted -> snackbarScope.launch {
-                                                    snackbarHostState.showSnackbar(
-                                                        "Descarga añadida. Puedes consultar el progreso en Descargas",
-                                                    )
-                                                }
-                                                DownloadStartResult.AwaitingNotificationPermission -> Unit
-                                                is DownloadStartResult.Rejected -> snackbarScope.launch {
-                                                    snackbarHostState.showSnackbar(result.message)
-                                                }
-                                            }
-                                        } else {
-                                            snackbarScope.launch {
-                                                snackbarHostState.showSnackbar(
-                                                    notificationDeniedMessage,
-                                                )
-                                            }
-                                        }
-                                    }
-                                    DownloadStartResult.AwaitingNotificationPermission
-                                }
+                            onDownloadRequested = downloadViewModel::start,
+                        )
+                    }
+
+                    composable(
+                        route = MediaFlowDestination.Gallery.route,
+                        enterTransition = navEnter,
+                        exitTransition = navExit,
+                        popEnterTransition = navPopEnter,
+                        popExitTransition = navPopExit,
+                    ) {
+                        LibraryScreen(
+                            onOpenItem = { item ->
+                                val uri = item.localUri ?: item.id
+                                navController.navigate(
+                                    MediaFlowDestination.Player.routeFor(Uri.encode(uri)),
+                                )
                             },
                         )
                     }
+
                     composable(
                         route = MediaFlowDestination.Downloads.route,
                         enterTransition = navEnter,
@@ -223,21 +242,14 @@ fun AppNavigation(
                     ) {
                         DownloadsScreen(
                             downloads = downloads,
-                            progressMap = downloadProgressMap,
                             spacesMap = spacesMap,
+                            progressMap = downloadProgressMap,
+                            onOpen = downloadViewModel::open,
                             onPause = downloadViewModel::pause,
                             onResume = downloadViewModel::resume,
                             onCancel = downloadViewModel::cancel,
                             onRetry = downloadViewModel::retry,
                             onRemove = downloadViewModel::remove,
-                            onOpen = { item ->
-                                android.util.Log.d("MediaFlow", "AppNavigation onOpen item=${item.id}, uri=${item.localUri}")
-                                item.localUri?.let { localUri ->
-                                    navController.navigate(
-                                        MediaFlowDestination.Player.routeFor(Uri.encode(localUri)),
-                                    )
-                                }
-                            },
                             onBackToHome = {
                                 navController.popBackStack(
                                     MediaFlowDestination.Home.route,
@@ -246,29 +258,7 @@ fun AppNavigation(
                             },
                         )
                     }
-                    composable(
-                        route = MediaFlowDestination.Gallery.route,
-                        enterTransition = navEnter,
-                        exitTransition = navExit,
-                        popEnterTransition = navPopEnter,
-                        popExitTransition = navPopExit,
-                    ) {
-                        GalleryScreen(
-                            onOpenItem = { item ->
-                                item.localUri?.let { localUri ->
-                                    navController.navigate(
-                                        MediaFlowDestination.Player.routeFor(Uri.encode(localUri)),
-                                    )
-                                }
-                            },
-                            onBackToHome = {
-                                navController.popBackStack(
-                                    MediaFlowDestination.Home.route,
-                                    inclusive = false,
-                                )
-                            },
-                        )
-                    }
+
                     composable(
                         route = MediaFlowDestination.Settings.route,
                         enterTransition = navEnter,
@@ -281,16 +271,21 @@ fun AppNavigation(
                             onThemeModeChange = themeViewModel::setThemeMode,
                         )
                     }
+
                     composable(
                         route = MediaFlowDestination.Player.route,
-                        arguments = listOf(navArgument("mediaId") { type = NavType.StringType }),
+                        arguments = listOf(
+                            navArgument("mediaId") { type = NavType.StringType },
+                        ),
                         enterTransition = navEnter,
                         exitTransition = navExit,
                         popEnterTransition = navPopEnter,
                         popExitTransition = navPopExit,
-                    ) {
+                    ) { entry ->
+                        val encodedMediaId = entry.arguments?.getString("mediaId").orEmpty()
+                        val mediaUri = Uri.decode(encodedMediaId)
                         PlayerScreen(
-                            mediaUri = Uri.decode(it.arguments?.getString("mediaId").orEmpty()),
+                            mediaUri = mediaUri,
                             onBack = { navController.popBackStack() },
                         )
                     }

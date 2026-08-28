@@ -96,7 +96,9 @@ fun AudioPlayerView(
             // Vinyl / Audio disc graphic
             Surface(
                 modifier = Modifier
-                    .size(210.dp)
+                // Keep the identity artwork clear of the bottom control panel
+                // on compact phones while preserving a strong focal point.
+                .size(184.dp)
                     .clip(CircleShape)
                     .then(if (isPlaying) Modifier.rotate(rotation) else Modifier),
                 shape = CircleShape,
@@ -160,7 +162,7 @@ fun AudioPlayerView(
                 }
             }
 
-            Spacer(Modifier.height(28.dp))
+            Spacer(Modifier.height(20.dp))
 
             // Badges Row
             Row(

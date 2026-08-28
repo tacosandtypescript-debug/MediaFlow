@@ -8,6 +8,7 @@ import com.mediaflow.core.model.XSpaceState
 import com.mediaflow.data.provider.x.XContentDetector
 import com.mediaflow.data.provider.x.XUrlParser
 import com.mediaflow.data.provider.x.spaces.XSpaceMetadataResolver
+import com.mediaflow.data.provider.x.spaces.XSpaceStore
 import com.mediaflow.data.repository.XSpaceRepositoryImpl
 import com.mediaflow.domain.repository.SourceInfo
 import com.mediaflow.domain.repository.SourceResolver
@@ -30,6 +31,7 @@ class YtDlpSourceResolver(
 ) : SourceResolver {
     private val appContext = context.applicationContext
     private val directResolver = DirectUrlSourceResolver()
+    private val spaceStore = XSpaceStore(appContext)
     private val analysisDirectory = File(appContext.filesDir, "yt_dlp_analysis").apply { mkdirs() }
 
     override suspend fun analyze(sourceUrl: String): SourceInfo = withContext(Dispatchers.IO) {
@@ -46,7 +48,11 @@ class YtDlpSourceResolver(
 
         // Fast-path for X URLs: check if it's an X Space via specialized resolver
         if (XUrlParser.isXUrl(trimmed)) {
+            // A transient X/guest-token failure must not discard a Space that
+            // was already resolved and persisted. Reuse only an exact URL or
+            // matching status/Space id; never fall back to an unrelated item.
             val space = runCatching { spaceResolver.resolveFromUrl(trimmed) }.getOrNull()
+                ?: findCachedSpace(trimmed)
             if (space != null) {
                 spaceRepository.saveSpace(space)
                 val formats = spaceResolver.createMediaFormats(space)
@@ -141,6 +147,18 @@ class YtDlpSourceResolver(
                 errorMessage = friendlyAnalysisError(trimmed, error),
             )
         }
+    }
+
+    private fun findCachedSpace(url: String): XSpace? {
+        val statusId = XUrlParser.extractStatusId(url)
+        val directId = XUrlParser.extractDirectSpaceId(url)
+        return runCatching {
+            spaceStore.loadAllSync().values.firstOrNull { space ->
+                space.url == url ||
+                    (statusId != null && XUrlParser.extractStatusId(space.url) == statusId) ||
+                    (directId != null && space.id == directId)
+            }
+        }.getOrNull()
     }
 
     private fun friendlyAnalysisError(sourceUrl: String, error: Throwable): String {

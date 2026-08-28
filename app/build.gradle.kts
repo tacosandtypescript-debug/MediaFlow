@@ -54,6 +54,10 @@ android {
             isIncludeAndroidResources = true
         }
     }
+
+    // Real muxer fixtures used by the instrumented test. Keep the source
+    // files in the repository-level mux-fixture directory.
+    sourceSets["androidTest"].assets.directories.add(file("../mux-fixture").absolutePath)
 }
 
 kotlin {

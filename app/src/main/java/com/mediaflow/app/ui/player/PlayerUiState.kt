@@ -1,6 +1,9 @@
 package com.mediaflow.app.ui.player
 
+import com.mediaflow.core.model.PlaybackQueueItem
+import com.mediaflow.core.model.Playlist
 import com.mediaflow.core.model.XSpace
+import com.mediaflow.domain.live.LiveSpaceEndState
 import com.mediaflow.domain.player.EnginePlaybackState
 import com.mediaflow.domain.player.PlayerServiceState
 
@@ -26,8 +29,10 @@ data class PlayerUiState(
     val seekFeedback: SeekFeedbackEvent? = null,
     val isScrubbing: Boolean = false,
     val scrubPositionMs: Long = 0L,
-    val liveEndState: com.mediaflow.domain.live.LiveSpaceEndState = com.mediaflow.domain.live.LiveSpaceEndState.ActiveLive,
+    val liveEndState: LiveSpaceEndState = LiveSpaceEndState.ActiveLive,
     val isAutoDownloadEnabled: Boolean = false,
+    val isFavorite: Boolean = false,
+    val playlists: List<Playlist> = emptyList(),
 ) {
     val isPlaying: Boolean
         get() = serviceState.isPlaying
@@ -70,4 +75,19 @@ data class PlayerUiState(
 
     val isLive: Boolean
         get() = serviceState.isLive || spaceMetadata?.isLive == true
+
+    val queue: List<PlaybackQueueItem>
+        get() = serviceState.queue
+
+    val queueIndex: Int
+        get() = serviceState.queueIndex
+
+    val hasNext: Boolean
+        get() = serviceState.hasNext
+
+    val hasPrevious: Boolean
+        get() = serviceState.hasPrevious
+
+    val playbackContext: String?
+        get() = serviceState.playbackContext
 }

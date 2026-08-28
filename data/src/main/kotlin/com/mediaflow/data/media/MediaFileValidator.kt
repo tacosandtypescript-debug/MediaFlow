@@ -2,6 +2,7 @@ package com.mediaflow.data.media
 
 import android.media.MediaExtractor
 import android.media.MediaFormat as AndroidMediaFormat
+import android.os.Build
 import android.util.Log
 import com.mediaflow.core.model.MediaType
 import java.io.File
@@ -54,7 +55,11 @@ object MediaFileValidator {
                 }
                 if (isVideo) {
                     videoMime = mime
-                    videoCodecString = format.getStringOrNull(AndroidMediaFormat.KEY_CODECS_STRING)
+                    videoCodecString = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                        format.getStringOrNull(AndroidMediaFormat.KEY_CODECS_STRING)
+                    } else {
+                        null
+                    }
                     if (expectedType == MediaType.VIDEO) {
                         hasExpectedTrack = true
                         width = format.getIntegerOrNull(AndroidMediaFormat.KEY_WIDTH)
@@ -62,7 +67,11 @@ object MediaFileValidator {
                     }
                 } else if (isAudio) {
                     audioMime = mime
-                    audioCodecString = format.getStringOrNull(AndroidMediaFormat.KEY_CODECS_STRING)
+                    audioCodecString = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                        format.getStringOrNull(AndroidMediaFormat.KEY_CODECS_STRING)
+                    } else {
+                        null
+                    }
                     if (expectedType == MediaType.AUDIO) {
                         hasExpectedTrack = true
                     }
