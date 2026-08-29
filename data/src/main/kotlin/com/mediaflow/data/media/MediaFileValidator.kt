@@ -29,8 +29,11 @@ object MediaFileValidator {
     ): Result<ValidatedMedia> = runCatching {
         require(file.isFile && file.length() > 0L) { "El archivo multimedia está vacío o no existe." }
         expectedExtension?.let { expected ->
-            require(file.extension.equals(expected, ignoreCase = true)) {
-                "La extensión real (.${file.extension}) no coincide con la extensión esperada (.$expected)."
+            if (!file.extension.equals(expected, ignoreCase = true)) {
+                Log.w(
+                    TAG,
+                    "La extensión real (.${file.extension}) no coincide con la extensión esperada (.$expected). El contenedor se validará igualmente si es reproducible.",
+                )
             }
         }
         val extractor = extractorFactory(file)

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Network security configuration.
+     Cleartext (HTTP) traffic is explicitly NOT permitted.
+     This file is intentionally not referenced from the manifest yet. -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false" />
+</network-security-config>

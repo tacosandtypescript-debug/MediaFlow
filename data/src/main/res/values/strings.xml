@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="download_notification_channel">Descargas de MediaFlow</string>
+    <string name="download_notification_title">Descarga en curso</string>
+    <string name="download_notification_description">Notificaciones de las descargas de MediaFlow</string>
+    <string name="download_notification_idle">MediaFlow está preparando tus descargas</string>
+</resources>

@@ -206,4 +206,58 @@ class MediaFileValidatorTest {
         assertFalse(result.isSuccess)
         assertTrue(result.exceptionOrNull()?.message?.contains("no contiene una pista video válida") == true)
     }
+
+    @Test
+    fun `validate playable file succeeds when extension differs from expected`() {
+        val file = createDummyFile("stream.webm")
+        val videoFormat = MediaFormat.createVideoFormat("video/avc", 1920, 1080).apply {
+            setLong(MediaFormat.KEY_DURATION, 12_000_000L)
+        }
+        val audioFormat = MediaFormat.createAudioFormat("audio/mp4a-latm", 44100, 2)
+        mockExtractor(listOf(videoFormat, audioFormat))
+
+        val result = MediaFileValidator.validate(
+            file = file,
+            expectedType = MediaType.VIDEO,
+            expectedExtension = "mp4",
+            expectedDurationSeconds = 12L,
+            expectedWidth = 1920,
+            expectedHeight = 1080,
+        )
+
+        assertTrue("A playable webm must not fail solely because mp4 was expected", result.isSuccess)
+        assertEquals(12L, result.getOrThrow().durationSeconds)
+    }
+
+    @Test
+    fun `validate avc1 profile string matches video avc mime`() {
+        val file = createDummyFile("clip.mp4")
+        val videoFormat = MediaFormat.createVideoFormat("video/avc", 1920, 1080)
+        mockExtractor(listOf(videoFormat))
+
+        val result = MediaFileValidator.validate(
+            file = file,
+            expectedType = MediaType.VIDEO,
+            expectedExtension = "mp4",
+            expectedVideoCodec = "avc1.640028",
+        )
+
+        assertTrue(result.isSuccess)
+    }
+
+    @Test
+    fun `validate unknown expected codec does not fail a playable file`() {
+        val file = createDummyFile("clip.mp4")
+        val videoFormat = MediaFormat.createVideoFormat("video/avc", 640, 360)
+        mockExtractor(listOf(videoFormat))
+
+        val result = MediaFileValidator.validate(
+            file = file,
+            expectedType = MediaType.VIDEO,
+            expectedExtension = "mp4",
+            expectedVideoCodec = "mystery-codec",
+        )
+
+        assertTrue(result.isSuccess)
+    }
 }

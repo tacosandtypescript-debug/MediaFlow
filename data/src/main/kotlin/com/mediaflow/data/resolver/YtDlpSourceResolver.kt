@@ -10,11 +10,10 @@ import com.mediaflow.data.provider.x.XUrlParser
 import com.mediaflow.data.provider.x.spaces.XSpaceMetadataResolver
 import com.mediaflow.data.provider.x.spaces.XSpaceStore
 import com.mediaflow.data.repository.XSpaceRepositoryImpl
+import com.mediaflow.data.ytdlp.YtDlpRuntime
 import com.mediaflow.domain.repository.SourceInfo
 import com.mediaflow.domain.repository.SourceResolver
 import com.mediaflow.domain.repository.XSpaceRepository
-import dev.ffmpegkit_maintained.ytdlp.YtDlp
-import dev.ffmpegkit_maintained.ytdlp.YtDlpRequest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -79,36 +78,12 @@ class YtDlpSourceResolver(
         }
 
         runCatching {
-            YtDlp.init(appContext)
-            val outputTemplate = File(analysisDirectory, "analysis_%(id)s.%(ext)s").absolutePath
             try {
-                val response = YtDlp.execute(
-                    YtDlpRequest(trimmed)
-                        .setOutputTemplate(outputTemplate)
-                        .addOption("--ignore-config")
-                        .addOption("--no-cookies")
-                        .addOption("--no-cache-dir")
-                        .addOption("--no-playlist")
-                        .addOption("--dump-single-json")
-                        .addOption("--skip-download")
-                        .addOption("--no-write-thumbnail")
-                        .addOption("--no-write-info-json")
-                        .addOption("--no-write-playlist-metafiles")
-                        .addOption("--retries", "3")
-                        .addOption("--fragment-retries", "3")
-                        .addOption("--socket-timeout", "30")
-                        .addOption("--force-ipv4")
-                        .addOption("--no-warnings")
-                        .addOption("--hls-prefer-native")
-                        .addOption("--extractor-args", "youtube:player_client=android,web")
-                        .addOption("--user-agent", USER_AGENT),
-                    null,
-                )
-                check(response.isSuccess) {
-                    response.errorOutput?.ifBlank { null }
-                        ?: "El extractor no pudo analizar la fuente."
+                val json = YtDlpRuntime.extractJson(appContext, trimmed, analysisDirectory)
+                check(json.isNotBlank() && json != "None") {
+                    "El extractor no pudo analizar la fuente."
                 }
-                parseForTest(trimmed, response.output)
+                parseForTest(trimmed, json)
             } finally {
                 analysisDirectory.listFiles().orEmpty().forEach { it.delete() }
             }
@@ -168,6 +143,9 @@ class YtDlpSourceResolver(
                 "La grabación de este X Space no está disponible o fue desactivada por el autor."
             text.contains("Twitter Space not found", ignoreCase = true) ->
                 "El X Space no existe o fue eliminado."
+            text.contains("Read-only file system", ignoreCase = true) ||
+                text.contains("Errno 30", ignoreCase = true) ->
+                "$platform no se pudo analizar: yt-dlp intentó escribir fuera del almacenamiento de la app. Vuelve a intentarlo."
             text.contains("DECRYPTION_FAILED_OR_BAD_RECORD_MAC", ignoreCase = true) ||
                 text.contains("SSL", ignoreCase = true) ->
                 "$platform no respondió de forma estable por HTTPS. Comprueba la conexión y vuelve a intentarlo; no se creó ningún archivo."
@@ -300,10 +278,5 @@ class YtDlpSourceResolver(
         "wav" -> "audio/wav"
         "ogg", "opus" -> "audio/ogg"
         else -> if (mediaType == MediaType.VIDEO) "video/*" else "audio/*"
-    }
-
-    companion object {
-        private const val USER_AGENT =
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     }
 }

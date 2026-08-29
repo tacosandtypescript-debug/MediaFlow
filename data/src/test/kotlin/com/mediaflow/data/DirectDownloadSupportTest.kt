@@ -89,10 +89,18 @@ class DirectDownloadSupportTest {
         val urls = listOf(
             "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
             "https://youtu.be/dQw4w9WgXcQ",
+            "https://m.youtube.com/watch?v=dQw4w9WgXcQ",
+            "https://music.youtube.com/watch?v=dQw4w9WgXcQ",
             "https://x.com/nicdunz/status/2090872826529988887/video/1?s=46",
+            "https://twitter.com/nicdunz/status/2090872826529988887",
             "https://x.com/i/spaces/1jGXgBDyzpNKZ",
             "https://www.instagram.com/reel/DcSOPIsuOpy/?igsi=MTVtMzlpazloOGxpeg==",
+            "https://instagr.am/p/DcSOPIsuOpy/",
             "https://vt.tiktok.com/ZSVPEWsKB/",
+            "https://vm.tiktok.com/ZSVPEWsKB/",
+            "https://m.facebook.com/watch/?v=1234567890",
+            "https://fb.watch/abcDEF/",
+            "https://fb.com/reel/1234567890",
         )
 
         urls.forEach { url ->

@@ -42,6 +42,113 @@ enum class QualityOption(@StringRes val labelRes: Int) {
 }
 
 /**
+ * Picks a downloadable format that MediaTrackMuxer can actually finish.
+ * Highest YouTube rungs are often VP9/AV1 video-only; AUTO prefers progressive
+ * MP4, then muxable AVC/HEVC+MP4, and only then VP9/AV1.
+ */
+internal object PreferredDownloadFormat {
+    fun select(
+        formats: List<MediaFormat>,
+        quality: QualityOption,
+        selectedFormatId: String? = null,
+    ): MediaFormat? {
+        if (selectedFormatId != null) {
+            formats.firstOrNull { it.formatId == selectedFormatId }?.let { return it }
+        }
+        if (formats.isEmpty()) return null
+        val preferLowest = quality == QualityOption.LOW
+        val targetHeight = when (quality) {
+            QualityOption.P360 -> 360
+            QualityOption.P480 -> 480
+            QualityOption.P720 -> 720
+            QualityOption.P1080 -> 1080
+            QualityOption.MEDIUM -> medianHeight(formats)
+            QualityOption.AUTO, QualityOption.HIGH, QualityOption.LOW -> null
+        }
+        return selectPreferred(formats, targetHeight, preferLowest)
+            ?: formats.firstOrNull()
+    }
+
+    private fun selectPreferred(
+        formats: List<MediaFormat>,
+        targetHeight: Int?,
+        preferLowest: Boolean,
+    ): MediaFormat? {
+        val heights = formats.mapNotNull { it.height }.distinct().let { distinct ->
+            if (targetHeight != null) {
+                val atOrBelow = distinct.filter { it <= targetHeight }
+                if (atOrBelow.isNotEmpty()) atOrBelow
+                else distinct.minByOrNull { kotlin.math.abs(it - targetHeight) }?.let { listOf(it) }.orEmpty()
+            } else {
+                distinct
+            }
+        }.let { list ->
+            if (preferLowest) list.sorted() else list.sortedDescending()
+        }
+
+        for (height in heights) {
+            pickCompatible(formats.filter { it.height == height }, preferLowest)?.let { return it }
+        }
+        pickCompatible(formats, preferLowest)?.let { return it }
+        return best(formats, preferLowest)
+    }
+
+    private fun pickCompatible(pool: List<MediaFormat>, preferLowest: Boolean): MediaFormat? {
+        if (pool.isEmpty()) return null
+        val progressive = pool.filter { it.isProgressive && !it.requiresMuxing }
+        if (progressive.isNotEmpty()) return best(progressive, preferLowest)
+        val muxable = pool.filter { isMuxableAvcHevcMp4(it) }
+        if (muxable.isNotEmpty()) return best(muxable, preferLowest)
+        return null
+    }
+
+    private fun best(pool: List<MediaFormat>, preferLowest: Boolean): MediaFormat? {
+        if (pool.isEmpty()) return null
+        val bestClass = pool.maxOf { compatibilityScore(it) }
+        val ranked = pool.filter { compatibilityScore(it) == bestClass }
+        val byQuality = compareBy<MediaFormat> { it.height ?: 0 }
+            .thenBy { it.fps ?: 0.0 }
+            .thenBy { it.bitrate ?: 0L }
+        return if (preferLowest) ranked.minWithOrNull(byQuality) else ranked.maxWithOrNull(byQuality)
+    }
+
+    private fun medianHeight(formats: List<MediaFormat>): Int? {
+        val heights = formats.mapNotNull { it.height }.distinct().sorted()
+        if (heights.isEmpty()) return null
+        return heights[heights.size / 2]
+    }
+
+    private fun isMuxableAvcHevcMp4(format: MediaFormat): Boolean {
+        val codec = format.videoCodec?.lowercase().orEmpty()
+        val ext = format.extension?.lowercase().orEmpty()
+        val container = format.container?.lowercase().orEmpty()
+        val muxableCodec = codec.contains("avc") || codec.contains("h264") ||
+            codec.contains("hev") || codec.contains("h265") || codec.contains("hvc")
+        val mp4 = ext in setOf("mp4", "m4v") || container.contains("mp4")
+        return muxableCodec && (mp4 || ext.isEmpty())
+    }
+
+    private fun compatibilityScore(format: MediaFormat): Int {
+        val codec = format.videoCodec?.lowercase().orEmpty()
+        val audio = format.audioCodec?.lowercase().orEmpty()
+        val ext = format.extension?.lowercase().orEmpty()
+        var score = 0
+        if (format.isProgressive && !format.requiresMuxing) score += 8
+        if (isMuxableAvcHevcMp4(format)) score += 6
+        if (ext in setOf("mp4", "m4v", "m4a")) score += 2
+        if (audio.contains("mp4a") || audio.contains("aac")) score += 2
+        if (codec.contains("vp9") || codec.contains("vp09") || codec.contains("av01") ||
+            (codec.contains("av1") && !codec.contains("avc"))
+        ) {
+            score -= 6
+        }
+        if (ext == "webm" || ext == "mkv") score -= 2
+        if (audio.contains("opus")) score -= 1
+        return score
+    }
+}
+
+/**
  * Result of the local, offline URL validation.
  */
 enum class ValidationState {

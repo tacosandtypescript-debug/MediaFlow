@@ -196,17 +196,11 @@ class DownloadViewModel(
     ): MediaFormat? {
         val preferred = formats.filter { it.mediaType == targetType }
         val typed = preferred.ifEmpty { formats }
-        if (selectedFormatId != null) {
-            val manual = typed.firstOrNull { it.formatId == selectedFormatId }
-            if (manual != null) return manual
-        }
-        return when (quality) {
-            com.mediaflow.app.ui.home.QualityOption.AUTO -> typed.firstOrNull()
-            com.mediaflow.app.ui.home.QualityOption.HIGH -> typed.firstOrNull()
-            com.mediaflow.app.ui.home.QualityOption.MEDIUM -> typed.getOrNull(typed.size / 2) ?: typed.firstOrNull()
-            com.mediaflow.app.ui.home.QualityOption.LOW -> typed.lastOrNull()
-            else -> typed.firstOrNull()
-        }
+        return com.mediaflow.app.ui.home.PreferredDownloadFormat.select(
+            typed,
+            quality,
+            selectedFormatId,
+        )
     }
 
     class Factory(

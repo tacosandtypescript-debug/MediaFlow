@@ -18,7 +18,10 @@ class PlatformFormatSelectorTest {
             qualityLabel = "1080p",
         )
 
-        assertEquals("137+bestaudio", PlatformFormatSelector.select(request))
+        assertEquals(
+            "137+bestaudio[ext=m4a]/137+bestaudio[acodec^=mp4a]/137+bestaudio[acodec^=aac]/137+bestaudio",
+            PlatformFormatSelector.select(request),
+        )
     }
 
     @Test
@@ -42,6 +45,40 @@ class PlatformFormatSelectorTest {
             qualityLabel = "720p",
         )
 
-        assertEquals("best[height<=720]/best", PlatformFormatSelector.select(request))
+        assertEquals(
+            "bv*[ext=mp4][height<=720]+ba[ext=m4a]/b[ext=mp4][height<=720]/b[height<=720]/b",
+            PlatformFormatSelector.select(request),
+        )
+    }
+
+    @Test
+    fun `missing format id prefers mp4 progressive then best`() {
+        val request = DownloadRequest(
+            sourceUrl = "https://www.youtube.com/watch?v=example",
+            mediaType = MediaType.VIDEO,
+        )
+
+        assertEquals("bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/b", PlatformFormatSelector.select(request))
+    }
+
+    @Test
+    fun `yt-dlp format id prefers mp4 progressive then best`() {
+        val request = DownloadRequest(
+            sourceUrl = "https://www.youtube.com/watch?v=example",
+            mediaType = MediaType.VIDEO,
+            formatId = "yt-dlp",
+        )
+
+        assertEquals("bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/b", PlatformFormatSelector.select(request))
+    }
+
+    @Test
+    fun `audio without format id prefers m4a`() {
+        val request = DownloadRequest(
+            sourceUrl = "https://www.youtube.com/watch?v=example",
+            mediaType = MediaType.AUDIO,
+        )
+
+        assertEquals("bestaudio[ext=m4a]/bestaudio", PlatformFormatSelector.select(request))
     }
 }

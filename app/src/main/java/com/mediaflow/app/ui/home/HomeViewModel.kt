@@ -53,7 +53,11 @@ class HomeViewModel : ViewModel() {
 
     fun onQualitySelected(quality: QualityOption) {
         if (quality !in _uiState.value.qualityOptions) return
-        _uiState.update { it.copy(quality = quality) }
+        _uiState.update {
+            val selectedId = PreferredDownloadFormat.select(it.availableFormats, quality)?.formatId
+                ?: it.selectedFormatId
+            it.copy(quality = quality, selectedFormatId = selectedId)
+        }
     }
 
     fun onFormatSelected(formatId: String) {
@@ -94,7 +98,7 @@ class HomeViewModel : ViewModel() {
                             analysisState = if (error == null) AnalysisState.READY else AnalysisState.FAILED,
                             sourceInfo = info,
                             availableFormats = formats,
-                            selectedFormatId = formats.firstOrNull()?.formatId,
+                            selectedFormatId = PreferredDownloadFormat.select(formats, it.quality)?.formatId,
                             analysisError = error,
                             infoMessage = if (error == null) R.string.analysis_ready else null,
                             isDownloadButtonEnabled = error == null,

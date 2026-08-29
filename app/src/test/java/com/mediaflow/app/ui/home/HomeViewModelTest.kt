@@ -237,6 +237,121 @@ class HomeViewModelTest {
     }
 
     @Test
+    fun `auto analysis prefers muxable avc over vp9 at the same height`() {
+        val vm = newViewModel()
+        vm.onUrlChanged("https://example.com/video")
+        vm.analyze(object : SourceResolver {
+            override suspend fun analyze(sourceUrl: String) = SourceInfo(
+                sourceUrl = sourceUrl,
+                title = "YouTube sample",
+                availableFormats = listOf(
+                    MediaFormat(
+                        "248", "webm", "video/webm", MediaType.VIDEO, "1080p",
+                        height = 1080, videoCodec = "vp9", requiresMuxing = true,
+                    ),
+                    MediaFormat(
+                        "137", "mp4", "video/mp4", MediaType.VIDEO, "1080p",
+                        height = 1080, videoCodec = "avc1", requiresMuxing = true,
+                    ),
+                    MediaFormat(
+                        "22", "mp4", "video/mp4", MediaType.VIDEO, "720p",
+                        height = 720, videoCodec = "avc1", audioCodec = "mp4a.40.2",
+                        isProgressive = true, requiresMuxing = false,
+                    ),
+                ),
+            )
+        })
+
+        assertEquals("137", vm.uiState.value.selectedFormatId)
+    }
+
+    @Test
+    fun `auto analysis prefers progressive when highest formats are not muxable`() {
+        val vm = newViewModel()
+        vm.onUrlChanged("https://example.com/video")
+        vm.analyze(object : SourceResolver {
+            override suspend fun analyze(sourceUrl: String) = SourceInfo(
+                sourceUrl = sourceUrl,
+                title = "YouTube sample",
+                availableFormats = listOf(
+                    MediaFormat(
+                        "248", "webm", "video/webm", MediaType.VIDEO, "1080p",
+                        height = 1080, videoCodec = "vp9", requiresMuxing = true,
+                    ),
+                    MediaFormat(
+                        "22", "mp4", "video/mp4", MediaType.VIDEO, "720p",
+                        height = 720, videoCodec = "avc1", audioCodec = "mp4a.40.2",
+                        isProgressive = true, requiresMuxing = false,
+                    ),
+                ),
+            )
+        })
+
+        assertEquals("22", vm.uiState.value.selectedFormatId)
+    }
+
+    @Test
+    fun `quality option selects format by height`() {
+        val vm = newViewModel()
+        vm.onUrlChanged("https://example.com/video")
+        vm.analyze(object : SourceResolver {
+            override suspend fun analyze(sourceUrl: String) = SourceInfo(
+                sourceUrl = sourceUrl,
+                title = "YouTube sample",
+                availableFormats = listOf(
+                    MediaFormat(
+                        "137", "mp4", "video/mp4", MediaType.VIDEO, "1080p",
+                        height = 1080, videoCodec = "avc1", requiresMuxing = true,
+                    ),
+                    MediaFormat(
+                        "22", "mp4", "video/mp4", MediaType.VIDEO, "720p",
+                        height = 720, videoCodec = "avc1", audioCodec = "mp4a.40.2",
+                        isProgressive = true, requiresMuxing = false,
+                    ),
+                    MediaFormat(
+                        "18", "mp4", "video/mp4", MediaType.VIDEO, "360p",
+                        height = 360, videoCodec = "avc1", audioCodec = "mp4a.40.2",
+                        isProgressive = true, requiresMuxing = false,
+                    ),
+                ),
+            )
+        })
+
+        vm.onQualitySelected(QualityOption.P360)
+        assertEquals("18", vm.uiState.value.selectedFormatId)
+        vm.onQualitySelected(QualityOption.P720)
+        assertEquals("22", vm.uiState.value.selectedFormatId)
+        vm.onQualitySelected(QualityOption.P1080)
+        assertEquals("137", vm.uiState.value.selectedFormatId)
+    }
+
+    @Test
+    fun `manual format id is kept when the user picks a specific format`() {
+        val vm = newViewModel()
+        vm.onUrlChanged("https://example.com/video")
+        vm.analyze(object : SourceResolver {
+            override suspend fun analyze(sourceUrl: String) = SourceInfo(
+                sourceUrl = sourceUrl,
+                title = "YouTube sample",
+                availableFormats = listOf(
+                    MediaFormat(
+                        "137", "mp4", "video/mp4", MediaType.VIDEO, "1080p",
+                        height = 1080, videoCodec = "avc1", requiresMuxing = true,
+                    ),
+                    MediaFormat(
+                        "248", "webm", "video/webm", MediaType.VIDEO, "1080p",
+                        height = 1080, videoCodec = "vp9", requiresMuxing = true,
+                    ),
+                ),
+            )
+        })
+
+        vm.onFormatSelected("248")
+        assertEquals("248", vm.uiState.value.selectedFormatId)
+        assertEquals("248", PreferredDownloadFormat.select(vm.uiState.value.availableFormats, QualityOption.AUTO, "248")?.formatId)
+    }
+
+    @Test
     fun `analysis with no matching formats disables download`() {
         val vm = newViewModel()
         vm.onUrlChanged("https://example.com/audio")

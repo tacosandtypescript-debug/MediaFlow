@@ -10,10 +10,12 @@ build/
 .cxx
 *.apk
 *.aab
-*.png
-*.xml
 *.mp4
 *.db
-*.json
 *.log
 emulator-backup-downloads/
+
+# Generated dumps and IDE artifacts, not Android source resources.
+docs/validation/dumps/
+docs/validation/screenshots/
+docs/validation/samples/

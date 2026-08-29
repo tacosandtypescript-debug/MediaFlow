@@ -15,26 +15,20 @@ object PlatformUrlSupport {
     fun platformFor(url: String): Platform? {
         val uri = runCatching { URI(url.trim()) }.getOrNull() ?: return null
         if (!uri.scheme.equals("https", ignoreCase = true) && !uri.scheme.equals("http", ignoreCase = true)) return null
-        val host = uri.host?.lowercase() ?: return null
+        val host = uri.host?.lowercase()?.trimEnd('.') ?: return null
         val cleanHost = host.removePrefix("www.")
-        val path = uri.path.orEmpty()
+        fun hostIs(base: String) = cleanHost == base || cleanHost.endsWith(".$base")
         return when {
-            cleanHost == "facebook.com" || cleanHost.endsWith(".facebook.com") ||
-                cleanHost == "fb.watch" || cleanHost.endsWith(".fb.watch") ||
-                cleanHost == "fb.com" || cleanHost.endsWith(".fb.com") -> Platform.FACEBOOK
+            hostIs("facebook.com") || hostIs("fb.watch") || hostIs("fb.com") -> Platform.FACEBOOK
 
-            cleanHost == "x.com" || cleanHost.endsWith(".x.com") ||
-                cleanHost == "twitter.com" || cleanHost.endsWith(".twitter.com") ||
+            hostIs("x.com") || hostIs("twitter.com") ||
                 cleanHost == "vxtwitter.com" || cleanHost == "fxtwitter.com" || cleanHost == "fixupx.com" -> Platform.X
 
-            cleanHost == "instagram.com" || cleanHost.endsWith(".instagram.com") ||
-                cleanHost == "instagr.am" || cleanHost.endsWith(".instagr.am") -> Platform.INSTAGRAM
+            hostIs("instagram.com") || hostIs("instagr.am") -> Platform.INSTAGRAM
 
-            cleanHost == "tiktok.com" || cleanHost.endsWith(".tiktok.com") ||
-                cleanHost == "douyin.com" || cleanHost.endsWith(".douyin.com") -> Platform.TIKTOK
+            hostIs("tiktok.com") || hostIs("douyin.com") -> Platform.TIKTOK
 
-            cleanHost == "youtube.com" || cleanHost.endsWith(".youtube.com") ||
-                cleanHost == "youtu.be" || cleanHost.endsWith(".youtu.be") -> Platform.YOUTUBE
+            hostIs("youtube.com") || hostIs("youtu.be") -> Platform.YOUTUBE
 
             else -> null
         }

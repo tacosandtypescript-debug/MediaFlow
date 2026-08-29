@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">MediaFlow</string>
+
+    <!-- Navigation -->
+    <string name="nav_home">Inicio</string>
+    <string name="nav_library">Biblioteca</string>
+    <string name="nav_gallery">Biblioteca</string>
+    <string name="nav_downloads">Descargas</string>
+    <string name="nav_settings">Ajustes</string>
+    <string name="nav_player">Reproductor</string>
+    <string name="back">Volver</string>
+    <string name="go_to_home">Volver a Inicio</string>
+
+    <!-- Home -->
+    <string name="home_subtitle">Descarga y organiza tus archivos multimedia</string>
+    <string name="home_url_label">Enlace</string>
+    <string name="home_url_placeholder">Pega aquí el enlace del vídeo o audio</string>
+    <string name="home_clear">Limpiar enlace</string>
+    <string name="home_paste_button">Pegar enlace</string>
+    <string name="home_error_empty">Pega un enlace para continuar</string>
+    <string name="home_error_invalid">Introduce un enlace válido</string>
+    <string name="home_error_http">Por seguridad, utiliza un enlace HTTPS</string>
+    <string name="home_info_valid">Enlace válido. La fuente se analizará al iniciar la descarga</string>
+    <string name="home_info_download_pending">La descarga real se conectará en una fase posterior</string>
+    <string name="analysis_loading">Analizando fuente…</string>
+    <string name="analysis_ready">Fuente analizada</string>
+    <string name="analysis_failed">No se pudo analizar la fuente</string>
+    <string name="analysis_untitled">Vídeo sin título</string>
+    <string name="analysis_formats">formatos disponibles</string>
+    <string name="analysis_format_one">1 formato disponible</string>
+    <string name="analysis_choose_format">Elige un formato real</string>
+    <string name="analysis_thumbnail">Miniatura de la fuente</string>
+    <string name="analysis_no_thumbnail">La fuente no proporcionó miniatura</string>
+    <string name="home_info_download_started">Descarga añadida. Puedes consultar el progreso en Descargas</string>
+    <string name="home_media_type">Tipo de contenido</string>
+    <string name="media_type_video">Vídeo</string>
+    <string name="media_type_audio">Audio</string>
+    <string name="home_quality">Calidad</string>
+    <string name="quality_auto">Automática</string>
+    <string name="quality_360p">360p</string>
+    <string name="quality_480p">480p</string>
+    <string name="quality_720p">720p</string>
+    <string name="quality_1080p">1080p</string>
+    <string name="quality_high">Alta</string>
+    <string name="quality_medium">Media</string>
+    <string name="quality_low">Baja</string>
+    <string name="home_file_name_label">Nombre del archivo</string>
+    <string name="home_file_name_placeholder">Nombre automático</string>
+    <string name="home_file_name_hint">Deja vacío para usar el nombre automático</string>
+    <string name="home_download_now">Descargar ahora</string>
+    <string name="home_recent_downloads">Descargas recientes</string>
+    <string name="home_recent_empty_title">Sin descargas todavía</string>
+    <string name="home_recent_empty_subtitle">Las descargas aparecerán aquí.</string>
+
+    <!-- Downloads -->
+    <string name="download_progress_unknown">Calculando progreso</string>
+    <string name="download_notifications_denied">Activa las notificaciones para iniciar descargas en segundo plano</string>
+    <string name="download_pause">Pausar descarga</string>
+    <string name="download_resume">Reanudar descarga</string>
+    <string name="download_cancel">Cancelar descarga</string>
+    <string name="download_retry">Reintentar descarga</string>
+    <string name="download_remove">Eliminar del historial</string>
+    <string name="download_open">Abrir archivo descargado</string>
+    <string name="download_status_idle">En espera</string>
+    <string name="download_status_queued">En cola</string>
+    <string name="download_status_analyzing">Analizando</string>
+    <string name="download_status_preparing">Preparando</string>
+    <string name="download_status_downloading">Descargando</string>
+    <string name="download_status_paused">Pausada</string>
+    <string name="download_status_completed">Completada</string>
+    <string name="download_status_failed">Error</string>
+    <string name="download_status_canceled">Cancelada</string>
+    <string name="downloads_empty_title">Todavía no tienes descargas</string>
+    <string name="downloads_empty_subtitle">Tus descargas aparecerán aquí.</string>
+
+    <!-- Gallery -->
+    <string name="gallery_filter_videos">Vídeos</string>
+    <string name="gallery_filter_audio">Audio</string>
+    <string name="gallery_view_grid">Cuadrícula</string>
+    <string name="gallery_view_list">Lista</string>
+    <string name="gallery_empty_title">Tu galería aparecerá aquí</string>
+    <string name="gallery_empty_subtitle">Aún no hay elementos para mostrar.</string>
+    <string name="gallery_unknown_file">Archivo multimedia</string>
+    <string name="gallery_permission_title">Permiso para mostrar tu galería</string>
+    <string name="gallery_permission_subtitle">MediaFlow necesita acceso a tus vídeos y audios para cargarlos aquí.</string>
+    <string name="gallery_error_title">No se pudo cargar la galería</string>
+    <string name="gallery_error_subtitle">Comprueba el acceso a tus archivos y vuelve a intentarlo.</string>
+    <string name="gallery_permission_action">Permitir acceso</string>
+    <string name="gallery_open">Abrir</string>
+    <string name="gallery_delete">Eliminar</string>
+    <string name="gallery_clear_selection">Quitar selección</string>
+    <string name="gallery_delete_title">¿Eliminar archivo?</string>
+    <string name="gallery_delete_message">Se eliminará %1$s del dispositivo.</string>
+    <string name="gallery_delete_confirm">Eliminar</string>
+    <string name="gallery_cancel">Cancelar</string>
+    <string name="gallery_open_unavailable">No hay una aplicación compatible para abrir este archivo.</string>
+
+    <!-- Settings -->
+    <string name="settings_section_appearance">Apariencia</string>
+    <string name="settings_section_notifications">Notificaciones</string>
+    <string name="settings_section_storage">Almacenamiento</string>
+    <string name="settings_storage_pending">Opciones de almacenamiento (en una fase posterior)</string>
+    <string name="settings_theme">Tema</string>
+    <string name="settings_theme_auto">Automático</string>
+    <string name="settings_theme_light">Claro</string>
+    <string name="settings_theme_dark">Oscuro</string>
+    <string name="settings_wifi_only">Descargar solo con Wi-Fi</string>
+    <string name="settings_notifications">Notificaciones</string>
+    <string name="settings_default_quality">Calidad predeterminada</string>
+    <string name="settings_section_about">Acerca de</string>
+    <string name="settings_version">Versión %1$s</string>
+
+</resources>

@@ -8,6 +8,7 @@ import com.mediaflow.core.model.MediaType
 import com.mediaflow.domain.repository.DownloadRequest
 import com.mediaflow.data.resolver.PlatformUrlSupport
 import com.mediaflow.data.resolver.InstagramAnonymousResolver
+import com.mediaflow.data.resolver.TikTokAnonymousResolver
 import com.mediaflow.data.media.MediaStorePublisher
 import com.mediaflow.data.media.MediaFileValidator
 import com.mediaflow.data.media.MediaFlowLibraryStore
@@ -16,10 +17,7 @@ import com.mediaflow.data.media.metadata.DefaultMediaMetadataWriter
 import com.mediaflow.data.media.metadata.MediaMetadata
 import com.mediaflow.data.media.metadata.MediaMetadataWriter
 import com.mediaflow.data.provider.x.spaces.XSpaceStore
-import dev.ffmpegkit_maintained.ytdlp.YtDlp
-import dev.ffmpegkit_maintained.ytdlp.YtDlpException
-import dev.ffmpegkit_maintained.ytdlp.YtDlpRequest
-import dev.ffmpegkit_maintained.ytdlp.YtDlpResponse
+import com.mediaflow.data.ytdlp.YtDlpRuntime
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -27,6 +25,7 @@ import java.io.File
 import java.io.FileOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
+import java.util.concurrent.Executors
 import java.util.concurrent.Future
 
 /** Runs yt-dlp for supported platform pages and exposes truthful progress. */
@@ -39,11 +38,12 @@ class YtDlpPlatformDownloader(
     private val xSpaceStore = XSpaceStore(context)
     private val ownership = MediaFlowLibraryStore(context)
     private val sessions = LinkedHashMap<String, Session>()
+    private val executor = Executors.newCachedThreadPool()
     private val _items = MutableStateFlow(store.load())
     val items: StateFlow<List<DownloadItem>> = _items.asStateFlow()
 
     init {
-        runCatching { YtDlp.init(context) }
+        runCatching { YtDlpRuntime.ensureReady(context) }
     }
 
     fun start(id: String, request: DownloadRequest) {
@@ -80,28 +80,32 @@ class YtDlpPlatformDownloader(
         executeDownload(id, request, request.sourceUrl)
     }
 
-    /** TikTok CDN URLs require the browser referer and must not be re-extracted by yt-dlp. */
+    /**
+     * Downloads a public CDN asset with a browser referer.
+     * Returns true only when the file is saved; failures must not mark the item failed
+     * so the caller can fall through to yt-dlp.
+     */
     private fun downloadDirectPlatformFile(
         id: String,
         request: DownloadRequest,
         directUrl: String,
         referer: String,
         cookieHeader: String?,
-    ) {
+    ): Boolean {
         val baseName = sanitize(request.fileName?.substringBeforeLast('.') ?: "mediaflow_$id")
         val output = File(outputDirectory, "$baseName.mp4")
         val partial = File(outputDirectory, "$baseName.mp4.part")
-        runCatching {
+        val outcome = runCatching {
             val connection = URL(directUrl).openConnection() as HttpURLConnection
             connection.instanceFollowRedirects = true
             connection.connectTimeout = 20_000
             connection.readTimeout = 30_000
-            connection.setRequestProperty("User-Agent", PLATFORM_USER_AGENT)
+            connection.setRequestProperty("User-Agent", ANONYMOUS_BROWSER_USER_AGENT)
             connection.setRequestProperty("Referer", referer)
             connection.setRequestProperty("Accept", "video/mp4,video/*;q=0.9,*/*;q=0.8")
             cookieHeader?.let { connection.setRequestProperty("Cookie", it) }
             check(connection.responseCode in 200..299) {
-                "TikTok CDN respondió HTTP ${connection.responseCode}"
+                "CDN respondió HTTP ${connection.responseCode}"
             }
             val total = connection.contentLengthLong
             var downloaded = 0L
@@ -118,14 +122,16 @@ class YtDlpPlatformDownloader(
                     }
                 }
             }
-            check(partial.length() > 0L) { "TikTok no entregó contenido" }
+            check(partial.length() > 0L) { "El CDN no entregó contenido" }
             if (output.exists()) output.delete()
-            check(partial.renameTo(output)) { "No se pudo guardar el vídeo de TikTok" }
+            check(partial.renameTo(output)) { "No se pudo guardar el vídeo" }
             completeFile(id, request, output)
-        }.onFailure { error ->
-            partial.delete()
-            updateFailed(id, error)
         }
+        if (outcome.isFailure) {
+            partial.delete()
+            return false
+        }
+        return _items.value.firstOrNull { it.id == id }?.status == DownloadStatus.COMPLETED
     }
 
     private fun updateProgress(id: String, downloaded: Long, total: Long) {
@@ -142,11 +148,12 @@ class YtDlpPlatformDownloader(
 
     private fun completeFile(id: String, request: DownloadRequest, output: File) {
         val current = _items.value.firstOrNull { it.id == id } ?: return
-        val mimeType = current.selectedFormat?.mimeType ?: "video/mp4"
+        val extension = output.extension.lowercase()
+        val mimeType = mimeFor(extension)
         val validation = MediaFileValidator.validate(
             output,
             request.mediaType,
-            request.extension,
+            extension,
             request.durationSeconds,
             request.width,
             request.height,
@@ -196,24 +203,11 @@ class YtDlpPlatformDownloader(
         val template = File(outputDirectory, "$baseName.%(ext)s").absolutePath
         val platform = PlatformUrlSupport.platformFor(sourceUrl)
 
-        // Instagram sometimes exposes a public CDN asset to a normal web view
-        // even when its yt-dlp extractor is rate-limited on Android. This
-        // fallback never imports browser/account cookies and only proceeds
-        // when the page exposes a public MP4 URL immediately.
-        if (platform == PlatformUrlSupport.Platform.INSTAGRAM) {
-            val anonymousAsset = runCatching {
-                InstagramAnonymousResolver(context).resolve(instagramEmbedUrl(sourceUrl)).getOrNull()
-            }.getOrNull()
-            if (!anonymousAsset.isNullOrBlank()) {
-                downloadDirectPlatformFile(
-                    id = id,
-                    request = request,
-                    directUrl = anonymousAsset,
-                    referer = "https://www.instagram.com/",
-                    cookieHeader = null,
-                )
-                return
-            }
+        // Public Instagram/TikTok pages sometimes expose a CDN MP4 without
+        // cookies. Try that first, but never mark the download failed if the
+        // anonymous URL is missing or the CDN transfer fails — yt-dlp runs next.
+        if (tryAnonymousDirectDownload(id, request, sourceUrl, platform)) {
+            return
         }
 
         val referer = when (platform) {
@@ -231,55 +225,45 @@ class YtDlpPlatformDownloader(
         } else null
 
         val targetUrl = space?.audioStreamUrl?.takeIf { it.isNotBlank() } ?: extractionUrl
-        val ytdlpRequest = YtDlpRequest(targetUrl)
-            .setOutputTemplate(template)
-            // Do not read browser/config cookies: downloads are intentionally anonymous.
-            .addOption("--ignore-config")
-            .addOption("--no-cookies")
-            .addOption("--no-cache-dir")
-            .addOption("--no-playlist")
-            .addOption("--no-part")
-            .addOption("--retries", "3")
-            .addOption("--socket-timeout", "30")
-            .addOption("--force-ipv4")
-            .addOption("--hls-prefer-native")
-            .addOption("--extractor-args", "youtube:player_client=android,web")
-            .addOption("--user-agent", PLATFORM_USER_AGENT)
-            .addOption("-f", PlatformFormatSelector.select(request))
-
-        if (request.requiresMuxing) {
-            // Never silently fall back to another quality. A separated format
-            // is accepted only if yt-dlp can actually merge its exact video
-            // stream with audio into the requested container.
-            ytdlpRequest.addOption("--merge-output-format", request.extension ?: "mp4")
-        }
-
-        referer?.let { ytdlpRequest.addOption("--referer", it) }
 
         if (request.requiresMuxing) {
             executeSeparatedTracks(id, request, extractionUrl, referer)
             return
         }
 
+        val startedAt = System.currentTimeMillis()
+        val options = YtDlpRuntime.downloadOptions(
+            outputDirectory = outputDirectory,
+            outputTemplate = template,
+            format = PlatformFormatSelector.select(request),
+            referer = referer,
+        )
         val future = runCatching {
-            YtDlp.executeAsync(ytdlpRequest) { progress, _, _ ->
-                val current = _items.value.firstOrNull { it.id == id } ?: return@executeAsync
-                update(current.copy(
-                    progress = (progress / 100f).coerceIn(0f, 1f),
-                    isProgressKnown = progress >= 0f,
-                    status = DownloadStatus.DOWNLOADING,
-                ))
+            executor.submit<Unit> {
+                YtDlpRuntime.download(
+                    context = context,
+                    url = targetUrl,
+                    options = options,
+                    outputDirectory = outputDirectory,
+                ) { progress ->
+                    val current = _items.value.firstOrNull { it.id == id } ?: return@download
+                    update(current.copy(
+                        progress = (progress / 100f).coerceIn(0f, 1f),
+                        isProgressKnown = progress >= 0f,
+                        status = DownloadStatus.DOWNLOADING,
+                    ))
+                }
             }
         }.getOrElse { error ->
             updateFailed(id, error)
             return
         }
         sessions[id] = Session(request, future)
-        Thread {
+        executor.execute {
             runCatching { future.get() }
-                .onSuccess { response -> finish(id, request, response) }
+                .onSuccess { finish(id, request, startedAt) }
                 .onFailure { error -> updateFailed(id, error) }
-        }.start()
+        }
     }
 
     /**
@@ -294,19 +278,24 @@ class YtDlpPlatformDownloader(
         extractionUrl: String,
         referer: String?,
     ) {
-        Thread {
+        val future = executor.submit<Unit> {
             val workDirectory = File(outputDirectory, "tracks_$id").apply { mkdirs() }
-            runCatching {
+            try {
+                val videoStartedAt = System.currentTimeMillis()
                 val videoTemplate = File(workDirectory, "video_%(id)s.%(ext)s").absolutePath
                 val audioTemplate = File(workDirectory, "audio_%(id)s.%(ext)s").absolutePath
-                val videoResponse = YtDlp.execute(
-                    separatedRequest(extractionUrl, videoTemplate, request.formatId ?: error("Falta el formato de vídeo"), referer),
-                    null,
+                YtDlpRuntime.download(
+                    context = context,
+                    url = extractionUrl,
+                    options = YtDlpRuntime.downloadOptions(
+                        outputDirectory = workDirectory,
+                        outputTemplate = videoTemplate,
+                        format = request.formatId ?: error("Falta el formato de vídeo"),
+                        referer = referer,
+                    ),
+                    outputDirectory = workDirectory,
                 )
-                check(videoResponse.isSuccess()) {
-                    videoResponse.errorOutput?.ifBlank { null } ?: "yt-dlp no pudo descargar la pista de vídeo."
-                }
-                val videoFile = findTrackFile(workDirectory, "video_")
+                val videoFile = YtDlpRuntime.findOutputFile(workDirectory, videoStartedAt, prefix = "video_")
                 check(videoFile != null) { "yt-dlp terminó sin generar la pista de vídeo." }
 
                 updateProgress(id, 0L, -1L)
@@ -315,56 +304,54 @@ class YtDlpPlatformDownloader(
                 } else {
                     "bestaudio[ext=m4a]/bestaudio[acodec^=mp4a]/bestaudio[acodec^=aac]/bestaudio/ba"
                 }
-                val audioResponse = YtDlp.execute(
-                    separatedRequest(extractionUrl, audioTemplate, audioFormat, referer),
-                    null,
+                val audioStartedAt = System.currentTimeMillis()
+                YtDlpRuntime.download(
+                    context = context,
+                    url = extractionUrl,
+                    options = YtDlpRuntime.downloadOptions(
+                        outputDirectory = workDirectory,
+                        outputTemplate = audioTemplate,
+                        format = audioFormat,
+                        referer = referer,
+                    ),
+                    outputDirectory = workDirectory,
                 )
-                check(audioResponse.isSuccess()) {
-                    audioResponse.errorOutput?.ifBlank { null } ?: "yt-dlp no pudo descargar la pista de audio."
-                }
-                val audioFile = findTrackFile(workDirectory, "audio_")
+                val audioFile = YtDlpRuntime.findOutputFile(workDirectory, audioStartedAt, prefix = "audio_")
                 check(audioFile != null) { "yt-dlp terminó sin generar la pista de audio." }
 
                 val baseName = sanitize(request.fileName?.substringBeforeLast('.') ?: "mediaflow_$id")
                 val output = File(outputDirectory, "$baseName.${request.extension ?: "mp4"}")
                 MediaTrackMuxer.mergeMp4(videoFile, audioFile, output).getOrThrow()
                 completeFile(id, request, output)
-            }.onFailure { error ->
-                updateFailed(id, error)
-            }.also {
+            } finally {
                 workDirectory.deleteRecursively()
             }
-        }.start()
+        }
+        sessions[id] = Session(request, future)
+        executor.execute {
+            runCatching { future.get() }
+                .onFailure { error -> updateFailed(id, error) }
+        }
     }
 
-    private fun separatedRequest(
-        sourceUrl: String,
-        template: String,
-        format: String,
-        referer: String?,
-    ): YtDlpRequest {
-        val request = YtDlpRequest(sourceUrl)
-            .setOutputTemplate(template)
-            .addOption("--ignore-config")
-            .addOption("--no-cookies")
-            .addOption("--no-cache-dir")
-            .addOption("--no-playlist")
-            .addOption("--no-part")
-            .addOption("--retries", "3")
-            .addOption("--socket-timeout", "30")
-            .addOption("--force-ipv4")
-            .addOption("--hls-prefer-native")
-            .addOption("--extractor-args", "youtube:player_client=android,web")
-            .addOption("--user-agent", PLATFORM_USER_AGENT)
-            .addOption("-f", format)
-        referer?.let { request.addOption("--referer", it) }
-        return request
+    /** Accepts mp4/mkv/webm produced for this session; never renames webm/mkv to .mp4. */
+    private fun findSessionOutput(id: String, request: DownloadRequest, startedAt: Long): File? {
+        val baseName = sanitize(request.fileName?.substringBeforeLast('.') ?: "mediaflow_$id")
+        val found = YtDlpRuntime.findOutputFile(
+            directory = outputDirectory,
+            startedAt = startedAt,
+            expectedBaseName = baseName,
+        )
+        if (found != null && found.extension.lowercase() in SESSION_MEDIA_EXTENSIONS) return found
+        val recent = outputDirectory.listFiles().orEmpty().filter { file ->
+            file.isFile &&
+                file.length() > 0L &&
+                !file.name.endsWith(".part", ignoreCase = true) &&
+                file.lastModified() >= startedAt - YtDlpRuntime.FILE_TIME_TOLERANCE_MS
+        }
+        val media = recent.filter { it.extension.lowercase() in SESSION_MEDIA_EXTENSIONS }
+        return media.maxByOrNull { it.lastModified() }
     }
-
-    private fun findTrackFile(directory: File, prefix: String): File? = directory.listFiles()
-        .orEmpty()
-        .filter { it.isFile && it.name.startsWith(prefix) && !it.name.endsWith(".part", true) }
-        .maxByOrNull { it.lastModified() }
 
     fun contains(id: String): Boolean = sessions.containsKey(id) || _items.value.any { it.id == id }
 
@@ -405,16 +392,9 @@ class YtDlpPlatformDownloader(
         start(id, request)
     }
 
-    private fun finish(id: String, request: DownloadRequest, response: YtDlpResponse) {
-        if (!response.isSuccess()) {
-            updateFailed(id, YtDlpException(response.errorOutput ?: "yt-dlp no pudo descargar el vídeo"))
-            return
-        }
+    private fun finish(id: String, request: DownloadRequest, startedAt: Long) {
         val current = _items.value.firstOrNull { it.id == id } ?: return
-        val output = outputDirectory.listFiles()
-            ?.filter { it.isFile && it.nameWithoutExtension == sanitize(request.fileName?.substringBeforeLast('.') ?: "mediaflow_$id") }
-            ?.filter { it.lastModified() >= current.createdAt - FILE_TIME_TOLERANCE_MS }
-            ?.maxByOrNull { it.lastModified() }
+        val output = findSessionOutput(id, request, minOf(startedAt, current.createdAt))
         if (output == null || output.length() == 0L) {
             updateFailed(id, IllegalStateException("yt-dlp terminó sin generar un archivo"))
             return
@@ -486,13 +466,14 @@ class YtDlpPlatformDownloader(
     /** Removes yt-dlp output candidates after cancellation or a failed run. */
     private fun cleanupPartial(fileName: String?, id: String, startedAt: Long) {
         val baseName = sanitize(fileName?.substringBeforeLast('.') ?: "mediaflow_$id")
+        val restricted = YtDlpRuntime.restrictFileName(baseName)
         outputDirectory.listFiles()
             .orEmpty()
-            .filter {
-                it.isFile &&
-                    it.name.startsWith(baseName) &&
-                    (it.name.endsWith(".part", ignoreCase = true) ||
-                        it.lastModified() >= startedAt - FILE_TIME_TOLERANCE_MS)
+            .filter { file ->
+                if (!file.isFile) return@filter false
+                val matchesName = file.name.startsWith(baseName) || file.name.startsWith(restricted)
+                val recent = file.lastModified() >= startedAt - YtDlpRuntime.FILE_TIME_TOLERANCE_MS
+                matchesName && (file.name.endsWith(".part", ignoreCase = true) || recent)
             }
             .forEach { it.delete() }
     }
@@ -542,31 +523,57 @@ class YtDlpPlatformDownloader(
         }
     }
 
-    private fun sanitize(value: String): String = value
-        .replace(Regex("[\\\\/:*?\"<>|\\u0000-\\u001F]"), "")
-        .ifBlank { "mediaflow_download" }
+    private fun sanitize(value: String): String = YtDlpRuntime.restrictFileName(
+        value.replace(Regex("[\\\\/:*?\"<>|\\u0000-\\u001F]"), ""),
+    )
 
-    private fun instagramEmbedUrl(sourceUrl: String): String {
-        val trimmed = sourceUrl.trim()
-        if (trimmed.contains("/embed", ignoreCase = true)) return trimmed
-        val queryIndex = trimmed.indexOf('?')
-        val path = if (queryIndex >= 0) trimmed.substring(0, queryIndex) else trimmed
-        val query = if (queryIndex >= 0) trimmed.substring(queryIndex) else ""
-        return "${path.trimEnd('/')}/embed/$query"
+    private fun tryAnonymousDirectDownload(
+        id: String,
+        request: DownloadRequest,
+        sourceUrl: String,
+        platform: PlatformUrlSupport.Platform?,
+    ): Boolean {
+        val (directUrl, referer) = when (platform) {
+            PlatformUrlSupport.Platform.INSTAGRAM -> {
+                val asset = runCatching {
+                    InstagramAnonymousResolver(context).resolve(sourceUrl).getOrNull()
+                }.getOrNull()?.takeIf { it.isNotBlank() } ?: return false
+                asset to "https://www.instagram.com/"
+            }
+            PlatformUrlSupport.Platform.TIKTOK -> {
+                val asset = runCatching {
+                    TikTokAnonymousResolver().resolve(sourceUrl).getOrNull()?.url
+                }.getOrNull()?.takeIf { it.isNotBlank() } ?: return false
+                asset to "https://www.tiktok.com/"
+            }
+            else -> return false
+        }
+        return downloadDirectPlatformFile(
+            id = id,
+            request = request,
+            directUrl = directUrl,
+            referer = referer,
+            cookieHeader = null,
+        )
     }
 
     private fun mimeFor(extension: String): String = when (extension) {
         "webm" -> "video/webm"
+        "mkv" -> "video/x-matroska"
         "m4a" -> "audio/mp4"
         "mp3" -> "audio/mpeg"
+        "aac" -> "audio/aac"
+        "opus", "ogg" -> "audio/ogg"
         else -> "video/mp4"
     }
 
-    private data class Session(val request: DownloadRequest, val future: Future<YtDlpResponse>)
+    private data class Session(val request: DownloadRequest, val future: Future<*>)
 
     private companion object {
-        const val FILE_TIME_TOLERANCE_MS = 1_000L
-        const val PLATFORM_USER_AGENT =
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36"
+        val SESSION_MEDIA_EXTENSIONS = setOf(
+            "mp4", "m4v", "m4a", "webm", "mkv", "mov", "mp3", "aac", "opus", "ogg", "wav",
+        )
+        const val ANONYMOUS_BROWSER_USER_AGENT =
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.6778.139 Safari/537.36"
     }
 }
