@@ -9,21 +9,33 @@ object PlatformUrlSupport {
         X("X", "x"),
         INSTAGRAM("Instagram", "instagram"),
         TIKTOK("TikTok", "tiktok"),
+        YOUTUBE("YouTube", "youtube"),
     }
 
     fun platformFor(url: String): Platform? {
         val uri = runCatching { URI(url.trim()) }.getOrNull() ?: return null
-        if (!uri.scheme.equals("https", ignoreCase = true)) return null
+        if (!uri.scheme.equals("https", ignoreCase = true) && !uri.scheme.equals("http", ignoreCase = true)) return null
         val host = uri.host?.lowercase() ?: return null
+        val cleanHost = host.removePrefix("www.")
         val path = uri.path.orEmpty()
         return when {
-            (host == "facebook.com" || host.endsWith(".facebook.com")) &&
-                (path.startsWith("/share/r/") || path.startsWith("/reel/") || path.startsWith("/watch")) -> Platform.FACEBOOK
-            (host == "x.com" || host.endsWith(".x.com") || host == "twitter.com" || host.endsWith(".twitter.com")) &&
-                path.contains("/status/") -> Platform.X
-            (host == "instagram.com" || host.endsWith(".instagram.com")) &&
-                (path.startsWith("/reel/") || path.startsWith("/p/") || path.startsWith("/tv/")) -> Platform.INSTAGRAM
-            (host == "tiktok.com" || host.endsWith(".tiktok.com")) && path.isNotBlank() -> Platform.TIKTOK
+            cleanHost == "facebook.com" || cleanHost.endsWith(".facebook.com") ||
+                cleanHost == "fb.watch" || cleanHost.endsWith(".fb.watch") ||
+                cleanHost == "fb.com" || cleanHost.endsWith(".fb.com") -> Platform.FACEBOOK
+
+            cleanHost == "x.com" || cleanHost.endsWith(".x.com") ||
+                cleanHost == "twitter.com" || cleanHost.endsWith(".twitter.com") ||
+                cleanHost == "vxtwitter.com" || cleanHost == "fxtwitter.com" || cleanHost == "fixupx.com" -> Platform.X
+
+            cleanHost == "instagram.com" || cleanHost.endsWith(".instagram.com") ||
+                cleanHost == "instagr.am" || cleanHost.endsWith(".instagr.am") -> Platform.INSTAGRAM
+
+            cleanHost == "tiktok.com" || cleanHost.endsWith(".tiktok.com") ||
+                cleanHost == "douyin.com" || cleanHost.endsWith(".douyin.com") -> Platform.TIKTOK
+
+            cleanHost == "youtube.com" || cleanHost.endsWith(".youtube.com") ||
+                cleanHost == "youtu.be" || cleanHost.endsWith(".youtu.be") -> Platform.YOUTUBE
+
             else -> null
         }
     }

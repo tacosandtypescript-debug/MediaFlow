@@ -120,6 +120,6 @@ object MediaTrackMuxer {
         extractor.unselectTrack(sourceTrack)
     }
 
-    private val SUPPORTED_VIDEO_MIMES = setOf("video/avc", "video/hevc")
-    private val SUPPORTED_AUDIO_MIMES = setOf("audio/mp4a-latm")
+    private val SUPPORTED_VIDEO_MIMES = setOf("video/avc", "video/hevc", "video/mp4v-es", "video/3gpp")
+    private val SUPPORTED_AUDIO_MIMES = setOf("audio/mp4a-latm", "audio/mp4a", "audio/aac", "audio/mpeg", "audio/amr-nb", "audio/amr-wb")
 }

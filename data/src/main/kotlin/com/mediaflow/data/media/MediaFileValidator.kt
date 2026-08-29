@@ -85,8 +85,27 @@ object MediaFileValidator {
 
             require(hasExpectedTrack) { "El archivo no contiene una pista ${expectedType.name.lowercase()} válida." }
 
-            expectedWidth?.let { require(width == it) { "La anchura real ($width) no coincide con la esperada ($it)." } }
-            expectedHeight?.let { require(height == it) { "La altura real ($height) no coincide con la esperada ($it)." } }
+            if (expectedWidth != null && width != null && expectedHeight != null && height != null) {
+                val matchesDirect = kotlin.math.abs(width - expectedWidth) <= 32 && kotlin.math.abs(height - expectedHeight) <= 32
+                val matchesFlipped = kotlin.math.abs(width - expectedHeight) <= 32 && kotlin.math.abs(height - expectedWidth) <= 32
+                if (!matchesDirect && !matchesFlipped) {
+                    Log.w(
+                        TAG,
+                        "Dimensiones del vídeo ($width x $height) difieren de las estimadas ($expectedWidth x $expectedHeight)",
+                    )
+                }
+            } else {
+                expectedWidth?.let { expW ->
+                    if (width != null && kotlin.math.abs(width - expW) > 32 && height != expW) {
+                        Log.w(TAG, "Anchura del vídeo ($width) difiere de la esperada ($expW)")
+                    }
+                }
+                expectedHeight?.let { expH ->
+                    if (height != null && kotlin.math.abs(height - expH) > 32 && width != expH) {
+                        Log.w(TAG, "Altura del vídeo ($height) difiere de la esperada ($expH)")
+                    }
+                }
+            }
 
             val actualDurationSeconds = (durationUs / 1_000_000L).takeIf { it > 0L }
 
@@ -139,11 +158,16 @@ object MediaFileValidator {
     private fun codecMatches(expected: String, mime: String?, codecString: String?): Boolean {
         val wanted = expected.lowercase()
         val actual = codecString?.lowercase().orEmpty()
-        if (actual.contains(wanted)) return true
+        if (actual.contains(wanted) || (actual.isNotEmpty() && wanted.contains(actual))) return true
+        val mimeStr = mime?.lowercase().orEmpty()
         return when {
-            wanted.contains("avc") || wanted.contains("h264") -> mime == "video/avc"
-            wanted.contains("hev") || wanted.contains("h265") -> mime == "video/hevc"
-            wanted.contains("aac") || wanted.contains("mp4a") -> mime == "audio/mp4a-latm"
+            wanted.contains("avc") || wanted.contains("h264") -> mimeStr.contains("avc") || mimeStr.contains("h264")
+            wanted.contains("hev") || wanted.contains("h265") || wanted.contains("hvc1") -> mimeStr.contains("hevc") || mimeStr.contains("h265")
+            wanted.contains("vp9") || wanted.contains("vp09") -> mimeStr.contains("vp9")
+            wanted.contains("av01") || wanted.contains("av1") -> mimeStr.contains("av01") || mimeStr.contains("av1")
+            wanted.contains("aac") || wanted.contains("mp4a") -> mimeStr.contains("mp4a") || mimeStr.contains("aac")
+            wanted.contains("opus") -> mimeStr.contains("opus")
+            wanted.contains("mp3") || wanted.contains("mpeg") -> mimeStr.contains("mpeg") || mimeStr.contains("mp3")
             wanted == "none" -> mime == null
             else -> true
         }

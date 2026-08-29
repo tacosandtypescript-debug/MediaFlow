@@ -100,8 +100,7 @@ class YtDlpSourceResolver(
                         .addOption("--force-ipv4")
                         .addOption("--no-warnings")
                         .addOption("--hls-prefer-native")
-                        .addOption("--no-check-formats")
-                        .addOption("--downloader", "m3u8:native")
+                        .addOption("--extractor-args", "youtube:player_client=android,web")
                         .addOption("--user-agent", USER_AGENT),
                     null,
                 )
@@ -188,7 +187,7 @@ class YtDlpSourceResolver(
             .takeIf { !it.isNaN() && it >= 0 }
             ?.toLong()
 
-        val formats = root.optJSONArray("formats")?.let { array ->
+        val parsedFormats = root.optJSONArray("formats")?.let { array ->
             buildList {
                 for (index in 0 until array.length()) {
                     val format = array.optJSONObject(index) ?: continue
@@ -196,6 +195,12 @@ class YtDlpSourceResolver(
                 }
             }
         }.orEmpty().distinctBy { it.formatId }
+
+        val formats = if (parsedFormats.isNotEmpty()) {
+            parsedFormats
+        } else {
+            listOfNotNull(toMediaFormat(root, duration))
+        }
 
         // Check if content is an X Space
         val isSpace = XContentDetector.detectFromYtDlpJson(root) == com.mediaflow.core.model.XContentType.SPACE ||
@@ -233,15 +238,25 @@ class YtDlpSourceResolver(
     }
 
     private fun toMediaFormat(json: JSONObject, duration: Long?): MediaFormat? {
-        val formatId = json.optString("format_id").takeIf { it.isNotBlank() } ?: return null
-        val videoCodec = json.optString("vcodec").takeIf { it.isNotBlank() && it != "none" }
-        val audioCodec = json.optString("acodec").takeIf { it.isNotBlank() && it != "none" }
-        if (videoCodec == null && audioCodec == null) return null
-        val mediaType = if (videoCodec != null) MediaType.VIDEO else MediaType.AUDIO
+        val formatId = json.optString("format_id").takeIf { it.isNotBlank() }
+            ?: json.optString("id").takeIf { it.isNotBlank() }
+            ?: if (json.has("url") || json.has("ext")) "direct" else return null
+        val videoCodec = json.optString("vcodec").takeIf { it.isNotBlank() && it != "none" && it != "null" }
+        val audioCodec = json.optString("acodec").takeIf { it.isNotBlank() && it != "none" && it != "null" }
+        val extension = json.optString("ext").takeIf { it.isNotBlank() } ?: "mp4"
         val height = json.optInt("height", 0).takeIf { it > 0 }
         val width = json.optInt("width", 0).takeIf { it > 0 }
-        val extension = json.optString("ext").takeIf { it.isNotBlank() }
-        val progressive = videoCodec != null && audioCodec != null
+
+        val mediaType = when {
+            videoCodec != null -> MediaType.VIDEO
+            audioCodec != null -> MediaType.AUDIO
+            extension.lowercase() in listOf("mp3", "m4a", "aac", "wav", "ogg", "opus") -> MediaType.AUDIO
+            height != null || width != null || extension.lowercase() in listOf("mp4", "m4v", "webm", "mkv", "mov", "flv", "3gp") -> MediaType.VIDEO
+            else -> MediaType.VIDEO
+        }
+
+        val progressive = (videoCodec != null && audioCodec != null) ||
+            (videoCodec == null && audioCodec == null && mediaType == MediaType.VIDEO)
         val size = firstPositive(json, "filesize", "filesize_approx")
         val bitrate = firstPositive(json, "tbr", "vbr", "abr")
         val fps = json.optDouble("fps", Double.NaN).takeIf { !it.isNaN() && it > 0 }

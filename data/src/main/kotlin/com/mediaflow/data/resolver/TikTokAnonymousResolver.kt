@@ -26,19 +26,29 @@ class TikTokAnonymousResolver {
     }
 
     private fun extractPlayAddress(html: String): String? {
-        val match = PLAY_ADDRESS.find(html) ?: return null
-        return match.groupValues[1]
-            .replace("\\u002F", "/")
-            .replace("\\u0026", "&")
-            .replace("\\/", "/")
-            .replace("\\u003D", "=")
-            .takeIf { runCatching { URI(it) }.getOrNull()?.scheme == "https" }
+        val candidates = listOf(
+            Regex("""\"playAddr\":\"([^\"]+)\""""),
+            Regex("""\"downloadAddr\":\"([^\"]+)\""""),
+            Regex("""\"playUrl\":\[\{\"src\":\"([^\"]+)\""""),
+            Regex("""\"playUrl\":\"([^\"]+)\""""),
+        )
+        for (pattern in candidates) {
+            val match = pattern.find(html) ?: continue
+            val raw = match.groupValues[1]
+                .replace("\\u002F", "/")
+                .replace("\\u0026", "&")
+                .replace("\\/", "/")
+                .replace("\\u003D", "=")
+            if (runCatching { URI(raw) }.getOrNull()?.scheme == "https") {
+                return raw
+            }
+        }
+        return null
     }
 
     private companion object {
         const val TIMEOUT_MS = 20_000
         const val BROWSER_USER_AGENT =
             "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/131.0 Mobile Safari/537.36"
-        val PLAY_ADDRESS = Regex("\\\"playAddr\\\":\\\"([^\\\"]+)\\\"")
     }
 }

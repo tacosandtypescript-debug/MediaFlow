@@ -71,7 +71,7 @@ class DirectDownloadSupportTest {
     }
 
     @Test
-    fun `Facebook platform link rejects audio until FFmpeg is integrated`() {
+    fun `Facebook platform link accepts audio and video requests`() {
         val result = resolver.createRequest(
             "https://www.facebook.com/share/r/1JdP2B9h4L/",
             MediaType.AUDIO,
@@ -79,13 +79,18 @@ class DirectDownloadSupportTest {
             null,
         )
 
-        assertFalse(result.isSuccess)
+        assertTrue(result.isSuccess)
+        assertEquals(MediaType.AUDIO, result.getOrThrow().mediaType)
+        assertEquals("m4a", result.getOrThrow().extension)
     }
 
     @Test
-    fun `X Instagram and TikTok platform links are accepted`() {
+    fun `YouTube X Instagram and TikTok platform links are accepted`() {
         val urls = listOf(
+            "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+            "https://youtu.be/dQw4w9WgXcQ",
             "https://x.com/nicdunz/status/2090872826529988887/video/1?s=46",
+            "https://x.com/i/spaces/1jGXgBDyzpNKZ",
             "https://www.instagram.com/reel/DcSOPIsuOpy/?igsi=MTVtMzlpazloOGxpeg==",
             "https://vt.tiktok.com/ZSVPEWsKB/",
         )

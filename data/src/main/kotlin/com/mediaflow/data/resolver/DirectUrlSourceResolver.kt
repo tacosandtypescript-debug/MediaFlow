@@ -77,9 +77,6 @@ class DirectUrlSourceResolver : SourceResolver {
         customFileName: String?,
     ): Result<DownloadRequest> {
         PlatformUrlSupport.platformFor(sourceUrl)?.let { platform ->
-            if (mediaType != MediaType.VIDEO && platform != PlatformUrlSupport.Platform.X) {
-                return Result.failure(IllegalArgumentException("${platform.label} se descarga como vídeo; el modo audio se añadirá con FFmpeg"))
-            }
             val isAudio = mediaType == MediaType.AUDIO
             val ext = if (isAudio) "m4a" else "mp4"
             val mime = if (isAudio) "audio/mp4" else "video/mp4"
@@ -93,7 +90,7 @@ class DirectUrlSourceResolver : SourceResolver {
                     sourceUrl = sourceUrl.trim(),
                     mediaType = mediaType,
                     qualityLabel = qualityLabel,
-                    formatId = if (isAudio) "space_audio_m4a" else "yt-dlp",
+                    formatId = if (isAudio) (if (platform == PlatformUrlSupport.Platform.X) "space_audio_m4a" else "bestaudio") else "yt-dlp",
                     fileName = name,
                     mimeType = mime,
                     extension = ext,

@@ -221,11 +221,7 @@ class YtDlpPlatformDownloader(
             PlatformUrlSupport.Platform.TIKTOK -> "https://www.tiktok.com/"
             else -> null
         }
-        val extractionUrl = if (platform == PlatformUrlSupport.Platform.INSTAGRAM) {
-            instagramEmbedUrl(sourceUrl)
-        } else {
-            sourceUrl
-        }
+        val extractionUrl = sourceUrl
         val space = if (platform == PlatformUrlSupport.Platform.X) {
             runCatching {
                 val store = com.mediaflow.data.provider.x.spaces.XSpaceStore(context)
@@ -244,9 +240,10 @@ class YtDlpPlatformDownloader(
             .addOption("--no-playlist")
             .addOption("--no-part")
             .addOption("--retries", "3")
+            .addOption("--socket-timeout", "30")
+            .addOption("--force-ipv4")
             .addOption("--hls-prefer-native")
-            .addOption("--no-check-formats")
-            .addOption("--downloader", "m3u8:native")
+            .addOption("--extractor-args", "youtube:player_client=android,web")
             .addOption("--user-agent", PLATFORM_USER_AGENT)
             .addOption("-f", PlatformFormatSelector.select(request))
 
@@ -313,8 +310,13 @@ class YtDlpPlatformDownloader(
                 check(videoFile != null) { "yt-dlp terminó sin generar la pista de vídeo." }
 
                 updateProgress(id, 0L, -1L)
+                val audioFormat = if (request.extension == "webm") {
+                    "bestaudio[ext=webm]/bestaudio[acodec=opus]/bestaudio"
+                } else {
+                    "bestaudio[ext=m4a]/bestaudio[acodec^=mp4a]/bestaudio[acodec^=aac]/bestaudio/ba"
+                }
                 val audioResponse = YtDlp.execute(
-                    separatedRequest(extractionUrl, audioTemplate, "bestaudio", referer),
+                    separatedRequest(extractionUrl, audioTemplate, audioFormat, referer),
                     null,
                 )
                 check(audioResponse.isSuccess()) {
@@ -349,6 +351,10 @@ class YtDlpPlatformDownloader(
             .addOption("--no-playlist")
             .addOption("--no-part")
             .addOption("--retries", "3")
+            .addOption("--socket-timeout", "30")
+            .addOption("--force-ipv4")
+            .addOption("--hls-prefer-native")
+            .addOption("--extractor-args", "youtube:player_client=android,web")
             .addOption("--user-agent", PLATFORM_USER_AGENT)
             .addOption("-f", format)
         referer?.let { request.addOption("--referer", it) }

@@ -75,4 +75,52 @@ class YtDlpSourceResolverTest {
         assertEquals("spacehost", info.spaceMetadata?.host?.username)
         assertEquals(1, info.availableFormats.size)
     }
+
+    @Test
+    fun `parses root-level single stream JSON without formats array`() = runTest {
+        val resolver = YtDlpSourceResolver(RuntimeEnvironment.getApplication())
+        val info = resolver.parseForTest("https://www.tiktok.com/@user/video/123", """
+            {
+              "id": "123",
+              "title": "TikTok Reel",
+              "url": "https://cdn.tiktok.com/video.mp4",
+              "ext": "mp4",
+              "width": 720,
+              "height": 1280,
+              "duration": 15.0
+            }
+        """.trimIndent())
+
+        assertEquals("TikTok Reel", info.title)
+        assertEquals(15L, info.durationSeconds)
+        assertEquals(1, info.availableFormats.size)
+        val format = info.availableFormats.first()
+        assertEquals(MediaType.VIDEO, format.mediaType)
+        assertEquals("mp4", format.extension)
+        assertEquals(720, format.width)
+        assertEquals(1280, format.height)
+        assertTrue(format.isProgressive)
+        assertFalse(format.requiresMuxing)
+    }
+
+    @Test
+    fun `parses formats with unspecified codecs but valid extensions`() = runTest {
+        val resolver = YtDlpSourceResolver(RuntimeEnvironment.getApplication())
+        val info = resolver.parseForTest("https://www.instagram.com/reel/abc", """
+            {
+              "id": "abc",
+              "title": "Instagram Post",
+              "formats": [
+                {"format_id": "0", "ext": "mp4", "url": "https://cdn.instagram.com/video.mp4", "height": 1080, "width": 1080}
+              ]
+            }
+        """.trimIndent())
+
+        assertEquals("Instagram Post", info.title)
+        assertEquals(1, info.availableFormats.size)
+        val format = info.availableFormats.first()
+        assertEquals(MediaType.VIDEO, format.mediaType)
+        assertEquals(1080, format.height)
+        assertTrue(format.isProgressive)
+    }
 }
