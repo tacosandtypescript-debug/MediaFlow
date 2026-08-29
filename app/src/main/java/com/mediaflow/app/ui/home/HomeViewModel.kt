@@ -3,7 +3,9 @@ package com.mediaflow.app.ui.home
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mediaflow.app.R
+import com.mediaflow.core.model.MediaFormat
 import com.mediaflow.core.model.MediaType
+import com.mediaflow.domain.repository.SourceInfo
 import com.mediaflow.domain.repository.SourceResolver
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -35,20 +37,7 @@ class HomeViewModel : ViewModel() {
     }
 
     fun onMediaTypeSelected(contentType: ContentType) {
-        val qualityOptions = QualityOption.optionsFor(contentType)
-        _uiState.update {
-            it.copy(
-                mediaType = contentType,
-                qualityOptions = qualityOptions,
-                quality = QualityOption.AUTO,
-                analysisState = AnalysisState.IDLE,
-                sourceInfo = null,
-                availableFormats = emptyList(),
-                selectedFormatId = null,
-                analysisError = null,
-                isDownloadButtonEnabled = it.validationState == ValidationState.Valid,
-            )
-        }
+        _uiState.update { applyContentType(it, contentType) }
     }
 
     fun onQualitySelected(quality: QualityOption) {
@@ -84,24 +73,15 @@ class HomeViewModel : ViewModel() {
         analysisJob = viewModelScope.launch {
             runCatching { sourceResolver.analyze(current.url) }
                 .onSuccess { info ->
-                    val isSpace = info.spaceMetadata != null
-                    val effectiveMediaType = if (isSpace) ContentType.AUDIO else current.mediaType
-                    val targetCoreType = if (effectiveMediaType == ContentType.VIDEO) MediaType.VIDEO else MediaType.AUDIO
-                    val formats = info.availableFormats.filter { it.mediaType == targetCoreType }
-                    val error = info.errorMessage ?: if (formats.isEmpty() && !isSpace) {
-                        "La fuente no ofrece formatos para el tipo seleccionado."
-                    } else null
-                    _uiState.update {
-                        it.copy(
-                            mediaType = effectiveMediaType,
-                            qualityOptions = QualityOption.optionsFor(effectiveMediaType),
-                            analysisState = if (error == null) AnalysisState.READY else AnalysisState.FAILED,
-                            sourceInfo = info,
-                            availableFormats = formats,
-                            selectedFormatId = PreferredDownloadFormat.select(formats, it.quality)?.formatId,
-                            analysisError = error,
-                            infoMessage = if (error == null) R.string.analysis_ready else null,
-                            isDownloadButtonEnabled = error == null,
+                    _uiState.update { latest ->
+                        val requested = if (info.spaceMetadata != null) {
+                            ContentType.AUDIO
+                        } else {
+                            latest.mediaType
+                        }
+                        applyContentType(
+                            latest.copy(sourceInfo = info, analysisState = AnalysisState.READY),
+                            requested,
                         )
                     }
                 }
@@ -132,6 +112,46 @@ class HomeViewModel : ViewModel() {
      * Internal validator that strictly checks for a standard HTTPS scheme
      * and a supported host.
      */
+    /**
+     * Reaplica Vídeo/Audio sobre el análisis ya hecho. Un Space de X permanece
+     * en audio; si el usuario pide audio y la fuente solo trae vídeo, se ofrece
+     * una pista de audio extraíble con yt-dlp (`bestaudio`).
+     */
+    private fun applyContentType(state: HomeUiState, contentType: ContentType): HomeUiState {
+        val info = state.sourceInfo
+        val isSpace = info?.spaceMetadata != null
+        val effective = if (isSpace) ContentType.AUDIO else contentType
+        val qualityOptions = QualityOption.optionsFor(effective)
+        val quality = if (state.quality in qualityOptions) state.quality else QualityOption.AUTO
+        if (info == null ||
+            state.analysisState == AnalysisState.IDLE ||
+            state.analysisState == AnalysisState.ANALYZING
+        ) {
+            return state.copy(
+                mediaType = effective,
+                qualityOptions = qualityOptions,
+                quality = quality,
+            )
+        }
+        val formats = formatsFor(info, effective)
+        val error = info.errorMessage ?: if (formats.isEmpty() && !isSpace) {
+            "La fuente no ofrece formatos para el tipo seleccionado."
+        } else {
+            null
+        }
+        return state.copy(
+            mediaType = effective,
+            qualityOptions = qualityOptions,
+            quality = quality,
+            availableFormats = formats,
+            selectedFormatId = PreferredDownloadFormat.select(formats, quality)?.formatId,
+            analysisState = if (error == null) AnalysisState.READY else AnalysisState.FAILED,
+            analysisError = error,
+            infoMessage = if (error == null) R.string.analysis_ready else null,
+            isDownloadButtonEnabled = error == null,
+        )
+    }
+
     private fun updateUrlValidation(rawUrl: String) {
         val trimmed = rawUrl.trim()
         val validation = validateUrl(trimmed)
@@ -170,6 +190,32 @@ class HomeViewModel : ViewModel() {
     }
 
     companion object {
+        internal const val SYNTHETIC_AUDIO_FORMAT_ID = "bestaudio"
         private val ILLEGAL_CHARACTERS_REGEX = Regex("""[\\/:*?"<>|]""")
+
+        internal fun formatsFor(info: SourceInfo, contentType: ContentType): List<MediaFormat> {
+            if (contentType == ContentType.AUDIO || info.spaceMetadata != null) {
+                val audio = info.availableFormats.filter { it.mediaType == MediaType.AUDIO }
+                if (audio.isNotEmpty()) return audio
+                if (info.spaceMetadata == null && info.availableFormats.any { it.mediaType == MediaType.VIDEO }) {
+                    val video = info.availableFormats.first { it.mediaType == MediaType.VIDEO }
+                    return listOf(
+                        MediaFormat(
+                            formatId = SYNTHETIC_AUDIO_FORMAT_ID,
+                            extension = "m4a",
+                            mimeType = "audio/mp4",
+                            mediaType = MediaType.AUDIO,
+                            qualityLabel = "Audio",
+                            durationSeconds = info.durationSeconds ?: video.durationSeconds,
+                            audioCodec = "mp4a",
+                            isProgressive = true,
+                            requiresMuxing = false,
+                        ),
+                    )
+                }
+                return audio
+            }
+            return info.availableFormats.filter { it.mediaType == MediaType.VIDEO }
+        }
     }
 }

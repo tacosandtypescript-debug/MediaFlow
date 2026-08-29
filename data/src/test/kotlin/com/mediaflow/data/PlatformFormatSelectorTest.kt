@@ -85,6 +85,18 @@ class PlatformFormatSelectorTest {
     }
 
     @Test
+    fun `synthetic bestaudio format id prefers m4a`() {
+        val request = DownloadRequest(
+            sourceUrl = "https://www.youtube.com/watch?v=example",
+            mediaType = MediaType.AUDIO,
+            formatId = "bestaudio",
+            extension = "m4a",
+        )
+
+        assertEquals("bestaudio[ext=m4a]/bestaudio", PlatformFormatSelector.select(request))
+    }
+
+    @Test
     fun `audio without format id prefers m4a`() {
         val request = DownloadRequest(
             sourceUrl = "https://www.youtube.com/watch?v=example",

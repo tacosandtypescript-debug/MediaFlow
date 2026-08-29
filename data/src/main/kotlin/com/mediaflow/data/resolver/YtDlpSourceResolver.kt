@@ -143,7 +143,7 @@ class YtDlpSourceResolver(
         }
     }
 
-    private fun anonymousVideoInfo(sourceUrl: String, _cdnUrl: String, title: String): SourceInfo = SourceInfo(
+    private fun anonymousVideoInfo(sourceUrl: String, cdnUrl: String, title: String): SourceInfo = SourceInfo(
         sourceUrl = sourceUrl,
         title = title,
         availableFormats = listOf(
@@ -155,6 +155,7 @@ class YtDlpSourceResolver(
                 qualityLabel = "Automática",
                 isProgressive = true,
                 requiresMuxing = false,
+                streamUrl = cdnUrl.takeIf { it.startsWith("https://") },
             ),
         ),
     )
@@ -299,6 +300,7 @@ class YtDlpSourceResolver(
             fileSize = size,
             isProgressive = progressive,
             requiresMuxing = videoCodec != null && audioCodec == null,
+            streamUrl = json.optString("url").takeIf { it.startsWith("https://") },
         )
     }
 

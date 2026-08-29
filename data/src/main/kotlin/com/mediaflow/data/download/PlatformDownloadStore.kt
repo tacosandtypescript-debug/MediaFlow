@@ -55,6 +55,7 @@ class PlatformDownloadStore private constructor(private val file: File) {
         put("durationSeconds", format.durationSeconds); put("bitrate", format.bitrate)
         put("fileSize", format.fileSize); put("isProgressive", format.isProgressive)
         put("requiresMuxing", format.requiresMuxing)
+        put("streamUrl", format.streamUrl)
     }
 
     private fun decode(json: JSONObject): DownloadItem? = runCatching {
@@ -93,5 +94,6 @@ class PlatformDownloadStore private constructor(private val file: File) {
         bitrate = json.optLong("bitrate", 0L).takeIf { it > 0L },
         fileSize = json.optLong("fileSize", 0L).takeIf { it > 0L },
         isProgressive = json.optBoolean("isProgressive"), requiresMuxing = json.optBoolean("requiresMuxing"),
+        streamUrl = json.optString("streamUrl").takeIf { it.startsWith("https://") },
     )
 }

@@ -260,4 +260,22 @@ class MediaFileValidatorTest {
 
         assertTrue(result.isSuccess)
     }
+
+    @Test
+    fun `validate playable video succeeds when estimated codec differs`() {
+        val file = createDummyFile("clip.mp4")
+        val videoFormat = MediaFormat.createVideoFormat("video/avc", 1280, 720)
+        val audioFormat = MediaFormat.createAudioFormat("audio/mp4a-latm", 44100, 2)
+        mockExtractor(listOf(videoFormat, audioFormat))
+
+        val result = MediaFileValidator.validate(
+            file = file,
+            expectedType = MediaType.VIDEO,
+            expectedExtension = "mp4",
+            expectedVideoCodec = "h265",
+            expectedAudioCodec = "opus",
+        )
+
+        assertTrue("A playable MP4 must not fail because the estimated codec differed", result.isSuccess)
+    }
 }

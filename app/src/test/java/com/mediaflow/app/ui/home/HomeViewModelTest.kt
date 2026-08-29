@@ -253,6 +253,26 @@ class HomeViewModelTest {
                         "137", "mp4", "video/mp4", MediaType.VIDEO, "1080p",
                         height = 1080, videoCodec = "avc1", requiresMuxing = true,
                     ),
+                ),
+            )
+        })
+
+        assertEquals("137", vm.uiState.value.selectedFormatId)
+    }
+
+    @Test
+    fun `auto analysis prefers progressive over higher mux-only rungs`() {
+        val vm = newViewModel()
+        vm.onUrlChanged("https://example.com/video")
+        vm.analyze(object : SourceResolver {
+            override suspend fun analyze(sourceUrl: String) = SourceInfo(
+                sourceUrl = sourceUrl,
+                title = "YouTube sample",
+                availableFormats = listOf(
+                    MediaFormat(
+                        "137", "mp4", "video/mp4", MediaType.VIDEO, "1080p",
+                        height = 1080, videoCodec = "avc1", requiresMuxing = true,
+                    ),
                     MediaFormat(
                         "22", "mp4", "video/mp4", MediaType.VIDEO, "720p",
                         height = 720, videoCodec = "avc1", audioCodec = "mp4a.40.2",
@@ -262,7 +282,7 @@ class HomeViewModelTest {
             )
         })
 
-        assertEquals("137", vm.uiState.value.selectedFormatId)
+        assertEquals("22", vm.uiState.value.selectedFormatId)
     }
 
     @Test
@@ -369,5 +389,67 @@ class HomeViewModelTest {
         assertEquals(AnalysisState.FAILED, vm.uiState.value.analysisState)
         assertFalse(vm.uiState.value.isDownloadButtonEnabled)
         assertTrue(vm.uiState.value.availableFormats.isEmpty())
+
+        vm.onMediaTypeSelected(ContentType.AUDIO)
+        assertEquals(AnalysisState.READY, vm.uiState.value.analysisState)
+        assertTrue(vm.uiState.value.isDownloadButtonEnabled)
+        assertEquals("140", vm.uiState.value.selectedFormatId)
+        assertEquals(ContentType.AUDIO, vm.uiState.value.mediaType)
+    }
+
+    @Test
+    fun `switching type after analysis refilters without clearing source`() {
+        val vm = newViewModel()
+        vm.onUrlChanged("https://example.com/video")
+        vm.analyze(object : SourceResolver {
+            override suspend fun analyze(sourceUrl: String) = SourceInfo(
+                sourceUrl = sourceUrl,
+                title = "Clip mixto",
+                availableFormats = listOf(
+                    MediaFormat("137", "mp4", "video/mp4", MediaType.VIDEO, "1080p", height = 1080, videoCodec = "avc1"),
+                    MediaFormat("140", "m4a", "audio/mp4", MediaType.AUDIO, "128k", audioCodec = "mp4a"),
+                ),
+            )
+        })
+
+        assertEquals("137", vm.uiState.value.selectedFormatId)
+        assertEquals("Clip mixto", vm.uiState.value.sourceInfo?.title)
+
+        vm.onMediaTypeSelected(ContentType.AUDIO)
+        assertEquals(AnalysisState.READY, vm.uiState.value.analysisState)
+        assertEquals("Clip mixto", vm.uiState.value.sourceInfo?.title)
+        assertEquals(ContentType.AUDIO, vm.uiState.value.mediaType)
+        assertEquals(1, vm.uiState.value.availableFormats.size)
+        assertEquals("140", vm.uiState.value.selectedFormatId)
+        assertTrue(vm.uiState.value.isDownloadButtonEnabled)
+
+        vm.onMediaTypeSelected(ContentType.VIDEO)
+        assertEquals(ContentType.VIDEO, vm.uiState.value.mediaType)
+        assertEquals("137", vm.uiState.value.selectedFormatId)
+        assertEquals(AnalysisState.READY, vm.uiState.value.analysisState)
+    }
+
+    @Test
+    fun `switching to audio synthesizes bestaudio when source is video only`() {
+        val vm = newViewModel()
+        vm.onUrlChanged("https://example.com/video")
+        vm.analyze(object : SourceResolver {
+            override suspend fun analyze(sourceUrl: String) = SourceInfo(
+                sourceUrl = sourceUrl,
+                title = "Solo vídeo",
+                availableFormats = listOf(
+                    MediaFormat(
+                        "anonymous", "mp4", "video/mp4", MediaType.VIDEO, "Automática",
+                        isProgressive = true,
+                    ),
+                ),
+            )
+        })
+
+        vm.onMediaTypeSelected(ContentType.AUDIO)
+        assertEquals(AnalysisState.READY, vm.uiState.value.analysisState)
+        assertEquals(HomeViewModel.SYNTHETIC_AUDIO_FORMAT_ID, vm.uiState.value.selectedFormatId)
+        assertEquals(MediaType.AUDIO, vm.uiState.value.availableFormats.single().mediaType)
+        assertTrue(vm.uiState.value.isDownloadButtonEnabled)
     }
 }

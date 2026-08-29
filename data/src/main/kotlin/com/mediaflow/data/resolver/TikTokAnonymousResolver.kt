@@ -21,6 +21,12 @@ class TikTokAnonymousResolver {
         ResolvedVideo(videoUrl, cookieHeader)
     }
 
+    fun sessionCookieHeader(sourceUrl: String): String? {
+        val cookies = linkedMapOf<String, String>()
+        runCatching { fetchHtml(sourceUrl, cookies) }
+        return cookies.entries.joinToString("; ") { "${it.key}=${it.value}" }.takeIf { it.isNotBlank() }
+    }
+
     /** Fetches the page and the CDN MP4 in one pass so the playAddr token does not expire. */
     fun downloadTo(
         sourceUrl: String,

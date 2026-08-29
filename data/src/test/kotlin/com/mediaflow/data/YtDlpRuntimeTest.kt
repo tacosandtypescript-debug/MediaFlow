@@ -24,6 +24,8 @@ class YtDlpRuntimeTest {
         assertFalse(opts.getBoolean("check_formats"))
         assertTrue(opts.getBoolean("restrictfilenames"))
         assertTrue(opts.getBoolean("nopart"))
+        assertFalse(opts.getBoolean("continuedl"))
+        assertTrue(opts.getBoolean("overwrites"))
         assertEquals(3, opts.getInt("retries"))
         assertEquals(30, opts.getInt("socket_timeout"))
         assertEquals("0.0.0.0", opts.getString("source_address"))

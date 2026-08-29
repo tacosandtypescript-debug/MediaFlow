@@ -124,12 +124,16 @@ object MediaFileValidator {
                 }
             }
 
-            expectedVideoCodec?.let { require(codecMatches(it, videoMime, videoCodecString)) {
-                "El códec de vídeo real ($videoMime) no coincide con el formato seleccionado."
-            } }
-            expectedAudioCodec?.let { require(codecMatches(it, audioMime, audioCodecString)) {
-                "El códec de audio real ($audioMime) no coincide con el formato seleccionado."
-            } }
+            expectedVideoCodec?.let {
+                if (!codecMatches(it, videoMime, videoCodecString)) {
+                    Log.w(TAG, "El códec de vídeo real ($videoMime) difiere del estimado ($it). El archivo se acepta si es reproducible.")
+                }
+            }
+            expectedAudioCodec?.let {
+                if (!codecMatches(it, audioMime, audioCodecString)) {
+                    Log.w(TAG, "El códec de audio real ($audioMime) difiere del estimado ($it). El archivo se acepta si es reproducible.")
+                }
+            }
 
             ValidatedMedia(
                 sizeBytes = file.length(),

@@ -24,6 +24,7 @@ data class DownloadRequest(
     val videoCodec: String? = null,
     val audioCodec: String? = null,
     val thumbnailUrl: String? = null,
+    val streamUrl: String? = null,
 )
 
 /**

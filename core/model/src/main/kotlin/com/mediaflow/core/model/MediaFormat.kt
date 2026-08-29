@@ -23,4 +23,5 @@ data class MediaFormat(
     val fileSize: Long? = null,
     val isProgressive: Boolean = false,
     val requiresMuxing: Boolean = false,
+    val streamUrl: String? = null,
 )

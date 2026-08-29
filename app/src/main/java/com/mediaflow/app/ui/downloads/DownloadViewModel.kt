@@ -8,6 +8,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.mediaflow.app.ui.home.AnalysisState
 import com.mediaflow.app.ui.home.HomeUiState
 import com.mediaflow.core.model.DownloadItem
 import com.mediaflow.core.model.MediaFormat
@@ -102,7 +103,17 @@ class DownloadViewModel(
         viewModelScope.launch {
             val repository = repositoryDeferred.await()
             runCatching {
-                val source = sourceResolver.analyze(state.url)
+                val cached = state.sourceInfo
+                val source = if (
+                    state.analysisState == AnalysisState.READY &&
+                    cached != null &&
+                    cached.errorMessage == null &&
+                    cached.availableFormats.isNotEmpty()
+                ) {
+                    cached
+                } else {
+                    sourceResolver.analyze(state.url)
+                }
                 check(source.errorMessage == null && source.availableFormats.isNotEmpty()) {
                     source.errorMessage ?: "La fuente no devolvió calidades descargables."
                 }
@@ -145,6 +156,7 @@ class DownloadViewModel(
                     videoCodec = selected.videoCodec,
                     audioCodec = selected.audioCodec,
                     thumbnailUrl = source.thumbnailUrl ?: space?.host?.avatarUrl,
+                    streamUrl = selected.streamUrl,
                 ))
 
                 if (space != null) {

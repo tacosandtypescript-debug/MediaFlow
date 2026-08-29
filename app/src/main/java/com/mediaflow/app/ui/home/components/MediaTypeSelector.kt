@@ -25,6 +25,7 @@ fun MediaTypeSelector(
     selected: ContentType,
     onSelect: (ContentType) -> Unit,
     modifier: Modifier = Modifier,
+    videoEnabled: Boolean = true,
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
         Text(
@@ -39,9 +40,11 @@ fun MediaTypeSelector(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             ContentType.entries.forEach { option ->
+                val enabled = option != ContentType.VIDEO || videoEnabled
                 FilterChip(
                     selected = selected == option,
-                    onClick = { onSelect(option) },
+                    onClick = { if (enabled) onSelect(option) },
+                    enabled = enabled,
                     label = { Text(stringResource(option.labelRes)) },
                     modifier = Modifier
                         .height(48.dp)

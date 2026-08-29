@@ -86,6 +86,13 @@ internal object PreferredDownloadFormat {
             if (preferLowest) list.sorted() else list.sortedDescending()
         }
 
+        // AUTO: a progressive MP4 (audio+video) is more reliable than a higher
+        // video-only rung that still has to be muxed.
+        if (targetHeight == null && !preferLowest) {
+            pickCompatible(formats.filter { it.isProgressive && !it.requiresMuxing }, preferLowest = false)
+                ?.let { return it }
+        }
+
         for (height in heights) {
             pickCompatible(formats.filter { it.height == height }, preferLowest)?.let { return it }
         }

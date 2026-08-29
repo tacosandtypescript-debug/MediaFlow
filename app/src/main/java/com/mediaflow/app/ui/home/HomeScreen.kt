@@ -194,14 +194,14 @@ fun HomeScreen(
                 modifier = Modifier.padding(bottom = 18.dp),
             )
 
-            AnimatedVisibility(
-                sourceResolver == null || state.analysisState == AnalysisState.IDLE,
-                enter = staggeredEnter(80),
-            ) {
-                MediaTypeSelector(
-                    selected = state.mediaType,
-                    onSelect = viewModel::onMediaTypeSelected,
-                )
+            AnimatedVisibility(entered, enter = staggeredEnter(80)) {
+                Column {
+                    MediaTypeSelector(
+                        selected = state.mediaType,
+                        onSelect = viewModel::onMediaTypeSelected,
+                        videoEnabled = state.sourceInfo?.spaceMetadata == null,
+                    )
+                }
             }
 
             Spacer(Modifier.height(18.dp))

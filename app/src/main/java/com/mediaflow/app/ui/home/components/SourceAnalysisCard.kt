@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import com.mediaflow.app.R
 import com.mediaflow.app.ui.home.AnalysisState
 import com.mediaflow.core.model.MediaFormat
+import com.mediaflow.core.model.MediaType
 import com.mediaflow.domain.repository.SourceInfo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -151,6 +152,8 @@ private fun ThumbnailPreview(url: String?) {
 }
 
 private fun formatLabel(format: MediaFormat): String = buildString {
+    append(if (format.mediaType == MediaType.VIDEO) "Vídeo" else "Audio")
+    append(" · ")
     append(format.qualityLabel ?: format.height?.let { "${it}p" } ?: format.extension ?: "Formato")
     format.extension?.let { append(" · .$it") }
     format.container?.let { append(" · $it") }

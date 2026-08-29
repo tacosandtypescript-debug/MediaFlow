@@ -14,6 +14,7 @@ object PlatformFormatSelector {
 
     fun select(request: DownloadRequest): String = when {
         request.formatId == "space_audio_m4a" -> "b/best/0/bestaudio"
+        request.formatId == "bestaudio" -> AUDIO_M4A_PREFERRED
         request.formatId == "anonymous" -> VIDEO_MP4_PREFERRED
         request.requiresMuxing && !request.formatId.isNullOrBlank() && request.formatId != "yt-dlp" ->
             muxedVideoAndAacAudio(request.formatId!!)

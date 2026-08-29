@@ -61,6 +61,8 @@ internal object YtDlpRuntime {
             .put("paths", paths)
             .put("restrictfilenames", true)
             .put("nopart", true)
+            .put("continuedl", false)
+            .put("overwrites", true)
             .put("noplaylist", true)
             .put("cachedir", false)
             .put("writethumbnail", false)

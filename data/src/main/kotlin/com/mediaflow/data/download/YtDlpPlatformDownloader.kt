@@ -70,6 +70,7 @@ class YtDlpPlatformDownloader(
                     videoCodec = request.videoCodec,
                     audioCodec = request.audioCodec,
                     requiresMuxing = request.requiresMuxing,
+                    streamUrl = request.streamUrl,
                 ),
                 progress = 0f,
                 isProgressKnown = false,
@@ -80,7 +81,7 @@ class YtDlpPlatformDownloader(
         )
 
         persistThumbnailAsync(id, request.thumbnailUrl)
-        executeDownload(id, request, request.sourceUrl)
+        executor.execute { executeDownload(id, request, request.sourceUrl) }
     }
 
     /**
@@ -130,7 +131,10 @@ class YtDlpPlatformDownloader(
             check(partial.length() > 0L) { "El CDN no entregó contenido" }
             if (output.exists()) output.delete()
             check(partial.renameTo(output)) { "No se pudo guardar el vídeo" }
-            completeFile(id, request, output)
+            if (!completeFile(id, request, output, commitFailure = false)) {
+                output.delete()
+                error("El archivo del CDN no se pudo validar como vídeo")
+            }
         }
         if (outcome.isFailure) {
             partial.delete()
@@ -151,8 +155,13 @@ class YtDlpPlatformDownloader(
         ))
     }
 
-    private fun completeFile(id: String, request: DownloadRequest, output: File) {
-        val current = _items.value.firstOrNull { it.id == id } ?: return
+    private fun completeFile(
+        id: String,
+        request: DownloadRequest,
+        output: File,
+        commitFailure: Boolean = true,
+    ): Boolean {
+        val current = _items.value.firstOrNull { it.id == id } ?: return false
         val extension = output.extension.lowercase()
         val mimeType = mimeFor(extension)
         val validation = MediaFileValidator.validate(
@@ -166,8 +175,8 @@ class YtDlpPlatformDownloader(
             request.audioCodec,
         )
             .getOrElse { error ->
-                updateFailed(id, error, request.mediaType)
-                return
+                if (commitFailure) updateFailed(id, error, request.mediaType)
+                return false
             }
 
         // Attempt non-blocking metadata embedding
@@ -204,17 +213,27 @@ class YtDlpPlatformDownloader(
             durationSeconds = validation.durationSeconds ?: current.durationSeconds,
         ))
         persistThumbnailAsync(id, request.thumbnailUrl)
+        return true
     }
 
     private fun executeDownload(id: String, request: DownloadRequest, sourceUrl: String) {
         val baseName = sanitize(request.fileName?.substringBeforeLast('.') ?: "mediaflow_$id")
-        val template = File(outputDirectory, "$baseName.%(ext)s").absolutePath
+        deleteStaleOutputs(baseName)
         val platform = PlatformUrlSupport.platformFor(sourceUrl)
+
+        if (request.mediaType != MediaType.AUDIO &&
+            tryDirectStreamUrl(id, request, sourceUrl, platform)
+        ) {
+            return
+        }
 
         // Public Instagram/TikTok pages sometimes expose a CDN MP4 without
         // cookies. Try that first, but never mark the download failed if the
         // anonymous URL is missing or the CDN transfer fails — yt-dlp runs next.
-        if (tryAnonymousDirectDownload(id, request, sourceUrl, platform)) {
+        // Anonymous CDN paths are progressive MP4. Audio-only downloads go through yt-dlp.
+        if (request.mediaType != MediaType.AUDIO &&
+            tryAnonymousDirectDownload(id, request, sourceUrl, platform)
+        ) {
             return
         }
 
@@ -239,11 +258,25 @@ class YtDlpPlatformDownloader(
             return
         }
 
+        downloadCombined(id, request, targetUrl, PlatformFormatSelector.select(request), referer)
+    }
+
+    private fun downloadCombined(
+        id: String,
+        request: DownloadRequest,
+        targetUrl: String,
+        format: String,
+        referer: String?,
+        allowProgressiveFallback: Boolean = true,
+    ) {
+        val baseName = sanitize(request.fileName?.substringBeforeLast('.') ?: "mediaflow_$id")
+        deleteStaleOutputs(baseName)
+        val template = File(outputDirectory, "$baseName.%(ext)s").absolutePath
         val startedAt = System.currentTimeMillis()
         val options = YtDlpRuntime.downloadOptions(
             outputDirectory = outputDirectory,
             outputTemplate = template,
-            format = PlatformFormatSelector.select(request),
+            format = format,
             referer = referer,
         )
         val future = runCatching {
@@ -270,7 +303,27 @@ class YtDlpPlatformDownloader(
         executor.execute {
             runCatching { future.get() }
                 .onSuccess { finish(id, request, startedAt) }
-                .onFailure { error -> updateFailed(id, error) }
+                .onFailure { error ->
+                    val canFallback = allowProgressiveFallback &&
+                        request.mediaType == MediaType.VIDEO &&
+                        format != PROGRESSIVE_VIDEO_FALLBACK
+                    if (canFallback) {
+                        android.util.Log.w(
+                            "YtDlpPlatformDownloader",
+                            "El formato de vídeo $format falló (${error.message}). Reintentando MP4 progresivo.",
+                        )
+                        downloadCombined(
+                            id,
+                            request.copy(requiresMuxing = false, formatId = "yt-dlp"),
+                            targetUrl,
+                            PROGRESSIVE_VIDEO_FALLBACK,
+                            referer,
+                            allowProgressiveFallback = false,
+                        )
+                    } else {
+                        updateFailed(id, error)
+                    }
+                }
         }
     }
 
@@ -340,8 +393,35 @@ class YtDlpPlatformDownloader(
         sessions[id] = Session(request, future)
         executor.execute {
             runCatching { future.get() }
-                .onFailure { error -> updateFailed(id, error) }
+                .onFailure { error ->
+                    android.util.Log.w(
+                        "YtDlpPlatformDownloader",
+                        "No se pudieron unir las pistas (${error.message}). Descargando MP4 progresivo.",
+                    )
+                    downloadCombined(
+                        id,
+                        request.copy(requiresMuxing = false, formatId = "yt-dlp"),
+                        extractionUrl,
+                        PROGRESSIVE_VIDEO_FALLBACK,
+                        referer,
+                        allowProgressiveFallback = false,
+                    )
+                }
         }
+    }
+
+    private fun deleteStaleOutputs(baseName: String) {
+        val restricted = YtDlpRuntime.restrictFileName(baseName)
+        outputDirectory.listFiles().orEmpty()
+            .filter { file ->
+                if (!file.isFile) return@filter false
+                val stem = file.nameWithoutExtension
+                stem == baseName || stem == restricted ||
+                    file.name.startsWith("$baseName.") || file.name.startsWith("$restricted.")
+            }
+            .forEach { stale ->
+                runCatching { stale.delete() }
+            }
     }
 
     /** Accepts mp4/mkv/webm produced for this session; never renames webm/mkv to .mp4. */
@@ -399,6 +479,7 @@ class YtDlpPlatformDownloader(
             videoCodec = old.selectedFormat?.videoCodec,
             audioCodec = old.selectedFormat?.audioCodec,
             thumbnailUrl = old.thumbnailUri?.takeIf { it.startsWith("http", ignoreCase = true) },
+            streamUrl = old.selectedFormat?.streamUrl,
         )
         start(id, request)
     }
@@ -558,6 +639,39 @@ class YtDlpPlatformDownloader(
         value.replace(Regex("[\\\\/:*?\"<>|\\u0000-\\u001F]"), ""),
     )
 
+    private fun tryDirectStreamUrl(
+        id: String,
+        request: DownloadRequest,
+        sourceUrl: String,
+        platform: PlatformUrlSupport.Platform?,
+    ): Boolean {
+        val streamUrl = request.streamUrl?.takeIf { it.startsWith("https://") } ?: return false
+        val referer = when (platform) {
+            PlatformUrlSupport.Platform.TIKTOK -> "https://www.tiktok.com/"
+            PlatformUrlSupport.Platform.INSTAGRAM -> "https://www.instagram.com/"
+            PlatformUrlSupport.Platform.FACEBOOK -> "https://www.facebook.com/"
+            else -> null
+        } ?: return false
+        val cookies = if (platform == PlatformUrlSupport.Platform.TIKTOK) {
+            runCatching { TikTokAnonymousResolver().sessionCookieHeader(sourceUrl) }.getOrNull()
+        } else {
+            null
+        }
+        val userAgent = if (platform == PlatformUrlSupport.Platform.TIKTOK) {
+            TikTokAnonymousResolver.BROWSER_USER_AGENT
+        } else {
+            ANONYMOUS_BROWSER_USER_AGENT
+        }
+        return downloadDirectPlatformFile(
+            id = id,
+            request = request,
+            directUrl = streamUrl,
+            referer = referer,
+            cookieHeader = cookies,
+            userAgent = userAgent,
+        )
+    }
+
     private fun tryAnonymousDirectDownload(
         id: String,
         request: DownloadRequest,
@@ -578,8 +692,17 @@ class YtDlpPlatformDownloader(
                     TikTokAnonymousResolver().downloadTo(sourceUrl, output) { downloaded, total ->
                         updateProgress(id, downloaded, total)
                     }.getOrThrow()
+                }.onFailure { error ->
+                    android.util.Log.w(
+                        "YtDlpPlatformDownloader",
+                        "TikTok anónimo no entregó el MP4: ${error.message ?: error.toString()}",
+                        error,
+                    )
                 }.getOrNull() ?: return false
-                completeFile(id, request, saved)
+                if (!completeFile(id, request, saved, commitFailure = false)) {
+                    saved.delete()
+                    return false
+                }
                 return _items.value.firstOrNull { it.id == id }?.status == DownloadStatus.COMPLETED
             }
             else -> return false
@@ -611,5 +734,6 @@ class YtDlpPlatformDownloader(
         )
         const val ANONYMOUS_BROWSER_USER_AGENT =
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.6778.139 Safari/537.36"
+        const val PROGRESSIVE_VIDEO_FALLBACK = "b[ext=mp4]/bv*[ext=mp4]+ba[ext=m4a]/b"
     }
 }
