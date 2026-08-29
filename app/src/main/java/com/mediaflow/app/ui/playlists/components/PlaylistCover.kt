@@ -33,7 +33,7 @@ fun PlaylistCover(
     size: Dp = 100.dp,
     shape: Shape = RoundedCornerShape(16.dp),
 ) {
-    val validArtworks = artworks.filter { !it.isNullOrBlank() }
+    val validArtworks = artworks.filter { com.mediaflow.app.ui.common.media.isLoadableArtworkUrl(it) }
 
     val gradient = Brush.linearGradient(
         colors = listOf(

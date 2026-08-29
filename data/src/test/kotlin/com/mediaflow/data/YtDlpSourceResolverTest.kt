@@ -123,4 +123,17 @@ class YtDlpSourceResolverTest {
         assertEquals(1080, format.height)
         assertTrue(format.isProgressive)
     }
+
+    @Test
+    fun `TikTok webpage failure is mapped to a short Spanish message`() {
+        val resolver = YtDlpSourceResolver(RuntimeEnvironment.getApplication())
+        val raw = IllegalStateException(
+            "DownloadError: ERROR: [TikTok] 7647678491193838865: Unexpected response from webpage request; please report this issue on  https://github.com/yt-dlp/yt-dlp/issues?q= , filling out the appropriate issue template. Confirm you are on the latest version using  yt-dlp -U",
+        )
+        val message = resolver.friendlyAnalysisError("https://vt.tiktok.com/ZSVWNejMx/", raw)
+        assertTrue(message.contains("TikTok"))
+        assertFalse(message.contains("github.com"))
+        assertFalse(message.contains("yt-dlp -U"))
+        assertTrue(message.length < 220)
+    }
 }

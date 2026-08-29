@@ -10,7 +10,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
+import com.mediaflow.app.R
 import com.mediaflow.app.ui.common.media.AudioMediaRow
+import com.mediaflow.app.ui.common.media.preferredArtworkUrl
 import com.mediaflow.core.model.DownloadItem
 import com.mediaflow.core.model.PlaybackProgress
 import com.mediaflow.core.model.XSpace
@@ -36,8 +39,8 @@ fun AudioLibraryView(
     if (items.isEmpty()) {
         EmptyLibraryState(
             icon = Icons.Outlined.Audiotrack,
-            title = "No tienes audios todavía",
-            subtitle = "Descarga un audio o pega un enlace de un X Space para escucharlo aquí.",
+            title = stringResource(R.string.library_audio_empty_title),
+            subtitle = stringResource(R.string.library_audio_empty_subtitle),
             actionLabel = null,
             onAction = null,
             modifier = modifier.fillMaxSize(),
@@ -57,7 +60,7 @@ fun AudioLibraryView(
 
                 val title = space?.title ?: item.title ?: item.fileName ?: "Audio"
                 val subtitle = space?.let { "Host: ${it.host.formattedHandle}" } ?: item.fileName ?: "Local"
-                val artwork = space?.host?.avatarUrl ?: item.thumbnailUri ?: item.localUri
+                val artwork = preferredArtworkUrl(item.thumbnailUri, space?.host?.avatarUrl)
 
                 val durationStr = item.durationSeconds?.let { s ->
                     val m = s / 60

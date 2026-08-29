@@ -108,7 +108,9 @@ fun PlaylistDetailScreen(
                     .padding(horizontal = 20.dp, vertical = 8.dp),
             ) {
                 PlaylistCover(
-                    artworks = items.take(4).map { it.thumbnailUri ?: it.localUri },
+                    artworks = items.take(4).map {
+                        com.mediaflow.app.ui.common.media.preferredArtworkUrl(it.thumbnailUri)
+                    },
                     size = 110.dp,
                     shape = RoundedCornerShape(20.dp),
                 )
@@ -188,7 +190,7 @@ fun PlaylistDetailScreen(
                         AudioMediaRow(
                             title = item.title ?: item.fileName ?: "Audio",
                             subtitle = item.fileName ?: "Local",
-                            artworkUrl = item.thumbnailUri ?: item.localUri,
+                            artworkUrl = com.mediaflow.app.ui.common.media.preferredArtworkUrl(item.thumbnailUri),
                             durationText = durationStr,
                             isSpace = false,
                             isPlaying = isPlaying,

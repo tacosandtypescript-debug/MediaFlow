@@ -5,28 +5,34 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.mediaflow.app.ui.common.media.preferredArtworkUrl
 import com.mediaflow.app.ui.library.components.AudioLibraryTab
 import com.mediaflow.core.model.DownloadItem
 import com.mediaflow.core.model.MediaType
 import com.mediaflow.core.model.PlaybackQueueItem
 import com.mediaflow.data.player.background.PlayerSessionHolder
+import com.mediaflow.app.ui.common.media.isLoadableArtworkUrl
 import com.mediaflow.data.repository.FavoritesRepositoryImpl
+import com.mediaflow.data.repository.Media3DownloadRepository
 import com.mediaflow.data.repository.MediaStoreGalleryRepository
 import com.mediaflow.data.repository.PlaylistRepositoryImpl
 import com.mediaflow.data.repository.ProgressRepositoryImpl
 import com.mediaflow.data.repository.XSpaceRepositoryImpl
 import com.mediaflow.domain.player.PlayerService
+import com.mediaflow.domain.repository.DownloadRepository
 import com.mediaflow.domain.repository.FavoritesRepository
 import com.mediaflow.domain.repository.GalleryRepository
 import com.mediaflow.domain.repository.PlaylistRepository
 import com.mediaflow.domain.repository.ProgressRepository
 import com.mediaflow.domain.repository.XSpaceRepository
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -43,10 +49,14 @@ class LibraryViewModel(
     private val playlistRepository: PlaylistRepository = PlaylistRepositoryImpl(application),
     private val favoritesRepository: FavoritesRepository = FavoritesRepositoryImpl(application),
     private val playerService: PlayerService = PlayerSessionHolder.get(application),
+    downloadRepository: DownloadRepository? = null,
 ) : AndroidViewModel(application) {
 
     private val selectedMediaType = MutableStateFlow(MediaType.AUDIO)
     private val selectedAudioTab = MutableStateFlow(AudioLibraryTab.ALL)
+    private val downloadsFlow: Flow<List<DownloadItem>> = downloadRepository?.observeDownloads()
+        ?: runCatching { Media3DownloadRepository.get(application).observeDownloads() }
+            .getOrElse { flowOf(emptyList()) }
 
     val uiState: StateFlow<LibraryUiState> = combine(
         galleryRepository.observeGallery()
@@ -60,6 +70,7 @@ class LibraryViewModel(
         playerService.uiState,
         selectedMediaType,
         selectedAudioTab,
+        downloadsFlow.flowOn(Dispatchers.IO),
     ) { args: Array<Any?> ->
         @Suppress("UNCHECKED_CAST")
         val galleryResult = args[0] as Result<List<DownloadItem>>
@@ -74,8 +85,10 @@ class LibraryViewModel(
         val playerState = args[5] as com.mediaflow.domain.player.PlayerServiceState
         val mediaType = args[6] as MediaType
         val audioTab = args[7] as AudioLibraryTab
+        @Suppress("UNCHECKED_CAST")
+        val downloads = args[8] as List<DownloadItem>
 
-        val allItems = galleryResult.getOrDefault(emptyList())
+        val allItems = overlayThumbnails(galleryResult.getOrDefault(emptyList()), downloads)
         val audioItems = allItems.filter { it.mediaType == MediaType.AUDIO }
         val videoItems = allItems.filter { it.mediaType == MediaType.VIDEO }
         val favoriteItems = allItems.filter { item ->
@@ -164,7 +177,7 @@ class LibraryViewModel(
                 title = space?.title ?: item.title ?: item.fileName ?: "Audio",
                 artistOrHost = space?.let { "Host: ${it.host.formattedHandle}" } ?: item.fileName,
                 durationMs = (item.durationSeconds ?: 0L) * 1000L,
-                artworkUrl = space?.host?.avatarUrl ?: item.thumbnailUri ?: item.localUri,
+                artworkUrl = preferredArtworkUrl(item.thumbnailUri, space?.host?.avatarUrl),
                 isLive = false,
             )
         }
@@ -179,7 +192,7 @@ class LibraryViewModel(
             title = space?.title ?: item.title ?: item.fileName ?: "Audio",
             artistOrHost = space?.let { "Host: ${it.host.formattedHandle}" } ?: item.fileName,
             durationMs = (item.durationSeconds ?: 0L) * 1000L,
-            artworkUrl = space?.host?.avatarUrl ?: item.thumbnailUri ?: item.localUri,
+            artworkUrl = preferredArtworkUrl(item.thumbnailUri, space?.host?.avatarUrl),
             isLive = false,
         )
         playerService.addToQueue(queueItem)
@@ -191,6 +204,30 @@ class LibraryViewModel(
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             return LibraryViewModel(application) as T
+        }
+    }
+}
+
+internal fun overlayThumbnails(
+    items: List<DownloadItem>,
+    downloads: List<DownloadItem>,
+): List<DownloadItem> {
+    if (items.isEmpty() || downloads.isEmpty()) return items
+    val thumbs = HashMap<String, String>()
+    downloads.forEach { item ->
+        val uri = item.thumbnailUri?.takeIf(::isLoadableArtworkUrl) ?: return@forEach
+        thumbs[item.id] = uri
+        item.localUri?.let { thumbs[it] = uri }
+        thumbs[item.sourceUrl] = uri
+    }
+    if (thumbs.isEmpty()) return items
+    return items.map { item ->
+        if (isLoadableArtworkUrl(item.thumbnailUri)) item
+        else {
+            val overlay = sequenceOf(item.localUri, item.id, item.sourceUrl)
+                .mapNotNull { key -> key?.let(thumbs::get) }
+                .firstOrNull()
+            if (overlay != null) item.copy(thumbnailUri = overlay) else item
         }
     }
 }

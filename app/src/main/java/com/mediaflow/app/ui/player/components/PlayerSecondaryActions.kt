@@ -64,7 +64,7 @@ fun PlayerSecondaryActions(
                         }
                         onSpeedChange(nextSpeed)
                     },
-                    modifier = Modifier.size(38.dp),
+                    modifier = Modifier.size(48.dp),
                 ) {
                     Text(
                         text = "${speed}x",

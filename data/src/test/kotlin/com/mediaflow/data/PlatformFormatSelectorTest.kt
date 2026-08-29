@@ -62,6 +62,18 @@ class PlatformFormatSelectorTest {
     }
 
     @Test
+    fun `anonymous format id uses mp4 progressive selector`() {
+        val request = DownloadRequest(
+            sourceUrl = "https://vt.tiktok.com/ZSVWNejMx/",
+            mediaType = MediaType.VIDEO,
+            formatId = "anonymous",
+            extension = "mp4",
+        )
+
+        assertEquals("bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/b", PlatformFormatSelector.select(request))
+    }
+
+    @Test
     fun `yt-dlp format id prefers mp4 progressive then best`() {
         val request = DownloadRequest(
             sourceUrl = "https://www.youtube.com/watch?v=example",

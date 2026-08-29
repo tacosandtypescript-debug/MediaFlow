@@ -88,6 +88,8 @@ class YtDlpSourceResolver(
                 analysisDirectory.listFiles().orEmpty().forEach { it.delete() }
             }
         }.getOrElse { error ->
+            analyzeAnonymousFallback(trimmed)?.let { return@withContext it }
+
             // Fallback for X Space if yt-dlp fails due to replay disabled or missing audio stream
             if (XUrlParser.isXUrl(trimmed)) {
                 val space = runCatching { spaceResolver.resolveFromUrl(trimmed) }.getOrNull()
@@ -123,6 +125,40 @@ class YtDlpSourceResolver(
         }
     }
 
+    private fun analyzeAnonymousFallback(sourceUrl: String): SourceInfo? {
+        val platform = PlatformUrlSupport.platformFor(sourceUrl) ?: return null
+        return when (platform) {
+            PlatformUrlSupport.Platform.TIKTOK -> {
+                val video = runCatching { TikTokAnonymousResolver().resolve(sourceUrl).getOrThrow() }.getOrNull()
+                    ?: return null
+                anonymousVideoInfo(sourceUrl, video.url, title = "Vídeo de TikTok")
+            }
+            PlatformUrlSupport.Platform.INSTAGRAM -> {
+                val cdn = runCatching {
+                    InstagramAnonymousResolver(appContext).resolve(sourceUrl).getOrNull()
+                }.getOrNull()?.takeIf { it.isNotBlank() } ?: return null
+                anonymousVideoInfo(sourceUrl, cdn, title = "Vídeo de Instagram")
+            }
+            else -> null
+        }
+    }
+
+    private fun anonymousVideoInfo(sourceUrl: String, _cdnUrl: String, title: String): SourceInfo = SourceInfo(
+        sourceUrl = sourceUrl,
+        title = title,
+        availableFormats = listOf(
+            MediaFormat(
+                formatId = "anonymous",
+                extension = "mp4",
+                mimeType = "video/mp4",
+                mediaType = MediaType.VIDEO,
+                qualityLabel = "Automática",
+                isProgressive = true,
+                requiresMuxing = false,
+            ),
+        ),
+    )
+
     private fun findCachedSpace(url: String): XSpace? {
         val statusId = XUrlParser.extractStatusId(url)
         val directId = XUrlParser.extractDirectSpaceId(url)
@@ -135,7 +171,7 @@ class YtDlpSourceResolver(
         }.getOrNull()
     }
 
-    private fun friendlyAnalysisError(sourceUrl: String, error: Throwable): String {
+    internal fun friendlyAnalysisError(sourceUrl: String, error: Throwable): String {
         val text = (error.message ?: error.cause?.message).orEmpty()
         val platform = PlatformUrlSupport.platformFor(sourceUrl)?.label ?: "La plataforma"
         return when {
@@ -143,6 +179,10 @@ class YtDlpSourceResolver(
                 "La grabación de este X Space no está disponible o fue desactivada por el autor."
             text.contains("Twitter Space not found", ignoreCase = true) ->
                 "El X Space no existe o fue eliminado."
+            text.contains("Unexpected response from webpage", ignoreCase = true) ||
+                text.contains("please report this issue on", ignoreCase = true) ||
+                (platform == "TikTok" && text.contains("[TikTok]", ignoreCase = true)) ->
+                "TikTok bloqueó el análisis automático. Si el vídeo es público, pulsa Descargar: se intentará por la página anónima, sin cookies."
             text.contains("Read-only file system", ignoreCase = true) ||
                 text.contains("Errno 30", ignoreCase = true) ->
                 "$platform no se pudo analizar: yt-dlp intentó escribir fuera del almacenamiento de la app. Vuelve a intentarlo."
@@ -154,6 +194,10 @@ class YtDlpSourceResolver(
                 text.contains("cookies", ignoreCase = true) ->
                 "$platform requiere acceso o el contenido no es público. MediaFlow no usa cookies de sesión."
             else -> text.ifBlank { "No se pudo analizar la fuente." }
+                .lineSequence()
+                .firstOrNull()
+                ?.take(180)
+                ?: "No se pudo analizar la fuente."
         }
     }
 

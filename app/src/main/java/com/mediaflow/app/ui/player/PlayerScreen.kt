@@ -34,7 +34,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.mediaflow.app.R
+import com.mediaflow.app.ui.common.media.preferredArtworkUrl
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -124,21 +127,25 @@ fun PlayerScreen(
                 .padding(if (uiState.isFullscreen) PaddingValues(0.dp) else innerPadding)
                 .playerGestures(
                     onSingleTap = viewModel::toggleControlsVisibility,
-                    onDoubleTapLeft = { viewModel.seekRelative(-10_000L) },
-                    onDoubleTapRight = { viewModel.seekRelative(10_000L) },
+                    onDoubleTapLeft = {
+                        if (!uiState.isLiveSession) viewModel.seekRelative(-10_000L)
+                    },
+                    onDoubleTapRight = {
+                        if (!uiState.isLiveSession) viewModel.seekRelative(10_000L)
+                    },
                     onDoubleTapCenter = viewModel::togglePlayPause,
                 ),
             contentAlignment = Alignment.Center,
         ) {
-            if (uiState.isLive) {
-                // Dedicated Live Space Player Variant
+            if (uiState.isLiveSession) {
                 Column(
                     modifier = Modifier.fillMaxSize(),
                     verticalArrangement = Arrangement.SpaceBetween,
                 ) {
                     PlayerHeaderContext(
-                        contextText = "X Space en vivo",
-                        isLive = true,
+                        contextText = stringResource(R.string.space_default_title),
+                        isLive = uiState.isBroadcastLive,
+                        isLiveSession = true,
                         onBack = onBack,
                     )
 
@@ -147,6 +154,13 @@ fun PlayerScreen(
                         playbackState = uiState.serviceState.playbackState,
                         liveEndState = uiState.liveEndState,
                         isAutoDownloadEnabled = uiState.isAutoDownloadEnabled,
+                        isBroadcastLive = uiState.isBroadcastLive,
+                        isError = uiState.isError,
+                        errorMessage = uiState.errorMessage,
+                        artworkUrl = preferredArtworkUrl(
+                            uiState.serviceState.artworkUrl,
+                            uiState.spaceMetadata?.host?.avatarUrl,
+                        ),
                         onTogglePlayPause = viewModel::togglePlayPause,
                         onToggleAutoDownload = viewModel::toggleAutoDownload,
                         onDownloadReplay = viewModel::downloadSpaceReplay,
@@ -185,6 +199,7 @@ fun PlayerScreen(
                                 space = uiState.spaceMetadata,
                                 subtitle = spaceSubtitle,
                                 isPlaying = uiState.isPlaying,
+                                artworkUrl = uiState.serviceState.artworkUrl,
                                 modifier = Modifier.fillMaxSize(),
                             )
                         } else {
@@ -248,9 +263,9 @@ fun PlayerScreen(
 
             // Buffering / Loading Indicator
             BufferingIndicator(
-                visible = uiState.isBuffering,
+                visible = uiState.isBuffering && !uiState.isLiveSession,
                 modifier = Modifier.align(Alignment.Center),
-                label = if (uiState.isPreparing) "Cargando..." else "Buffering...",
+                label = stringResource(R.string.player_buffering),
             )
 
             // Double-tap ±10s Seek Feedback Overlay
@@ -261,7 +276,7 @@ fun PlayerScreen(
 
             // Error Display Card
             AnimatedVisibility(
-                visible = uiState.isError,
+                visible = uiState.isError && !uiState.isLiveSession,
                 enter = fadeIn(),
                 exit = fadeOut(),
                 modifier = Modifier.align(Alignment.Center),
@@ -278,15 +293,23 @@ fun PlayerScreen(
                         modifier = Modifier.padding(20.dp),
                     ) {
                         Text(
-                            text = uiState.errorMessage ?: "Error en la reproducción",
+                            text = stringResource(R.string.player_error_title),
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                        )
+                        Text(
+                            text = uiState.errorMessage ?: stringResource(R.string.player_error_subtitle),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onErrorContainer,
+                            modifier = Modifier.padding(top = 8.dp),
                         )
                         Button(
                             onClick = onBack,
-                            modifier = Modifier.padding(top = 16.dp),
+                            modifier = Modifier
+                                .padding(top = 16.dp)
+                                .height(52.dp),
                         ) {
-                            Text("Volver")
+                            Text(stringResource(R.string.back))
                         }
                     }
                 }
@@ -326,7 +349,10 @@ fun PlayerScreen(
     if (showDeleteDialog) {
         DeleteMediaDialog(
             title = displayTitle,
-            artworkUrl = uiState.spaceMetadata?.host?.avatarUrl ?: uiState.mediaUri,
+            artworkUrl = preferredArtworkUrl(
+                uiState.serviceState.artworkUrl,
+                uiState.spaceMetadata?.host?.avatarUrl,
+            ),
             onConfirm = {
                 viewModel.deleteCurrentMedia(onDeleted = onBack)
                 showDeleteDialog = false

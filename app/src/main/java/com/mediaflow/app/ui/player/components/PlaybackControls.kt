@@ -50,25 +50,24 @@ fun PlaybackControls(
             .padding(horizontal = 16.dp, vertical = 8.dp)
             .testTag("playback_controls"),
     ) {
-        // Previous Track
-        IconButton(
-            onClick = onPrevious,
-            enabled = hasPrevious || !isLive,
-            modifier = Modifier.size(48.dp),
-        ) {
-            Icon(
-                imageVector = Icons.Filled.SkipPrevious,
-                contentDescription = "Pista anterior",
-                tint = if (hasPrevious || !isLive) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
-                modifier = Modifier.size(32.dp),
-            )
+        if (hasPrevious) {
+            IconButton(
+                onClick = onPrevious,
+                modifier = Modifier.size(48.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.SkipPrevious,
+                    contentDescription = "Pista anterior",
+                    tint = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.size(32.dp),
+                )
+            }
         }
 
-        // Rewind 10s (only if not live)
         if (!isLive) {
             IconButton(
                 onClick = onRewind10,
-                modifier = Modifier.size(44.dp),
+                modifier = Modifier.size(48.dp),
             ) {
                 Icon(
                     imageVector = Icons.Filled.Replay10,
@@ -92,7 +91,11 @@ fun PlaybackControls(
                 .size(72.dp)
                 .testTag("dominant_play_pause_btn"),
         ) {
-            Crossfade(targetState = isPlaying, label = "play_pause_crossfade") { playing ->
+            Crossfade(
+                targetState = isPlaying,
+                animationSpec = androidx.compose.animation.core.tween(200),
+                label = "play_pause_crossfade",
+            ) { playing ->
                 Icon(
                     imageVector = if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
                     contentDescription = if (playing) "Pausar" else "Reproducir",
@@ -105,7 +108,7 @@ fun PlaybackControls(
         if (!isLive) {
             IconButton(
                 onClick = onForward10,
-                modifier = Modifier.size(44.dp),
+                modifier = Modifier.size(48.dp),
             ) {
                 Icon(
                     imageVector = Icons.Filled.Forward10,
@@ -116,18 +119,18 @@ fun PlaybackControls(
             }
         }
 
-        // Next Track
-        IconButton(
-            onClick = onNext,
-            enabled = hasNext,
-            modifier = Modifier.size(48.dp),
-        ) {
-            Icon(
-                imageVector = Icons.Filled.SkipNext,
-                contentDescription = "Siguiente pista",
-                tint = if (hasNext) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
-                modifier = Modifier.size(32.dp),
-            )
+        if (hasNext) {
+            IconButton(
+                onClick = onNext,
+                modifier = Modifier.size(48.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.SkipNext,
+                    contentDescription = "Siguiente pista",
+                    tint = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.size(32.dp),
+                )
+            }
         }
     }
 }

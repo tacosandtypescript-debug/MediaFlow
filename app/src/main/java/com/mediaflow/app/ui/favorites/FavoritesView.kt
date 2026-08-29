@@ -32,6 +32,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
+import com.mediaflow.app.R
+import com.mediaflow.app.ui.common.media.preferredArtworkUrl
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.mediaflow.app.ui.theme.customColors
@@ -62,8 +65,8 @@ fun FavoritesView(
         if (items.isEmpty()) {
             EmptyLibraryState(
                 icon = Icons.Outlined.FavoriteBorder,
-                title = "Aún no tienes favoritos",
-                subtitle = "Marca con corazón los audios o X Spaces que quieras guardar aquí.",
+                title = stringResource(R.string.favorites_empty_title),
+                subtitle = stringResource(R.string.favorites_empty_subtitle),
                 actionLabel = null,
                 onAction = null,
                 modifier = Modifier.weight(1f),
@@ -93,7 +96,7 @@ fun FavoritesView(
 
                 Box(
                     modifier = Modifier
-                        .size(80.dp)
+                        .size(72.dp)
                         .clip(RoundedCornerShape(18.dp))
                         .background(heartGradient),
                     contentAlignment = Alignment.Center,
@@ -110,7 +113,7 @@ fun FavoritesView(
 
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "Tus favoritos",
+                        text = stringResource(R.string.favorites_title),
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface,
@@ -128,7 +131,9 @@ fun FavoritesView(
                 Button(
                     onClick = onPlayAllFavorites,
                     shape = RoundedCornerShape(14.dp),
-                    modifier = Modifier.testTag("play_all_favorites_btn"),
+                    modifier = Modifier
+                        .height(52.dp)
+                        .testTag("play_all_favorites_btn"),
                 ) {
                     Icon(Icons.Outlined.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(4.dp))
@@ -149,7 +154,7 @@ fun FavoritesView(
 
                     val title = space?.title ?: item.title ?: item.fileName ?: "Audio"
                     val subtitle = space?.let { "Host: ${it.host.formattedHandle}" } ?: item.fileName ?: "Local"
-                    val artwork = space?.host?.avatarUrl ?: item.thumbnailUri ?: item.localUri
+                    val artwork = preferredArtworkUrl(item.thumbnailUri, space?.host?.avatarUrl)
 
                     val durationStr = item.durationSeconds?.let { s ->
                         val m = s / 60

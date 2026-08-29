@@ -143,5 +143,97 @@ class XSpaceMetadataResolverTest {
         assertEquals(1, space.allSpeakers.size)
         assertEquals("Host Only", space.host.displayName)
         assertEquals(0L, space.durationSeconds)
+        assertEquals(false, space.recordingAvailable)
+    }
+
+    @Test
+    fun `live GraphQL plus yt-dlp HLS does not set recordingAvailable`() {
+        val liveJson = JSONObject("""
+        {
+          "data": {
+            "audioSpace": {
+              "metadata": {
+                "state": "Running",
+                "title": "Live Discussion",
+                "is_space_available_for_replay": false,
+                "creator_results": {
+                  "result": {
+                    "rest_id": "123",
+                    "legacy": {
+                      "name": "Host Only",
+                      "screen_name": "hostonly"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+        """.trimIndent())
+        val ytDlp = JSONObject("""
+        {
+          "formats": [
+            { "url": "https://prod-fastly-us-west-2.video.pscp.tv/live.m3u8" }
+          ]
+        }
+        """.trimIndent())
+
+        val space = resolver.parseGraphqlAudioSpace(
+            spaceId = "s_live",
+            originalUrl = "https://x.com/i/spaces/s_live",
+            json = liveJson,
+            ytDlpJson = ytDlp,
+        )
+
+        org.junit.Assert.assertFalse(space.recordingAvailable)
+        assertEquals("https://prod-fastly-us-west-2.video.pscp.tv/live.m3u8", space.audioStreamUrl)
+        assertEquals(XSpaceState.LIVE, space.state)
+    }
+
+    @Test
+    fun `yt-dlp fallback was_live with audio does not mark LIVE as replay-available`() {
+        val ytDlp = JSONObject(
+            """
+            {
+              "title": "Live Space",
+              "uploader": "Host",
+              "uploader_id": "host",
+              "is_live": true,
+              "was_live": true,
+              "formats": [ { "url": "https://prod-fastly.video.pscp.tv/live.m3u8" } ]
+            }
+            """.trimIndent(),
+        )
+        val space = resolver.fallbackFromYtDlp(
+            spaceId = "s_live_yt",
+            originalUrl = "https://x.com/i/spaces/s_live_yt",
+            ytDlpJson = ytDlp,
+        )
+        assertEquals(XSpaceState.LIVE, space.state)
+        org.junit.Assert.assertFalse(space.recordingAvailable)
+        assertEquals("https://prod-fastly.video.pscp.tv/live.m3u8", space.audioStreamUrl)
+    }
+
+    @Test
+    fun `yt-dlp fallback ended replay sets recordingAvailable only when not live`() {
+        val ytDlp = JSONObject(
+            """
+            {
+              "title": "Ended Space",
+              "uploader": "Host",
+              "uploader_id": "host",
+              "is_live": false,
+              "was_live": true,
+              "formats": [ { "url": "https://prod-fastly.video.pscp.tv/replay.m3u8" } ]
+            }
+            """.trimIndent(),
+        )
+        val space = resolver.fallbackFromYtDlp(
+            spaceId = "s_ended_yt",
+            originalUrl = "https://x.com/i/spaces/s_ended_yt",
+            ytDlpJson = ytDlp,
+        )
+        assertEquals(XSpaceState.ENDED, space.state)
+        assertTrue(space.recordingAvailable)
     }
 }

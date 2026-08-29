@@ -15,28 +15,28 @@ class XSpaceReplayResolver(
 ) {
     suspend fun resolveReplay(spaceId: String, originalUrl: String): ReplayResolutionResult = withContext(Dispatchers.IO) {
         runCatching {
-            val space: XSpace = metadataResolver.resolve(spaceId, originalUrl)
-
-            when (space.state) {
-                XSpaceState.UPCOMING -> {
-                    ReplayResolutionResult.Processing("Este Space todavía no ha comenzado.")
-                }
-                XSpaceState.LIVE -> {
-                    ReplayResolutionResult.Processing("El Space sigue transmitiendo en directo.")
-                }
-                XSpaceState.ENDED, XSpaceState.TIMED_OUT, XSpaceState.UNKNOWN -> {
-                    val streamUrl = space.audioStreamUrl
-                    if (streamUrl != null) {
-                        ReplayResolutionResult.Available(streamUrl, space)
-                    } else if (space.recordingAvailable) {
-                        ReplayResolutionResult.Processing("La grabación del Space se está procesando.")
-                    } else {
-                        ReplayResolutionResult.NotAvailable("El host finalizó el Space sin guardar la grabación.")
-                    }
-                }
-            }
+            resolveFromSpace(metadataResolver.resolve(spaceId, originalUrl))
         }.getOrElse { error ->
             ReplayResolutionResult.Error(error.message ?: "No se pudo consultar el estado de la grabación.")
+        }
+    }
+
+    fun resolveFromSpace(space: XSpace): ReplayResolutionResult {
+        return when (space.state) {
+            XSpaceState.UPCOMING -> {
+                ReplayResolutionResult.Processing("Este Space todavía no ha comenzado.")
+            }
+            XSpaceState.LIVE -> {
+                ReplayResolutionResult.Processing("El Space sigue transmitiendo en directo.")
+            }
+            XSpaceState.ENDED, XSpaceState.TIMED_OUT, XSpaceState.UNKNOWN -> {
+                val streamUrl = space.audioStreamUrl
+                when {
+                    streamUrl != null -> ReplayResolutionResult.Available(streamUrl, space)
+                    space.recordingAvailable -> ReplayResolutionResult.Processing("La grabación del Space se está procesando.")
+                    else -> ReplayResolutionResult.NotAvailable("El host finalizó el Space sin guardar la grabación.")
+                }
+            }
         }
     }
 }

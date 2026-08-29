@@ -30,6 +30,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import com.mediaflow.app.ui.theme.customColors
 import java.util.Locale
@@ -241,12 +242,12 @@ fun PlayerTimeline(
         ) {
             Text(
                 text = formatPlayerTime(displayPositionMs),
-                style = MaterialTheme.typography.bodySmall,
+                style = MaterialTheme.typography.labelMedium.copy(fontFamily = FontFamily.Monospace),
                 color = MaterialTheme.colorScheme.onSurface,
             )
             Text(
                 text = formatPlayerTime(effectiveDuration),
-                style = MaterialTheme.typography.bodySmall,
+                style = MaterialTheme.typography.labelMedium.copy(fontFamily = FontFamily.Monospace),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }

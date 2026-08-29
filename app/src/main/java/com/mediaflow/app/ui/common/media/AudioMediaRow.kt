@@ -67,7 +67,7 @@ fun AudioMediaRow(
         Color.Transparent
     }
     val rowBorder = if (isPlaying) {
-        androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.customColors.libraryRowPlayingBorder)
+        androidx.compose.foundation.BorderStroke(1.5.dp, MaterialTheme.customColors.libraryRowPlayingBorder)
     } else {
         null
     }
@@ -90,7 +90,7 @@ fun AudioMediaRow(
             Box(contentAlignment = Alignment.Center) {
                 MediaArtwork(
                     artworkUrl = artworkUrl,
-                    size = 52.dp,
+                    size = 48.dp,
                     isSpace = isSpace,
                     shape = RoundedCornerShape(12.dp),
                 )
@@ -98,7 +98,7 @@ fun AudioMediaRow(
                 if (isPlaying) {
                     Box(
                         modifier = Modifier
-                            .size(52.dp)
+                            .size(48.dp)
                             .clip(RoundedCornerShape(12.dp))
                             .background(Color.Black.copy(alpha = 0.45f)),
                         contentAlignment = Alignment.Center,
@@ -185,10 +185,9 @@ fun AudioMediaRow(
             FavoriteButton(
                 isFavorite = isFavorite,
                 onToggle = onToggleFavorite,
-                modifier = Modifier.size(38.dp),
+                modifier = Modifier.size(48.dp),
             )
 
-            // Contextual Overflow Menu
             MediaOverflowMenu(
                 isFavorite = isFavorite,
                 onPlay = onClick,
@@ -196,7 +195,7 @@ fun AudioMediaRow(
                 onToggleFavorite = onToggleFavorite,
                 onAddToQueue = onAddToQueue,
                 onDelete = onDelete,
-                modifier = Modifier.size(38.dp),
+                modifier = Modifier.size(48.dp),
             )
         }
     }

@@ -116,11 +116,13 @@ class PendingLiveDownloadRepositoryImpl(
                         hostHandle = obj.optString("hostHandle", "@host"),
                         sourceUrl = obj.optString("sourceUrl", ""),
                         requestedAt = obj.optLong("requestedAt", System.currentTimeMillis()),
-                        autoDownloadAfterEnd = obj.optBoolean("autoDownloadAfterEnd", true),
+                        autoDownloadAfterEnd = obj.optBoolean("autoDownloadAfterEnd", false),
                         status = status,
                         replayStreamUrl = obj.optString("replayStreamUrl").takeIf { it.isNotBlank() },
                         downloadId = obj.optString("downloadId").takeIf { it.isNotBlank() },
                         errorMessage = obj.optString("errorMessage").takeIf { it.isNotBlank() },
+                        attemptCount = obj.optInt("attemptCount", 0),
+                        nextRetryAtMs = obj.optLong("nextRetryAtMs", 0L).takeIf { it > 0L },
                     )
                 )
             }
@@ -143,6 +145,8 @@ class PendingLiveDownloadRepositoryImpl(
                     item.replayStreamUrl?.let { put("replayStreamUrl", it) }
                     item.downloadId?.let { put("downloadId", it) }
                     item.errorMessage?.let { put("errorMessage", it) }
+                    put("attemptCount", item.attemptCount)
+                    item.nextRetryAtMs?.let { put("nextRetryAtMs", it) }
                 }
                 array.put(obj)
             }

@@ -118,7 +118,10 @@ class DownloadViewModel(
                 val finalFileName = if (state.fileName.isNotBlank()) {
                     state.fileName
                 } else if (space != null) {
-                    space.title
+                    com.mediaflow.data.provider.x.live.SpaceDownloadDedup.fileName(
+                        space.host.cleanUsername,
+                        space.id,
+                    )
                 } else {
                     source.title ?: request.fileName
                 }
@@ -141,6 +144,7 @@ class DownloadViewModel(
                     container = selected.container,
                     videoCodec = selected.videoCodec,
                     audioCodec = selected.audioCodec,
+                    thumbnailUrl = source.thumbnailUrl ?: space?.host?.avatarUrl,
                 ))
 
                 if (space != null) {

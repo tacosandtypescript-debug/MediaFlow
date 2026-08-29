@@ -16,21 +16,50 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import coil.compose.AsyncImage
+import coil.compose.SubcomposeAsyncImage
 import coil.request.ImageRequest
 import com.mediaflow.core.model.MediaType
 
-/**
- * Robust, high-aesthetic media artwork loader with automatic fallbacks for Spaces,
- * downloaded audios, podcasts, and videos.
- */
+private val IMAGE_EXTENSIONS = setOf("jpg", "jpeg", "png", "webp", "gif")
+private val MEDIA_FILE_EXTENSIONS = setOf(
+    "mp4", "m4a", "mp3", "webm", "mkv", "mov", "aac", "opus", "ogg", "wav", "m4v", "m3u8", "m3u",
+)
+
+/** True only for HTTP(S) images, content image URIs, or local image files. */
+fun isLoadableArtworkUrl(url: String?): Boolean {
+    if (url.isNullOrBlank()) return false
+    val lower = url.trim().lowercase()
+    val extension = lower
+        .substringAfterLast('/', lower)
+        .substringAfterLast('.', "")
+        .substringBefore('?')
+        .substringBefore('#')
+    if (extension in MEDIA_FILE_EXTENSIONS) return false
+    if (lower.startsWith("http://") || lower.startsWith("https://")) {
+        return extension.isEmpty() || extension in IMAGE_EXTENSIONS ||
+            !lower.substringAfterLast('/').contains('.')
+    }
+    if (lower.startsWith("content://")) {
+        if (extension in MEDIA_FILE_EXTENSIONS) return false
+        if (extension in IMAGE_EXTENSIONS) return true
+        return lower.contains("/images") || lower.contains("image")
+    }
+    if (lower.startsWith("file://") || lower.startsWith("/")) {
+        return extension in IMAGE_EXTENSIONS
+    }
+    return false
+}
+
+fun preferredArtworkUrl(thumbnailUri: String?, spaceAvatarUrl: String? = null): String? =
+    listOf(thumbnailUri, spaceAvatarUrl).firstOrNull(::isLoadableArtworkUrl)
+
 @Composable
 fun MediaArtwork(
     artworkUrl: String?,
@@ -47,38 +76,44 @@ fun MediaArtwork(
         mediaType == MediaType.VIDEO -> Icons.Outlined.Videocam
         else -> Icons.Outlined.Audiotrack
     }
-
     val gradientBrush = Brush.linearGradient(
         colors = listOf(
-            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.8f),
-            MaterialTheme.colorScheme.surfaceContainerHigh,
-        )
+            MaterialTheme.colorScheme.background,
+            MaterialTheme.colorScheme.surface,
+        ),
     )
+    val loadable = isLoadableArtworkUrl(artworkUrl)
 
     Box(
         modifier = modifier
             .size(size)
             .clip(shape)
-            .background(gradientBrush),
+            .background(gradientBrush)
+            .testTag("media_artwork"),
         contentAlignment = Alignment.Center,
     ) {
-        if (!artworkUrl.isNullOrBlank()) {
-            AsyncImage(
+        val placeholder = @Composable {
+            Icon(
+                imageVector = fallbackIcon,
+                contentDescription = contentDescription,
+                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                modifier = Modifier.size(size * 0.48f),
+            )
+        }
+        if (loadable) {
+            SubcomposeAsyncImage(
                 model = ImageRequest.Builder(context)
                     .data(artworkUrl)
-                    .crossfade(true)
+                    .crossfade(250)
                     .build(),
                 contentDescription = contentDescription,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),
+                loading = { placeholder() },
+                error = { placeholder() },
             )
         } else {
-            Icon(
-                imageVector = fallbackIcon,
-                contentDescription = contentDescription,
-                tint = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
-                modifier = Modifier.size(size * 0.48f),
-            )
+            placeholder()
         }
     }
 }

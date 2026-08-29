@@ -19,12 +19,16 @@ class NetworkPlaybackMonitor(
 
     private var lastTriggerTimeMs = 0L
     private val throttleIntervalMs = 5_000L
+    @Volatile
+    var isReconnecting: Boolean = false
+        private set
 
     private val networkCallback = object : ConnectivityManager.NetworkCallback() {
         override fun onAvailable(network: Network) {
             val now = System.currentTimeMillis()
             if (now - lastTriggerTimeMs > throttleIntervalMs) {
                 lastTriggerTimeMs = now
+                isReconnecting = true
                 onNetworkAvailable()
             }
         }
@@ -42,6 +46,10 @@ class NetworkPlaybackMonitor(
             cm.registerNetworkCallback(request, networkCallback)
             isRegistered = true
         }
+    }
+
+    fun clearReconnecting() {
+        isReconnecting = false
     }
 
     fun stopMonitoring() {

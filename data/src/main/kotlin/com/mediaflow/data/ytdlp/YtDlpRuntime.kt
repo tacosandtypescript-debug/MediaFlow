@@ -38,6 +38,7 @@ internal object YtDlpRuntime {
         val opts = baseOptions(outputDirectory, outputTemplate)
             .put("skip_download", false)
             .put("simulate", false)
+            .put("writethumbnail", true)
         format?.let { opts.put("format", it) }
         mergeOutputFormat?.let { opts.put("merge_output_format", it) }
         referer?.let { opts.getJSONObject("http_headers").put("Referer", it) }
@@ -161,9 +162,11 @@ internal object YtDlpRuntime {
             .filter { it.isFile && it.length() > 0L }
             .filter { file ->
                 val name = file.name
+                val extension = file.extension.lowercase()
                 !name.endsWith(".part", ignoreCase = true) &&
                     !name.endsWith(".ytdl", ignoreCase = true) &&
-                    !name.endsWith(".temp", ignoreCase = true)
+                    !name.endsWith(".temp", ignoreCase = true) &&
+                    extension !in NON_MEDIA_EXTENSIONS
             }
             .filter { it.lastModified() >= startedAt - FILE_TIME_TOLERANCE_MS }
         if (candidates.isEmpty()) return null
@@ -187,6 +190,10 @@ internal object YtDlpRuntime {
 
         return candidates.maxByOrNull { it.lastModified() }
     }
+
+    private val NON_MEDIA_EXTENSIONS = setOf(
+        "jpg", "jpeg", "png", "webp", "gif", "json", "vtt", "srt", "nfo", "description",
+    )
 
     fun restrictFileName(value: String): String = value
         .replace(Regex("[\\\\/:*?\"<>|\\u0000-\\u001F]"), "")

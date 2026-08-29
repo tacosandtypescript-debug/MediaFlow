@@ -9,26 +9,20 @@ import android.os.Binder
 import android.os.Build
 import android.os.IBinder
 import androidx.core.content.ContextCompat
-import com.mediaflow.core.model.MediaType
 import com.mediaflow.core.model.XSpace
+import com.mediaflow.data.provider.x.live.LiveSpaceEndHandler
 import com.mediaflow.data.provider.x.live.LiveSpaceEndMonitor
 import com.mediaflow.data.provider.x.live.PendingLiveDownloadRepositoryImpl
-import com.mediaflow.data.provider.x.live.XSpaceReplayResolver
 import com.mediaflow.data.provider.x.spaces.XSpaceMetadataResolver
 import com.mediaflow.data.repository.Media3DownloadRepository
 import com.mediaflow.data.repository.XSpaceRepositoryImpl
-import com.mediaflow.domain.live.PendingLiveDownloadStatus
-import com.mediaflow.domain.live.ReplayResolutionResult
 import com.mediaflow.domain.player.EnginePlaybackState
 import com.mediaflow.domain.player.PlaybackEvent
 import com.mediaflow.domain.player.PlayerService
-import com.mediaflow.domain.repository.DownloadRequest
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 
 /**
@@ -96,6 +90,16 @@ class MediaPlaybackService : Service() {
     private var activeSpaceId: String? = null
     private var activeSpaceUrl: String? = null
     private var autoDownloadWhenEnded = false
+    private val liveEndHandler by lazy {
+        LiveSpaceEndHandler(
+            liveEndMonitor = liveEndMonitor,
+            pendingDownloadRepo = pendingDownloadRepo,
+            spaceRepository = spaceRepository,
+            downloadRepository = downloadRepo,
+            onBroadcastEnded = { playerService.markBroadcastEnded() },
+            onSpaceUpdated = { currentSpace = it },
+        )
+    }
 
     inner class LocalBinder : Binder() {
         fun getService(): MediaPlaybackService = this@MediaPlaybackService
@@ -148,6 +152,9 @@ class MediaPlaybackService : Service() {
 
         observePlayerState()
         observePlayerEvents()
+        serviceScope.launch {
+            liveEndHandler.resumeInterruptedWaits(serviceScope)
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -206,6 +213,7 @@ class MediaPlaybackService : Service() {
                 mediaSessionController.updatePlaybackState(state)
 
                 if (state.isPlaying) {
+                    networkMonitor.clearReconnecting()
                     wakeLockManager.acquireLocks(isLive = state.isLive)
                     updateForegroundNotification()
                 } else {
@@ -224,10 +232,10 @@ class MediaPlaybackService : Service() {
             playerService.events.collect { event ->
                 when (event) {
                     is PlaybackEvent.PlaybackFinished -> {
-                        handleStreamEnded(event.mediaId)
+                        handleStreamEnded()
                     }
                     is PlaybackEvent.PlaybackError -> {
-                        handleStreamEnded(event.mediaId)
+                        handleStreamEnded()
                     }
                     else -> Unit
                 }
@@ -235,55 +243,17 @@ class MediaPlaybackService : Service() {
         }
     }
 
-    private fun handleStreamEnded(mediaId: String) {
-        val state = playerService.uiState.value
+    private fun handleStreamEnded() {
         val spaceId = activeSpaceId ?: currentSpace?.id ?: return
         val spaceUrl = activeSpaceUrl ?: currentSpace?.url ?: "https://x.com/i/spaces/$spaceId"
-
         serviceScope.launch {
-            // Verify if space truly ended vs temporary connection cut
-            val result = liveEndMonitor.verifySpaceEnded(spaceId, spaceUrl)
-            if (result is ReplayResolutionResult.Available) {
-                // Space has ended and replay is ready!
-                if (autoDownloadWhenEnded || pendingDownloadRepo.isAutoDownloadEnabled(spaceId)) {
-                    triggerPostLiveDownload(spaceId, result.space, result.replayUrl)
-                }
-            }
-        }
-    }
-
-    private suspend fun triggerPostLiveDownload(spaceId: String, space: XSpace, replayUrl: String) {
-        // Prevent duplicate downloads
-        val existing = downloadRepo.observeDownloads().firstOrNull()?.any {
-            it.sourceUrl == replayUrl || it.sourceUrl == space.url || it.id.contains(spaceId)
-        } ?: false
-
-        if (existing) return
-
-        val request = DownloadRequest(
-            sourceUrl = replayUrl,
-            mediaType = MediaType.AUDIO,
-            formatId = "space_audio_m4a",
-            fileName = "Space_${space.host.cleanUsername}_${space.id}.m4a",
-            mimeType = "audio/mp4",
-            extension = "m4a",
-            durationSeconds = space.durationSeconds.takeIf { it > 0 },
-        )
-
-        val downloadId = downloadRepo.startDownload(request)
-
-        pendingDownloadRepo.savePendingDownload(
-            com.mediaflow.domain.live.PendingLiveDownload(
+            liveEndHandler.handleStreamEnded(
                 spaceId = spaceId,
-                title = space.title,
-                hostHandle = space.host.formattedHandle,
-                sourceUrl = space.url,
-                autoDownloadAfterEnd = true,
-                status = PendingLiveDownloadStatus.DOWNLOADING,
-                replayStreamUrl = replayUrl,
-                downloadId = downloadId,
+                spaceUrl = spaceUrl,
+                autoDownloadWhenEnded = autoDownloadWhenEnded,
+                scope = serviceScope,
             )
-        )
+        }
     }
 
     private fun updateForegroundNotification() {

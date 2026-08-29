@@ -73,8 +73,16 @@ data class PlayerUiState(
     val isAudioOnly: Boolean
         get() = serviceState.isAudioOnly
 
+    val isBroadcastLive: Boolean
+        get() = spaceMetadata?.isLive == true && liveEndState is LiveSpaceEndState.ActiveLive
+
+    val isLiveSession: Boolean
+        get() = serviceState.isLive ||
+            spaceMetadata?.isLive == true ||
+            liveEndState !is LiveSpaceEndState.ActiveLive
+
     val isLive: Boolean
-        get() = serviceState.isLive || spaceMetadata?.isLive == true
+        get() = isBroadcastLive || (serviceState.isLive && liveEndState is LiveSpaceEndState.ActiveLive)
 
     val queue: List<PlaybackQueueItem>
         get() = serviceState.queue

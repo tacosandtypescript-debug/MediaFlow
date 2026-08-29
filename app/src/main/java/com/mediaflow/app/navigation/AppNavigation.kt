@@ -104,7 +104,7 @@ fun AppNavigation(
         downloadViewModel.events.collect { event ->
             when (event) {
                 is DownloadEvent.Started -> snackbarHostState.showSnackbar(
-                    "Descarga añadida. Puedes consultar el progreso en Descargas",
+                    context.getString(R.string.home_info_download_started),
                 )
                 is DownloadEvent.Failed -> snackbarHostState.showSnackbar(event.message)
             }
@@ -154,7 +154,7 @@ fun AppNavigation(
 
                             NavigationBar(
                                 containerColor = MaterialTheme.customColors.navigationBackground,
-                                tonalElevation = 8.dp,
+                                tonalElevation = 0.dp,
                             ) {
                                 MediaFlowDestination.bottomBarItems.forEach { destination ->
                                     val selected = destination.route == currentRoute
@@ -222,6 +222,13 @@ fun AppNavigation(
                                 )
                             },
                             onDownloadRequested = downloadViewModel::start,
+                            recentDownloads = downloads,
+                            onRecentClick = { item ->
+                                val uri = item.localUri ?: item.id
+                                navController.navigate(
+                                    MediaFlowDestination.Player.routeFor(Uri.encode(uri)),
+                                )
+                            },
                         )
                     }
 
@@ -253,7 +260,12 @@ fun AppNavigation(
                             downloads = downloads,
                             spacesMap = spacesMap,
                             progressMap = downloadProgressMap,
-                            onOpen = downloadViewModel::open,
+                            onOpen = { item ->
+                                val uri = item.localUri ?: item.id
+                                navController.navigate(
+                                    MediaFlowDestination.Player.routeFor(Uri.encode(uri)),
+                                )
+                            },
                             onPause = downloadViewModel::pause,
                             onResume = downloadViewModel::resume,
                             onCancel = downloadViewModel::cancel,

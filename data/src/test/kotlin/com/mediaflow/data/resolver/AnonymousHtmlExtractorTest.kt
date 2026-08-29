@@ -22,6 +22,17 @@ class AnonymousHtmlExtractorTest {
     }
 
     @Test
+    fun `TikTok downloadAddr is preferred over playAddr`() {
+        val html = """
+            {"video":{"playAddr":"https://cdn.tiktok.com/play.mp4","downloadAddr":"https://cdn.tiktok.com/file.mp4"}}
+        """.trimIndent()
+        assertEquals(
+            "https://cdn.tiktok.com/file.mp4",
+            TikTokAnonymousResolver.extractPlayAddress(html),
+        )
+    }
+
+    @Test
     fun `TikTok play_addr url_list and og video are accepted`() {
         val listHtml = """{"play_addr":{"uri":"v100","url_list":["https://v16m.tiktokcdn.com/file.mp4"]}}"""
         assertEquals(

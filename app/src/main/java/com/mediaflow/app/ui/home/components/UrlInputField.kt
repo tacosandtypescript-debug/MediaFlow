@@ -2,7 +2,9 @@ package com.mediaflow.app.ui.home.components
 
 import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Close
@@ -73,6 +75,7 @@ fun UrlInputField(
             capitalization = KeyboardCapitalization.None,
             keyboardType = KeyboardType.Uri,
         ),
+        shape = RoundedCornerShape(14.dp),
         modifier = modifier
             .fillMaxWidth()
             .testTag("url_input"),
@@ -87,6 +90,7 @@ fun UrlInputField(
         modifier = Modifier
             .fillMaxWidth()
             .padding(top = 8.dp)
+            .height(52.dp)
             .testTag("paste_button"),
     ) {
         Icon(Icons.Outlined.ContentPaste, contentDescription = null)

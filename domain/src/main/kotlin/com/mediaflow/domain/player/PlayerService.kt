@@ -300,6 +300,14 @@ class PlayerService(
         }
     }
 
+    fun markBroadcastEnded() {
+        if (isReleased) return
+        val current = _uiState.value
+        if (current.isLive) {
+            _uiState.value = current.copy(isLive = false)
+        }
+    }
+
     fun play() {
         if (isReleased) return
         engine.play()

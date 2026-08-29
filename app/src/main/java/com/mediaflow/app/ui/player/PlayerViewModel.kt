@@ -6,37 +6,38 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.mediaflow.app.ui.common.media.preferredArtworkUrl
 import com.mediaflow.core.model.MediaType
 import com.mediaflow.core.model.Playlist
 import com.mediaflow.core.model.XSpace
 import com.mediaflow.core.model.XSpaceState
-import com.mediaflow.data.player.MpvPlaybackEngine
 import com.mediaflow.data.player.background.MediaPlaybackService
 import com.mediaflow.data.player.background.PlayerSessionHolder
+import com.mediaflow.data.provider.x.XUrlParser
 import com.mediaflow.data.provider.x.live.LiveSpaceEndMonitor
 import com.mediaflow.data.provider.x.live.PendingLiveDownloadRepositoryImpl
-import com.mediaflow.data.provider.x.live.XSpaceReplayResolver
+import com.mediaflow.data.provider.x.live.SpaceDownloadDedup
 import com.mediaflow.data.repository.FavoritesRepositoryImpl
 import com.mediaflow.data.repository.Media3DownloadRepository
 import com.mediaflow.data.repository.MediaStoreGalleryRepository
 import com.mediaflow.data.repository.PlaylistRepositoryImpl
-import com.mediaflow.data.repository.ProgressRepositoryImpl
 import com.mediaflow.data.repository.XSpaceRepositoryImpl
 import com.mediaflow.domain.live.LiveSpaceEndState
 import com.mediaflow.domain.live.PendingLiveDownload
+import com.mediaflow.domain.live.PendingLiveDownloadRepository
 import com.mediaflow.domain.live.PendingLiveDownloadStatus
 import com.mediaflow.domain.live.ReplayResolutionResult
 import com.mediaflow.domain.player.EnginePlaybackState
-import com.mediaflow.domain.player.PlaybackEngine
 import com.mediaflow.domain.player.PlaybackEvent
 import com.mediaflow.domain.player.PlayerService
 import com.mediaflow.domain.player.PlayerServiceState
+import com.mediaflow.domain.repository.DownloadRepository
 import com.mediaflow.domain.repository.DownloadRequest
 import com.mediaflow.domain.repository.FavoritesRepository
 import com.mediaflow.domain.repository.GalleryRepository
 import com.mediaflow.domain.repository.PlaylistRepository
-import com.mediaflow.domain.repository.ProgressRepository
 import com.mediaflow.domain.repository.XSpaceRepository
+import com.mediaflow.domain.usecase.StartDownloadUseCase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -44,9 +45,13 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * ViewModel orchestrating player UI states, gestures, seek feedbacks, and service bridge.
@@ -58,6 +63,9 @@ class PlayerViewModel(
     private val favoritesRepository: FavoritesRepository = FavoritesRepositoryImpl(app),
     private val playlistRepository: PlaylistRepository = PlaylistRepositoryImpl(app),
     private val galleryRepository: GalleryRepository = MediaStoreGalleryRepository(app),
+    private val liveEndMonitor: LiveSpaceEndMonitor = LiveSpaceEndMonitor(),
+    private val pendingDownloadRepo: PendingLiveDownloadRepository = PendingLiveDownloadRepositoryImpl(app),
+    downloadRepository: DownloadRepository? = null,
 ) : AndroidViewModel(app) {
 
     constructor(application: Application) : this(
@@ -78,13 +86,13 @@ class PlayerViewModel(
     private val liveEndState = MutableStateFlow<LiveSpaceEndState>(LiveSpaceEndState.ActiveLive)
     private val isAutoDownloadEnabled = MutableStateFlow(false)
 
-    private val liveEndMonitor by lazy { LiveSpaceEndMonitor() }
-    private val pendingDownloadRepo by lazy { PendingLiveDownloadRepositoryImpl(app) }
-    private val downloadRepo by lazy { Media3DownloadRepository.get(app) }
+    private val downloadRepo: DownloadRepository = downloadRepository ?: Media3DownloadRepository.get(app)
 
     private var hideControlsJob: Job? = null
     private var seekFeedbackJob: Job? = null
     private var openJob: Job? = null
+    private var liveEndJob: Job? = null
+    private val downloadMutex = Mutex()
 
     val uiState: StateFlow<PlayerUiState> = combine(
         playerService.uiState,
@@ -146,11 +154,46 @@ class PlayerViewModel(
         viewModelScope.launch {
             playerService.events.collect { event ->
                 when (event) {
-                    is PlaybackEvent.PlaybackError -> {
+                    is PlaybackEvent.PlaybackError,
+                    is PlaybackEvent.PlaybackFinished,
+                    -> {
                         val state = playerService.uiState.value
                         val space = currentSpace.value
                         if (state.isLive || space?.isLive == true) {
                             checkSpaceEnded()
+                        }
+                    }
+                    else -> Unit
+                }
+            }
+        }
+
+        viewModelScope.launch {
+            pendingDownloadRepo.observePendingDownloads().collect { pendingList ->
+                val spaceId = currentSpace.value?.id ?: return@collect
+                val pending = pendingList.firstOrNull { it.spaceId == spaceId } ?: return@collect
+                isAutoDownloadEnabled.value = pending.autoDownloadAfterEnd
+                when (pending.status) {
+                    PendingLiveDownloadStatus.DOWNLOADING,
+                    PendingLiveDownloadStatus.COMPLETED,
+                    -> {
+                        val downloadId = pending.downloadId
+                        if (!downloadId.isNullOrBlank()) {
+                            liveEndState.value = LiveSpaceEndState.EndedDownloadStarted(downloadId)
+                        }
+                    }
+                    PendingLiveDownloadStatus.RESOLVING_REPLAY -> {
+                        if (liveEndState.value is LiveSpaceEndState.ActiveLive) {
+                            liveEndState.value = LiveSpaceEndState.EndedReplayProcessing(
+                                message = "Esperando repetición",
+                                attempt = pending.attemptCount.coerceAtLeast(1),
+                            )
+                        }
+                    }
+                    PendingLiveDownloadStatus.READY_TO_DOWNLOAD -> {
+                        val replay = pending.replayStreamUrl
+                        if (!replay.isNullOrBlank() && liveEndState.value !is LiveSpaceEndState.EndedDownloadStarted) {
+                            liveEndState.value = LiveSpaceEndState.EndedReplayAvailable(replay)
                         }
                     }
                     else -> Unit
@@ -162,9 +205,9 @@ class PlayerViewModel(
     fun open(mediaUri: String, title: String? = null, isLive: Boolean = false) {
         openJob?.cancel()
         openJob = viewModelScope.launch {
-            val space = spaceRepository.getSpaceForMedia(mediaUri)
+            val space = resolveSpaceForMedia(mediaUri)
             currentSpace.value = space
-            val effectiveLive = isLive || space?.isLive == true || (mediaUri.startsWith("http", ignoreCase = true) && space?.isEnded != true && !mediaUri.endsWith(".mp4", ignoreCase = true) && !mediaUri.endsWith(".m4a", ignoreCase = true))
+            val effectiveLive = isLive || space?.isLive == true
 
             space?.id?.let { spaceId ->
                 isAutoDownloadEnabled.value = pendingDownloadRepo.isAutoDownloadEnabled(spaceId)
@@ -180,10 +223,23 @@ class PlayerViewModel(
                 playerService.stop()
             }
 
+            val preservedArtwork = activeState.artworkUrl.takeIf {
+                activeState.mediaId == mediaUri || activeState.filePath == mediaUri
+            }
+            val downloadThumb = withTimeoutOrNull(250) {
+                downloadRepo.observeDownloads().first().firstOrNull { item ->
+                    item.localUri == mediaUri || item.id == mediaUri || item.sourceUrl == mediaUri
+                }?.thumbnailUri
+            }
             playerService.openMedia(
                 mediaId = mediaUri,
                 filePath = mediaUri,
                 title = space?.title ?: title,
+                artistOrHost = space?.let { "Host: ${it.host.formattedHandle}" },
+                artworkUrl = preferredArtworkUrl(
+                    preservedArtwork ?: downloadThumb,
+                    space?.host?.avatarUrl,
+                ),
                 autoPlay = true,
                 isLive = effectiveLive,
             )
@@ -345,7 +401,6 @@ class PlayerViewModel(
     fun toggleAutoDownload() {
         val space = currentSpace.value ?: return
         val newEnabled = !isAutoDownloadEnabled.value
-        isAutoDownloadEnabled.value = newEnabled
         viewModelScope.launch {
             pendingDownloadRepo.setAutoDownloadEnabled(
                 spaceId = space.id,
@@ -354,65 +409,164 @@ class PlayerViewModel(
                 sourceUrl = space.url,
                 enabled = newEnabled,
             )
+            isAutoDownloadEnabled.value = newEnabled
         }
     }
 
     fun checkSpaceEnded() {
         val space = currentSpace.value ?: return
-        viewModelScope.launch {
-            liveEndState.value = LiveSpaceEndState.EndedResolvingReplay(attempt = 1)
-            val result = liveEndMonitor.verifySpaceEnded(space.id, space.url)
-            when (result) {
-                is ReplayResolutionResult.Available -> {
-                    liveEndState.value = LiveSpaceEndState.EndedReplayAvailable(result.replayUrl)
-                    if (isAutoDownloadEnabled.value) {
-                        downloadSpaceReplay(result.replayUrl)
+        if (liveEndJob?.isActive == true) return
+        if (liveEndState.value !is LiveSpaceEndState.ActiveLive) return
+        liveEndJob = viewModelScope.launch {
+            val pending = pendingDownloadRepo.getPendingDownload(space.id)
+            when (pending?.status) {
+                PendingLiveDownloadStatus.DOWNLOADING,
+                PendingLiveDownloadStatus.COMPLETED,
+                -> {
+                    val downloadId = pending.downloadId
+                    if (!downloadId.isNullOrBlank()) {
+                        liveEndState.value = LiveSpaceEndState.EndedDownloadStarted(downloadId)
                     }
+                    applyEndedSpace(space)
+                    return@launch
                 }
-                is ReplayResolutionResult.Processing -> {
-                    liveEndState.value = LiveSpaceEndState.EndedReplayProcessing(result.message)
+                PendingLiveDownloadStatus.RESOLVING_REPLAY -> {
+                    liveEndState.value = LiveSpaceEndState.EndedReplayProcessing(
+                        message = "Esperando repetición",
+                        attempt = pending.attemptCount.coerceAtLeast(1),
+                    )
+                    applyEndedSpace(space)
+                    return@launch
                 }
-                is ReplayResolutionResult.NotAvailable -> {
-                    liveEndState.value = LiveSpaceEndState.EndedNoReplay(result.reason)
+                PendingLiveDownloadStatus.READY_TO_DOWNLOAD -> {
+                    val replay = pending.replayStreamUrl
+                    if (!replay.isNullOrBlank()) {
+                        liveEndState.value = LiveSpaceEndState.EndedReplayAvailable(replay)
+                    }
+                    applyEndedSpace(space)
+                    return@launch
                 }
-                is ReplayResolutionResult.Error -> {
-                    liveEndState.value = LiveSpaceEndState.EndedReplayProcessing(result.message)
-                }
+                else -> Unit
             }
+
+            // Overlay only. Service / LiveSpaceEndHandler owns wait + auto-download.
+            val result = liveEndMonitor.verifySpaceEnded(space.id, space.url)
+            applyReplayResult(space, result, startDownloadIfAuto = false)
         }
     }
 
     fun checkReplayAgain() {
-        checkSpaceEnded()
+        if (liveEndJob?.isActive == true) return
+        liveEndJob = viewModelScope.launch {
+            val space = currentSpace.value ?: return@launch
+            liveEndState.value = LiveSpaceEndState.EndedResolvingReplay(attempt = 1)
+            val result = liveEndMonitor.waitForReplay(space.id, space.url) { attempt, message ->
+                liveEndState.value = LiveSpaceEndState.EndedReplayProcessing(
+                    message = message,
+                    attempt = attempt,
+                )
+            }
+            applyReplayResult(space, result, startDownloadIfAuto = false)
+        }
     }
 
     fun downloadSpaceReplay(replayUrl: String) {
         val space = currentSpace.value ?: return
         viewModelScope.launch {
-            val request = DownloadRequest(
-                sourceUrl = replayUrl,
-                mediaType = MediaType.AUDIO,
-                formatId = "space_audio_m4a",
-                fileName = "Space_${space.host.cleanUsername}_${space.id}.m4a",
-                mimeType = "audio/mp4",
-                extension = "m4a",
-                durationSeconds = space.durationSeconds.takeIf { it > 0 },
-            )
-            val downloadId = downloadRepo.startDownload(request)
-            liveEndState.value = LiveSpaceEndState.EndedDownloadStarted(downloadId)
-            pendingDownloadRepo.savePendingDownload(
-                PendingLiveDownload(
-                    spaceId = space.id,
-                    title = space.title,
-                    hostHandle = space.host.formattedHandle,
-                    sourceUrl = space.url,
-                    autoDownloadAfterEnd = true,
-                    status = PendingLiveDownloadStatus.DOWNLOADING,
-                    replayStreamUrl = replayUrl,
-                    downloadId = downloadId,
+            downloadMutex.withLock {
+                val pending = pendingDownloadRepo.getPendingDownload(space.id)
+                val downloads = downloadRepo.observeDownloads().first()
+                if (SpaceDownloadDedup.shouldSkipDownload(space.id, pending, downloads)) {
+                    val existingId = pending?.downloadId ?: downloads.firstOrNull {
+                        SpaceDownloadDedup.matchesSpace(space.id, it)
+                    }?.id
+                    if (!existingId.isNullOrBlank()) {
+                        liveEndState.value = LiveSpaceEndState.EndedDownloadStarted(existingId)
+                    }
+                    return@withLock
+                }
+                val request = DownloadRequest(
+                    sourceUrl = space.url.ifBlank { replayUrl },
+                    mediaType = MediaType.AUDIO,
+                    formatId = "space_audio_m4a",
+                    fileName = SpaceDownloadDedup.fileName(space.host.cleanUsername, space.id),
+                    mimeType = "audio/mp4",
+                    extension = "m4a",
+                    durationSeconds = space.durationSeconds.takeIf { it > 0 },
+                    thumbnailUrl = space.host.avatarUrl,
                 )
-            )
+                val downloadId = StartDownloadUseCase(downloadRepo)(request)
+                liveEndState.value = LiveSpaceEndState.EndedDownloadStarted(downloadId)
+                pendingDownloadRepo.savePendingDownload(
+                    PendingLiveDownload(
+                        spaceId = space.id,
+                        title = space.title,
+                        hostHandle = space.host.formattedHandle,
+                        sourceUrl = space.url,
+                        autoDownloadAfterEnd = isAutoDownloadEnabled.value,
+                        status = PendingLiveDownloadStatus.DOWNLOADING,
+                        replayStreamUrl = replayUrl,
+                        downloadId = downloadId,
+                    ),
+                )
+            }
         }
+    }
+
+    private suspend fun applyReplayResult(
+        space: XSpace,
+        result: ReplayResolutionResult,
+        startDownloadIfAuto: Boolean,
+    ) {
+        when (result) {
+            is ReplayResolutionResult.Available -> {
+                val ended = space.copy(
+                    state = XSpaceState.ENDED,
+                    audioStreamUrl = result.replayUrl,
+                    recordingAvailable = result.space.recordingAvailable,
+                    durationSeconds = result.space.durationSeconds.takeIf { it > 0 } ?: space.durationSeconds,
+                    endedAtMs = result.space.endedAtMs ?: space.endedAtMs,
+                )
+                applyEndedSpace(ended)
+                liveEndState.value = LiveSpaceEndState.EndedReplayAvailable(result.replayUrl)
+                if (startDownloadIfAuto && isAutoDownloadEnabled.value) {
+                    downloadSpaceReplay(result.replayUrl)
+                }
+            }
+            is ReplayResolutionResult.Processing -> {
+                val stillLive = LiveSpaceEndMonitor.isStillBroadcasting(result)
+                if (stillLive) {
+                    liveEndState.value = LiveSpaceEndState.ActiveLive
+                } else {
+                    applyEndedSpace(space)
+                    liveEndState.value = LiveSpaceEndState.EndedReplayProcessing(result.message)
+                }
+            }
+            is ReplayResolutionResult.NotAvailable -> {
+                applyEndedSpace(space)
+                val canRetry = result.reason == LiveSpaceEndMonitor.REPLAY_TIMEOUT_MESSAGE
+                liveEndState.value = LiveSpaceEndState.EndedNoReplay(result.reason, canCheckAgain = canRetry)
+            }
+            is ReplayResolutionResult.Error -> {
+                liveEndState.value = LiveSpaceEndState.EndedReplayProcessing(result.message)
+            }
+        }
+    }
+
+    private suspend fun applyEndedSpace(space: XSpace) {
+        val ended = if (space.isEnded) space else space.copy(state = XSpaceState.ENDED)
+        currentSpace.value = ended
+        spaceRepository.saveSpace(ended, mediaId = ended.url)
+        playerService.markBroadcastEnded()
+    }
+
+    private suspend fun resolveSpaceForMedia(mediaUri: String): XSpace? {
+        spaceRepository.getSpaceForMedia(mediaUri)?.let { return it }
+        val parsedId = XUrlParser.extractDirectSpaceId(mediaUri)
+        if (parsedId != null) {
+            spaceRepository.getSpace(parsedId)?.let { return it }
+        }
+        return null
     }
 
     private fun showControlsTemporarily() {
@@ -441,6 +595,7 @@ class PlayerViewModel(
         cancelHideControls()
         seekFeedbackJob?.cancel()
         openJob?.cancel()
+        liveEndJob?.cancel()
         super.onCleared()
     }
 

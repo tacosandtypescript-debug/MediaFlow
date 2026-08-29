@@ -21,11 +21,13 @@ data class PendingLiveDownload(
     val hostHandle: String,
     val sourceUrl: String,
     val requestedAt: Long = System.currentTimeMillis(),
-    val autoDownloadAfterEnd: Boolean = true,
+    val autoDownloadAfterEnd: Boolean = false,
     val status: PendingLiveDownloadStatus = PendingLiveDownloadStatus.WAITING_FOR_END,
     val replayStreamUrl: String? = null,
     val downloadId: String? = null,
     val errorMessage: String? = null,
+    val attemptCount: Int = 0,
+    val nextRetryAtMs: Long? = null,
 )
 
 /**
@@ -35,7 +37,13 @@ sealed class LiveSpaceEndState {
     data object ActiveLive : LiveSpaceEndState()
     data class EndedResolvingReplay(val attempt: Int = 1) : LiveSpaceEndState()
     data class EndedReplayAvailable(val replayUrl: String) : LiveSpaceEndState()
-    data class EndedReplayProcessing(val message: String = "La grabación todavía se está procesando...") : LiveSpaceEndState()
-    data class EndedNoReplay(val reason: String = "La grabación no está disponible.") : LiveSpaceEndState()
+    data class EndedReplayProcessing(
+        val message: String = "La grabación todavía se está procesando...",
+        val attempt: Int = 1,
+    ) : LiveSpaceEndState()
+    data class EndedNoReplay(
+        val reason: String = "La grabación no está disponible.",
+        val canCheckAgain: Boolean = false,
+    ) : LiveSpaceEndState()
     data class EndedDownloadStarted(val downloadId: String) : LiveSpaceEndState()
 }

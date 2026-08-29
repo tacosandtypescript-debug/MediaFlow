@@ -98,4 +98,13 @@ class XSpaceRepositoryTest {
         assertEquals(500, space?.liveListenersCount)
         assertEquals(42, space?.replayCount)
     }
+
+    @Test
+    fun `getSpaceForMedia does not return the only stored space for unrelated media`() = runTest(testDispatcher) {
+        testScheduler.advanceUntilIdle()
+        repository.saveSpace(sampleSpace)
+
+        val unrelated = repository.getSpaceForMedia("file:///storage/unrelated_track.m4a")
+        assertNull(unrelated)
+    }
 }

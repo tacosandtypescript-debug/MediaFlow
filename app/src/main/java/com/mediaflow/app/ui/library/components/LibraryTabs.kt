@@ -3,6 +3,7 @@ package com.mediaflow.app.ui.library.components
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.FilterChip
@@ -40,25 +41,37 @@ fun LibraryTabs(
         AudioLibraryTab.entries.forEach { tab ->
             val isSelected = tab == selectedTab
 
+            val selectedContainer = if (tab == AudioLibraryTab.FAVORITES) {
+                MaterialTheme.customColors.favorite
+            } else {
+                MaterialTheme.customColors.chipSelectedBackground
+            }
+            val selectedLabel = if (tab == AudioLibraryTab.FAVORITES) {
+                MaterialTheme.customColors.onLive
+            } else {
+                MaterialTheme.customColors.chipSelectedText
+            }
             FilterChip(
                 selected = isSelected,
                 onClick = { onSelectTab(tab) },
                 label = {
                     Text(
                         text = tab.label,
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
                     )
                 },
                 shape = RoundedCornerShape(12.dp),
                 colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = MaterialTheme.customColors.chipSelectedBackground,
-                    selectedLabelColor = MaterialTheme.customColors.chipSelectedText,
+                    selectedContainerColor = selectedContainer,
+                    selectedLabelColor = selectedLabel,
                     containerColor = MaterialTheme.customColors.chipBackground,
                     labelColor = MaterialTheme.customColors.chipText,
                 ),
                 border = null,
-                modifier = Modifier.testTag("tab_${tab.name.lowercase()}"),
+                modifier = Modifier
+                    .height(48.dp)
+                    .testTag("tab_${tab.name.lowercase()}"),
             )
         }
     }

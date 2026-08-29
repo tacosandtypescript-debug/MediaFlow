@@ -1,5 +1,6 @@
 package com.mediaflow.app.ui.library.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -29,6 +30,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
+import com.mediaflow.app.R
+import com.mediaflow.app.ui.common.media.preferredArtworkUrl
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -54,8 +58,8 @@ fun VideoLibraryView(
     if (items.isEmpty()) {
         EmptyLibraryState(
             icon = Icons.Outlined.VideoLibrary,
-            title = "No tienes videos todavía",
-            subtitle = "Descarga un video para reproducirlo aquí.",
+            title = stringResource(R.string.library_video_empty_title),
+            subtitle = stringResource(R.string.library_video_empty_subtitle),
             actionLabel = null,
             onAction = null,
             modifier = modifier.fillMaxSize(),
@@ -74,9 +78,21 @@ fun VideoLibraryView(
                 val uri = item.localUri ?: item.id
                 val isFavorite = favoriteUris.contains(uri)
 
+                val isPlaying = playingMediaId == uri
                 Card(
                     shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (isPlaying) {
+                            MaterialTheme.customColors.libraryRowPlaying
+                        } else {
+                            MaterialTheme.colorScheme.surface
+                        },
+                    ),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                    border = BorderStroke(
+                        if (isPlaying) 1.5.dp else 1.dp,
+                        if (isPlaying) MaterialTheme.customColors.libraryRowPlayingBorder else MaterialTheme.colorScheme.outline,
+                    ),
                     modifier = Modifier
                         .fillMaxWidth()
                         .clickable { onPlayItem(item) },
@@ -88,11 +104,10 @@ fun VideoLibraryView(
                                 .height(100.dp),
                         ) {
                             MediaArtwork(
-                                artworkUrl = item.thumbnailUri ?: item.localUri,
-                                size = 200.dp,
+                                artworkUrl = preferredArtworkUrl(item.thumbnailUri),
+                                size = 160.dp,
                                 mediaType = MediaType.VIDEO,
                                 shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
-                                modifier = Modifier.fillMaxSize(),
                             )
 
                             item.durationSeconds?.let { s ->

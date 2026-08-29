@@ -20,6 +20,7 @@ class YtDlpRuntimeTest {
 
         assertTrue(opts.getBoolean("skip_download"))
         assertTrue(opts.getBoolean("simulate"))
+        assertFalse(opts.getBoolean("writethumbnail"))
         assertFalse(opts.getBoolean("check_formats"))
         assertTrue(opts.getBoolean("restrictfilenames"))
         assertTrue(opts.getBoolean("nopart"))
@@ -64,6 +65,7 @@ class YtDlpRuntimeTest {
         assertEquals("https://www.facebook.com/", opts.getJSONObject("http_headers").getString("Referer"))
         assertEquals("0.0.0.0", opts.getString("source_address"))
         assertEquals(3, opts.getInt("retries"))
+        assertTrue(opts.getBoolean("writethumbnail"))
     }
 
     @Test
@@ -86,6 +88,42 @@ class YtDlpRuntimeTest {
                 expectedBaseName = "Ya nadie le atora a una mamá soltera😂",
             )
             assertEquals(written.canonicalFile, found?.canonicalFile)
+        } finally {
+            dir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `findOutputFile ignores thumbnail sidecars next to media`() {
+        val dir = File("build/tmp/yt-dlp-find-thumb-${System.nanoTime()}").apply {
+            deleteRecursively()
+            mkdirs()
+        }
+        try {
+            val startedAt = System.currentTimeMillis()
+            val written = File(dir, "clip.mp4").apply {
+                writeText("media")
+                setLastModified(startedAt)
+            }
+            File(dir, "clip.jpg").apply {
+                writeText("thumb")
+                setLastModified(startedAt + 50)
+            }
+
+            val found = YtDlpRuntime.findOutputFile(
+                directory = dir,
+                startedAt = startedAt,
+                expectedBaseName = "clip",
+            )
+            assertEquals(written.canonicalFile, found?.canonicalFile)
+
+            File(dir, "clip.mp4").delete()
+            val onlyThumb = YtDlpRuntime.findOutputFile(
+                directory = dir,
+                startedAt = startedAt,
+                expectedBaseName = "clip",
+            )
+            assertEquals(null, onlyThumb)
         } finally {
             dir.deleteRecursively()
         }

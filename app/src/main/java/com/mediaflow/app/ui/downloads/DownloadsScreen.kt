@@ -1,5 +1,6 @@
 package com.mediaflow.app.ui.downloads
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -29,7 +30,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -38,7 +38,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.mediaflow.app.R
+import com.mediaflow.app.ui.common.media.MediaArtwork
+import com.mediaflow.app.ui.common.media.preferredArtworkUrl
 import com.mediaflow.app.ui.components.EmptyState
+import com.mediaflow.app.ui.theme.customColors
 import com.mediaflow.app.ui.components.PlaybackBadge
 import com.mediaflow.app.ui.components.PlaybackProgressBar
 import com.mediaflow.core.model.DownloadItem
@@ -78,22 +81,17 @@ fun DownloadsScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center,
             ) {
-                Card(
-                    shape = MaterialTheme.shapes.extraLarge,
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                    ),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-                ) {
-                    EmptyState(
-                        icon = Icons.Outlined.Download,
-                        title = stringResource(R.string.downloads_empty_title),
-                        subtitle = stringResource(R.string.downloads_empty_subtitle),
-                    )
-                }
+                EmptyState(
+                    icon = Icons.Outlined.Download,
+                    title = stringResource(R.string.downloads_empty_title),
+                    subtitle = stringResource(R.string.downloads_empty_subtitle),
+                )
                 Spacer(Modifier.height(24.dp))
-                Button(onClick = onBackToHome) {
-                    Text(stringResource(R.string.go_to_home))
+                Button(
+                    onClick = onBackToHome,
+                    modifier = Modifier.height(52.dp),
+                ) {
+                    Text(stringResource(R.string.go_to_home_cta))
                 }
             }
         } else {
@@ -140,20 +138,32 @@ private fun DownloadCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(enabled = item.status == DownloadStatus.COMPLETED) {
-                android.util.Log.d("MediaFlow", "DownloadCard clicked for item ${item.id}")
-                onOpen()
-            },
-        shape = MaterialTheme.shapes.large,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
+            .clickable(enabled = item.status == DownloadStatus.COMPLETED) { onOpen() },
+        shape = MaterialTheme.shapes.medium,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
     ) {
         Column(Modifier.padding(16.dp)) {
-            Text(
-                text = space?.title ?: item.fileName ?: item.title ?: item.sourceUrl,
-                style = MaterialTheme.typography.titleMedium,
-                maxLines = 2,
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                MediaArtwork(
+                    artworkUrl = preferredArtworkUrl(item.thumbnailUri, space?.host?.avatarUrl),
+                    size = 56.dp,
+                    mediaType = item.mediaType,
+                    isSpace = space != null,
+                )
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(start = 12.dp),
+                ) {
+                    Text(
+                        text = space?.title ?: item.fileName ?: item.title ?: item.sourceUrl,
+                        style = MaterialTheme.typography.titleMedium,
+                        maxLines = 2,
+                    )
+                }
+            }
 
             if (space != null) {
                 Row(
@@ -201,6 +211,7 @@ private fun DownloadCard(
                 if (item.isProgressKnown) {
                     LinearProgressIndicator(
                         progress = { item.progress },
+                        color = MaterialTheme.customColors.success,
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(top = 12.dp),
@@ -267,10 +278,7 @@ private fun DownloadCard(
                         }
                     }
                     DownloadStatus.COMPLETED -> {
-                        IconButton(onClick = {
-                            android.util.Log.d("MediaFlow", "Open IconButton clicked for item ${item.id}")
-                            onOpen()
-                        }) {
+                        IconButton(onClick = onOpen) {
                             Icon(Icons.AutoMirrored.Outlined.OpenInNew, contentDescription = stringResource(R.string.gallery_open))
                         }
                         IconButton(onClick = onRemove) {

@@ -18,6 +18,7 @@ import com.mediaflow.core.model.MediaType
 import com.mediaflow.data.download.DirectDownloadService
 import com.mediaflow.data.download.Media3DownloadInfrastructure
 import com.mediaflow.data.download.Media3DownloadStateMapper
+import com.mediaflow.data.download.ThumbnailPersister
 import com.mediaflow.data.download.YtDlpPlatformDownloader
 import com.mediaflow.data.media.MediaStorePublisher
 import com.mediaflow.data.media.MediaFileValidator
@@ -199,6 +200,7 @@ class Media3DownloadRepository private constructor(
                     publishedUris[download.request.id] = uri.toString()
                     ownership.add(uri)
                 }
+            ThumbnailPersister.persist(context, download.request.id, metadata.thumbnailUrl)
             return
         }
 
@@ -244,6 +246,7 @@ class Media3DownloadRepository private constructor(
                 publishedUris[download.request.id] = it.toString()
                 ownership.add(it)
             }
+            ThumbnailPersister.persist(context, download.request.id, metadata.thumbnailUrl)
             refresh()
         }.onFailure {
             output.delete()
@@ -262,12 +265,14 @@ class Media3DownloadRepository private constructor(
         } else {
             null
         }
+        val thumbnailUri = ThumbnailPersister.existingUri(context, request.id) ?: metadata.thumbnailUrl
         return DownloadItem(
             id = request.id,
             sourceUrl = request.uri.toString(),
             title = metadata.fileName,
             fileName = metadata.fileName,
             mediaType = metadata.mediaType,
+            thumbnailUri = thumbnailUri,
             selectedFormat = metadata.extension?.let { extension ->
                 MediaFormat(
                     formatId = metadata.formatId ?: "direct",
@@ -336,6 +341,7 @@ class Media3DownloadRepository private constructor(
                 .put("container", request.container)
                 .put("videoCodec", request.videoCodec)
                 .put("audioCodec", request.audioCodec)
+                .put("thumbnailUrl", request.thumbnailUrl)
                 .toString()
                 .toByteArray(),
             Base64.NO_WRAP,
@@ -360,6 +366,7 @@ class Media3DownloadRepository private constructor(
                 container = json.optString("container").takeIf { it.isNotBlank() },
                 videoCodec = json.optString("videoCodec").takeIf { it.isNotBlank() },
                 audioCodec = json.optString("audioCodec").takeIf { it.isNotBlank() },
+                thumbnailUrl = json.optString("thumbnailUrl").takeIf { it.isNotBlank() },
             )
         }.getOrDefault(Metadata())
     }
@@ -383,6 +390,7 @@ class Media3DownloadRepository private constructor(
         val container: String? = null,
         val videoCodec: String? = null,
         val audioCodec: String? = null,
+        val thumbnailUrl: String? = null,
     )
 
     companion object {

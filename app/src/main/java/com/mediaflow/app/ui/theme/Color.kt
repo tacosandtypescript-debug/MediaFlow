@@ -6,127 +6,118 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 
 // -------------------------------------------------------------------------
-// MediaFlow Canonical Palette Tokens
+// MediaFlow — paleta morada original
 // -------------------------------------------------------------------------
 
-// Base Oscura
-val BackgroundDark = Color(0xFF0B0E15)
-val SurfaceDark = Color(0xFF121621)
-val SurfaceVariantDark = Color(0xFF1A1F2C)
-val SurfaceElevatedDark = Color(0xFF202635)
-val SurfaceSelectedDark = Color(0xFF322E4C)
-val OutlineDark = Color(0xFF303747)
-val OutlineSoftDark = Color(0xFF242A38)
-
-// Morado Principal
+val Ink = Color(0xFF0B0E15)
+val Panel = Color(0xFF121621)
+val PanelRaised = Color(0xFF1A1F2C)
 val PrimaryPurple = Color(0xFF7C3AED)
+val OnPrimaryPurple = Color(0xFFFFFFFF)
 val PrimaryBrightPurple = Color(0xFF8B5CF6)
 val PrimaryPressedPurple = Color(0xFF6B3CD0)
-val PrimaryDarkPurple = Color(0xFF5C2F9E)
-val PrimaryContainerPurple = Color(0xFF322E4C)
-val OnPrimaryPurple = Color(0xFFFFFFFF)
+val TextDark = Color(0xFFF5F3F7)
+val TextMutedDark = Color(0xFFA7A5AF)
+val LineDark = Color(0xFF303747)
 
-// Texto
-val TextPrimaryDark = Color(0xFFF5F3F7)
-val TextSecondaryDark = Color(0xFFA7A5AF)
-val TextTertiaryDark = Color(0xFF777985)
-val TextDisabledDark = Color(0xFF585B66)
+val Paper = Color(0xFFF7F7FA)
+val Sheet = Color(0xFFFFFFFF)
+val SheetMuted = Color(0xFFF0EEF5)
+val PrimaryLight = Color(0xFF7138D8)
+val OnPrimaryLight = Color(0xFFFFFFFF)
+val PrimaryBrightLight = Color(0xFF8B5CF6)
+val TextLight = Color(0xFF17141D)
+val TextMutedLight = Color(0xFF66616E)
+val LineLight = Color(0xFFDDD9E5)
 
-// Favoritos
-val FavoritePink = Color(0xFFD95B9B)
-val FavoriteBrightPink = Color(0xFFEC6BAE)
-val FavoriteInactiveDark = Color(0xFF8B8D98)
+val CopperDark = PrimaryPurple
+val OnCopperDark = OnPrimaryPurple
+val CopperBrightDark = PrimaryBrightPurple
+val CopperPressedDark = PrimaryPressedPurple
+val CopperLight = PrimaryLight
+val OnCopperLight = OnPrimaryLight
+val CopperBrightLight = PrimaryBrightLight
 
-// X Spaces LIVE
 val LiveRed = Color(0xFFF04455)
-val LiveContainerDark = Color(0xFF542C2E)
 val OnLiveColor = Color(0xFFFFFFFF)
-
-// Eliminar / Errores
-val ErrorRed = Color(0xFFEF4444)
-val ErrorPressedRed = Color(0xFFC9363E)
-val ErrorContainerDark = Color(0xFF3B1D23)
+val FavoritePink = Color(0xFFD95B9B)
+val FavoritePinkLight = Color(0xFFD95B9B)
+val FavoriteBrightPink = Color(0xFFEC6BAE)
+val ErrorRed = Color(0xFFE25555)
+val ErrorPressedRed = Color(0xFFC44545)
 val OnErrorColor = Color(0xFFFFFFFF)
-
-// Estados
-val SuccessGreen = Color(0xFF4ADE80)
+val SuccessGreen = Color(0xFF3D9B7A)
 val WarningYellow = Color(0xFFF5B942)
 val InfoBlue = Color(0xFF60A5FA)
-val BufferingPurple = Color(0xFFA78BFA)
+val ScrimColor = Color(0x99000000)
 
-// Player Tokens
-val PlayerBackgroundDark = Color(0xFF0B0E15)
-val PlayerControlDark = Color(0xFFF5F3F7)
-val PlayerControlSecondaryDark = Color(0xFFA7A5AF)
-val ProgressTrackDark = Color(0xFF343947)
-val ProgressPlayedPurple = Color(0xFF8B5CF6)
-val ProgressThumbPurple = Color(0xFF8B5CF6)
+val BackgroundDark = Ink
+val SurfaceDark = Panel
+val SurfaceVariantDark = PanelRaised
+val SurfaceElevatedDark = PanelRaised
+val SurfaceSelectedDark = Color(0xFF322E4C)
+val OutlineDark = LineDark
+val OutlineSoftDark = Color(0xFF222C3A)
+val TextPrimaryDark = TextDark
+val TextSecondaryDark = TextMutedDark
+val TextTertiaryDark = Color(0xFF7C8594)
+val TextDisabledDark = Color(0xFF5C6573)
+val FavoriteInactiveDark = Color(0xFF8B8D98)
+val LiveContainerDark = Color(0xFF542C2E)
+val ErrorContainerDark = Color(0xFF3B1D23)
+val PrimaryCopper = PrimaryPurple
+val PrimaryBrightCopper = PrimaryBrightPurple
+val PrimaryPressedCopper = PrimaryPressedPurple
+val PrimaryContainerCopper = Color(0xFF322E4C)
+val OnPrimaryCopper = OnPrimaryPurple
+val ProgressTrackDark = LineDark
 val MiniPlayerBackgroundDark = Color(0xFF1A1825)
 val MiniPlayerBorderDark = Color(0xFF403553)
-
-// Biblioteca Tokens
-val LibraryRowDark = Color(0xFF121621)
-val LibraryRowPressedDark = Color(0xFF1A1F2C)
+val LibraryRowDark = Panel
+val LibraryRowPressedDark = PanelRaised
 val LibraryRowPlayingDark = Color(0xFF211A32)
 val LibraryRowPlayingBorderDark = Color(0xFF7345D8)
-val ChipBackgroundDark = Color(0xFF1A1F2C)
-val ChipSelectedBackgroundDark = Color(0xFF7C3AED)
-val ChipTextDark = Color(0xFFA7A5AF)
-val ChipSelectedTextDark = Color(0xFFFFFFFF)
-
-// Bottom Navigation Tokens
+val ChipBackgroundDark = PanelRaised
+val ChipSelectedBackgroundDark = PrimaryPurple
+val ChipTextDark = TextMutedDark
+val ChipSelectedTextDark = OnPrimaryPurple
 val NavigationBackgroundDark = Color(0xFF0D111A)
-val NavigationSelectedPurple = Color(0xFF8B5CF6)
-val NavigationUnselectedDark = Color(0xFF777985)
+val NavigationSelectedCopper = PrimaryBrightPurple
+val NavigationUnselectedDark = TextTertiaryDark
 val NavigationIndicatorDark = Color(0xFF2A203D)
+val DialogBackgroundDark = PanelRaised
+val BottomSheetBackgroundDark = PanelRaised
 
-// Diálogos y Bottom Sheets
-val DialogBackgroundDark = Color(0xFF171B26)
-val BottomSheetBackgroundDark = Color(0xFF141822)
-val ScrimColor = Color(0x99000000) // 60% alpha
-
-// -------------------------------------------------------------------------
-// Light Mode Tokens
-// -------------------------------------------------------------------------
-val BackgroundLight = Color(0xFFF7F7FA)
-val SurfaceLight = Color(0xFFFFFFFF)
-val SurfaceVariantLight = Color(0xFFF0EEF5)
-val OutlineLight = Color(0xFFDDD9E5)
-val OutlineSoftLight = Color(0xFFE5E2EC)
-val TextPrimaryLight = Color(0xFF17141D)
-val TextSecondaryLight = Color(0xFF66616E)
-val TextTertiaryLight = Color(0xFF8D8896)
-val TextDisabledLight = Color(0xFFB5B1BE)
-val PrimaryLight = Color(0xFF7138D8)
-val PrimaryBrightLight = Color(0xFF8B5CF6)
-val PrimaryPressedLight = Color(0xFF5C2F9E)
+val BackgroundLight = Paper
+val SurfaceLight = Sheet
+val SurfaceVariantLight = SheetMuted
+val OutlineLight = LineLight
+val OutlineSoftLight = Color(0xFFE4DFD6)
+val TextPrimaryLight = TextLight
+val TextSecondaryLight = TextMutedLight
+val TextTertiaryLight = Color(0xFF7A8290)
+val TextDisabledLight = Color(0xFFA8AEB8)
+val PrimaryLightCopper = PrimaryLight
 val PrimaryContainerLight = Color(0xFFEEE7FF)
-val OnPrimaryLight = Color(0xFFFFFFFF)
-val FavoriteLight = Color(0xFFD95B9B)
-val FavoriteBrightLight = Color(0xFFEC6BAE)
 val FavoriteInactiveLight = Color(0xFF9E9AA6)
-val LiveLight = Color(0xFFF04455)
 val LiveContainerLight = Color(0xFFFFDAD9)
 val MiniPlayerBackgroundLight = Color(0xFFF3EDFD)
 val MiniPlayerBorderLight = Color(0xFFD5C7F2)
-val LibraryRowLight = Color(0xFFFFFFFF)
-val LibraryRowPressedLight = Color(0xFFF0EEF5)
+val LibraryRowLight = Sheet
+val LibraryRowPressedLight = SheetMuted
 val LibraryRowPlayingLight = Color(0xFFEDE5FF)
-val LibraryRowPlayingBorderLight = Color(0xFF8B5CF6)
-val ChipBackgroundLight = Color(0xFFF0EEF5)
-val ChipSelectedBackgroundLight = Color(0xFF7138D8)
-val ChipTextLight = Color(0xFF66616E)
-val ChipSelectedTextLight = Color(0xFFFFFFFF)
+val LibraryRowPlayingBorderLight = PrimaryBrightPurple
+val ChipBackgroundLight = SheetMuted
+val ChipSelectedBackgroundLight = PrimaryLight
+val ChipTextLight = TextMutedLight
+val ChipSelectedTextLight = OnPrimaryLight
 val NavigationBackgroundLight = Color(0xFFFAF9FD)
-val NavigationSelectedLight = Color(0xFF7138D8)
-val NavigationUnselectedLight = Color(0xFF8D8896)
+val NavigationSelectedLight = PrimaryLight
+val NavigationUnselectedLight = TextTertiaryLight
 val NavigationIndicatorLight = Color(0xFFE8DEFF)
-val DialogBackgroundLight = Color(0xFFFFFFFF)
-val BottomSheetBackgroundLight = Color(0xFFFFFFFF)
+val DialogBackgroundLight = Sheet
+val BottomSheetBackgroundLight = Sheet
 
-// -------------------------------------------------------------------------
-// Extended Semantic Custom Colors for MediaFlow
-// -------------------------------------------------------------------------
 @Immutable
 data class MediaFlowCustomColors(
     val favorite: Color,
@@ -194,10 +185,10 @@ val DarkCustomColors = MediaFlowCustomColors(
     success = SuccessGreen,
     warning = WarningYellow,
     info = InfoBlue,
-    buffering = BufferingPurple,
-    primaryBright = PrimaryBrightPurple,
-    primaryPressed = PrimaryPressedPurple,
-    primaryDark = PrimaryDarkPurple,
+    buffering = CopperDark.copy(alpha = 0.6f),
+    primaryBright = PrimaryBrightCopper,
+    primaryPressed = PrimaryPressedCopper,
+    primaryDark = PrimaryPressedCopper,
     textTertiary = TextTertiaryDark,
     textDisabled = TextDisabledDark,
     outlineSoft = OutlineSoftDark,
@@ -216,19 +207,19 @@ val DarkCustomColors = MediaFlowCustomColors(
     chipText = ChipTextDark,
     chipSelectedText = ChipSelectedTextDark,
     navigationBackground = NavigationBackgroundDark,
-    navigationSelected = NavigationSelectedPurple,
+    navigationSelected = NavigationSelectedCopper,
     navigationUnselected = NavigationUnselectedDark,
     navigationIndicator = NavigationIndicatorDark,
     progressTrack = ProgressTrackDark,
-    progressPlayed = ProgressPlayedPurple,
-    progressThumb = ProgressThumbPurple,
+    progressPlayed = CopperDark,
+    progressThumb = CopperDark,
 )
 
 val LightCustomColors = MediaFlowCustomColors(
-    favorite = FavoriteLight,
-    favoriteBright = FavoriteBrightLight,
+    favorite = FavoritePinkLight,
+    favoriteBright = FavoriteBrightPink,
     favoriteInactive = FavoriteInactiveLight,
-    live = LiveLight,
+    live = LiveRed,
     liveContainer = LiveContainerLight,
     onLive = OnLiveColor,
     error = ErrorRed,
@@ -237,10 +228,10 @@ val LightCustomColors = MediaFlowCustomColors(
     success = SuccessGreen,
     warning = WarningYellow,
     info = InfoBlue,
-    buffering = BufferingPurple,
-    primaryBright = PrimaryBrightLight,
-    primaryPressed = PrimaryPressedLight,
-    primaryDark = PrimaryPressedLight,
+    buffering = CopperLight.copy(alpha = 0.6f),
+    primaryBright = CopperBrightLight,
+    primaryPressed = CopperLight,
+    primaryDark = CopperLight,
     textTertiary = TextTertiaryLight,
     textDisabled = TextDisabledLight,
     outlineSoft = OutlineSoftLight,
@@ -263,6 +254,6 @@ val LightCustomColors = MediaFlowCustomColors(
     navigationUnselected = NavigationUnselectedLight,
     navigationIndicator = NavigationIndicatorLight,
     progressTrack = OutlineLight,
-    progressPlayed = PrimaryBrightLight,
-    progressThumb = PrimaryBrightLight,
+    progressPlayed = CopperLight,
+    progressThumb = CopperLight,
 )

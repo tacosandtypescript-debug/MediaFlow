@@ -1,6 +1,9 @@
 package com.mediaflow.app.ui
 
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -9,14 +12,17 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.mediaflow.app.ui.player.PlayerScreen
 import com.mediaflow.app.ui.player.SeekFeedbackEvent
 import com.mediaflow.app.ui.player.components.AudioPlayerView
+import com.mediaflow.app.ui.player.components.LivePlayerView
 import com.mediaflow.app.ui.player.components.PlayPauseButton
 import com.mediaflow.app.ui.player.components.PlayerTimeline
 import com.mediaflow.app.ui.player.components.SeekFeedback
+import com.mediaflow.app.ui.player.live.LiveEndedContent
 import com.mediaflow.app.ui.theme.MediaFlowTheme
 import com.mediaflow.core.model.ParticipantRole
 import com.mediaflow.core.model.XParticipant
 import com.mediaflow.core.model.XSpace
 import com.mediaflow.core.model.XSpaceState
+import com.mediaflow.domain.live.LiveSpaceEndState
 import com.mediaflow.domain.player.EnginePlaybackState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -113,7 +119,7 @@ class PlayerScreenTest {
         }
 
         composeRule.onNodeWithText("ASOCIACIÓN DE MADRES SOLTERAS").assertIsDisplayed()
-        composeRule.onNodeWithText("X SPACE AUDIO").assertIsDisplayed()
+        composeRule.onNodeWithText("X SPACE").assertIsDisplayed()
         composeRule.onNodeWithText("190 oyentes").assertIsDisplayed()
         composeRule.onNodeWithText("Host: Fake Kiffs (@FakeKiffs)").assertIsDisplayed()
     }
@@ -126,5 +132,90 @@ class PlayerScreenTest {
             }
         }
         composeRule.onNodeWithContentDescription("+10 segundos").assertIsDisplayed()
+    }
+
+    @Test
+    fun livePlayerViewShowsEnVivoAndAutoDownloadToggle() {
+        val liveSpace = XSpace(
+            id = "1wGWjlyzqeNKQ",
+            url = "https://x.com/i/spaces/1wGWjlyzqeNKQ",
+            title = "Space en vivo",
+            state = XSpaceState.LIVE,
+            host = XParticipant(
+                displayName = "Fake Kiffs",
+                username = "FakeKiffs",
+                userId = "123",
+                role = ParticipantRole.HOST,
+            ),
+            liveListenersCount = 12,
+            startedAtMs = System.currentTimeMillis() - 60_000L,
+        )
+        composeRule.setContent {
+            MediaFlowTheme {
+                LivePlayerView(
+                    space = liveSpace,
+                    playbackState = EnginePlaybackState.PLAYING,
+                    liveEndState = LiveSpaceEndState.ActiveLive,
+                    isAutoDownloadEnabled = false,
+                    onTogglePlayPause = {},
+                    onToggleAutoDownload = {},
+                    onDownloadReplay = {},
+                    onCheckReplayAgain = {},
+                    isBroadcastLive = true,
+                )
+            }
+        }
+        composeRule.onNodeWithText("EN VIVO").assertIsDisplayed()
+        composeRule.onNodeWithText("Space en vivo").assertIsDisplayed()
+        composeRule.onNodeWithText("En el aire").assertExists()
+        composeRule.onNodeWithTag("auto_download_toggle").assertExists()
+    }
+
+    @Test
+    fun `livePlayerView shows FINALIZADO and waiting replay copy`() {
+        val endedSpace = XSpace(
+            id = "1wGWjlyzqeNKQ",
+            url = "https://x.com/i/spaces/1wGWjlyzqeNKQ",
+            title = "Space cerrado",
+            state = XSpaceState.ENDED,
+            host = XParticipant(
+                displayName = "Fake Kiffs",
+                username = "FakeKiffs",
+                userId = "123",
+                role = ParticipantRole.HOST,
+            ),
+        )
+        composeRule.setContent {
+            MediaFlowTheme {
+                LivePlayerView(
+                    space = endedSpace,
+                    playbackState = EnginePlaybackState.ENDED,
+                    liveEndState = LiveSpaceEndState.EndedReplayProcessing("Esperando repetición"),
+                    isAutoDownloadEnabled = false,
+                    onTogglePlayPause = {},
+                    onToggleAutoDownload = {},
+                    onDownloadReplay = {},
+                    onCheckReplayAgain = {},
+                    isBroadcastLive = false,
+                )
+            }
+        }
+        composeRule.onNodeWithText("FINALIZADO").assertIsDisplayed()
+        composeRule.onNodeWithText("Esperando repetición").assertIsDisplayed()
+    }
+
+    @Test
+    fun liveEndedContentShowsWaitingForReplay() {
+        composeRule.setContent {
+            MediaFlowTheme {
+                LiveEndedContent(
+                    endState = LiveSpaceEndState.EndedReplayProcessing("Esperando repetición"),
+                    onDownloadReplay = {},
+                    onCheckReplayAgain = {},
+                )
+            }
+        }
+        composeRule.onNodeWithText("Esperando repetición").assertIsDisplayed()
+        composeRule.onAllNodesWithText("Comprobar de nuevo").assertCountEquals(0)
     }
 }

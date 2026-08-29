@@ -51,6 +51,7 @@ class PlatformDownloadStoreTest {
             status = DownloadStatus.COMPLETED,
             createdAt = 100,
             completedAt = 200,
+            thumbnailUri = "file:///data/user/0/com.mediaflow.app/files/thumbs/platform-1.jpg",
         )
 
         PlatformDownloadStore(file).save(listOf(item))
@@ -63,5 +64,6 @@ class PlatformDownloadStoreTest {
         assertEquals(item.selectedFormat?.height, restored.single().selectedFormat?.height)
         assertEquals(item.selectedFormat?.requiresMuxing, restored.single().selectedFormat?.requiresMuxing)
         assertTrue(restored.single().selectedFormat?.videoCodec == "avc1")
+        assertEquals(item.thumbnailUri, restored.single().thumbnailUri)
     }
 }

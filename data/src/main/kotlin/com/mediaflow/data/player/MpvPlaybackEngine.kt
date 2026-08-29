@@ -58,10 +58,7 @@ class MpvPlaybackEngine(
                 }
                 "eof-reached" -> {
                     if (value) {
-                        _state.value = _state.value.copy(playbackState = EnginePlaybackState.ENDED)
-                        engineScope.launch {
-                            _events.emit(PlaybackEvent.PlaybackFinished(mediaId, _state.value.durationMs))
-                        }
+                        emitPlaybackFinishedOnce(mediaId)
                     }
                 }
                 "mute" -> {
@@ -134,10 +131,7 @@ class MpvPlaybackEngine(
                     }
                 }
                 MPV.mpvEvent.MPV_EVENT_END_FILE -> {
-                    _state.value = _state.value.copy(playbackState = EnginePlaybackState.ENDED)
-                    engineScope.launch {
-                        _events.emit(PlaybackEvent.PlaybackFinished(mediaId, _state.value.durationMs))
-                    }
+                    emitPlaybackFinishedOnce(mediaId)
                 }
                 MPV.mpvEvent.MPV_EVENT_PLAYBACK_RESTART -> {
                     if (_state.value.isPlaying) {
@@ -178,12 +172,14 @@ class MpvPlaybackEngine(
     private var currentResolvedSource: ResolvedSource? = null
     private var pendingStartPositionMs: Long = 0L
     private var isReleased = false
+    private val playbackFinishedGate = PlaybackFinishedGate()
 
     override fun load(mediaSource: String, startPositionMs: Long, autoPlay: Boolean) {
         if (isReleased) return
 
         currentMediaId = mediaSource
         pendingStartPositionMs = startPositionMs
+        playbackFinishedGate.reset()
 
         _state.value = _state.value.copy(
             mediaSource = mediaSource,
@@ -325,6 +321,14 @@ class MpvPlaybackEngine(
             _events.emit(PlaybackEvent.MediaClosed(mediaId, lastPos))
         }
         engineScope.cancel()
+    }
+
+    private fun emitPlaybackFinishedOnce(mediaId: String) {
+        if (!playbackFinishedGate.tryMarkEmitted()) return
+        _state.value = _state.value.copy(playbackState = EnginePlaybackState.ENDED)
+        engineScope.launch {
+            _events.emit(PlaybackEvent.PlaybackFinished(mediaId, _state.value.durationMs))
+        }
     }
 
     private fun inspectTrackList(node: MPVNode) {

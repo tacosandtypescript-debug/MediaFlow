@@ -29,7 +29,7 @@ class AppNavigationTest {
     @Test
     fun initialDestinationIsHome() {
         composeRule.onNodeWithText("MediaFlow").assertIsDisplayed()
-        composeRule.onNodeWithText("Descarga y organiza tus archivos multimedia")
+        composeRule.onNodeWithText("Pega un enlace de YouTube o un X Space y archívalo.")
             .assertIsDisplayed()
     }
 
@@ -44,8 +44,8 @@ class AppNavigationTest {
     @Test
     fun canNavigateToDownloads() {
         composeRule.onNodeWithTag("tab_downloads").performClick()
-        composeRule.onNodeWithText("Todavía no tienes descargas").assertIsDisplayed()
-        composeRule.onNodeWithText("Volver a Inicio").assertIsDisplayed()
+        composeRule.onNodeWithText("Todavía no hay descargas").assertIsDisplayed()
+        composeRule.onNodeWithText("Ir a Inicio").assertIsDisplayed()
     }
 
     @Test
@@ -66,16 +66,16 @@ class AppNavigationTest {
     @Test
     fun downloadsCanReturnHome() {
         composeRule.onNodeWithTag("tab_downloads").performClick()
-        composeRule.onNodeWithText("Volver a Inicio").performClick()
-        composeRule.onNodeWithText("Descarga y organiza tus archivos multimedia")
+        composeRule.onNodeWithText("Ir a Inicio").performClick()
+        composeRule.onNodeWithText("Pega un enlace de YouTube o un X Space y archívalo.")
             .assertIsDisplayed()
     }
 
     @Test
     fun sameTabTapDoesNotCrash() {
         composeRule.onNodeWithTag("tab_downloads").performClick()
-        composeRule.onNodeWithText("Todavía no tienes descargas").assertIsDisplayed()
+        composeRule.onNodeWithText("Todavía no hay descargas").assertIsDisplayed()
         composeRule.onNodeWithTag("tab_downloads").performClick()
-        composeRule.onNodeWithText("Todavía no tienes descargas").assertIsDisplayed()
+        composeRule.onNodeWithText("Todavía no hay descargas").assertIsDisplayed()
     }
 }

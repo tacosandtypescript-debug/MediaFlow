@@ -72,7 +72,8 @@ fun EmptyLibraryState(
             Spacer(Modifier.height(20.dp))
             Button(
                 onClick = onAction,
-                shape = RoundedCornerShape(12.dp),
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier.height(52.dp),
             ) {
                 Text(actionLabel, fontWeight = FontWeight.SemiBold)
             }

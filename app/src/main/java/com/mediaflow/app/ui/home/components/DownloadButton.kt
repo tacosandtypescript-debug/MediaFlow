@@ -1,7 +1,9 @@
 package com.mediaflow.app.ui.home.components
 
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.FileDownload
 import androidx.compose.material3.Button
@@ -14,10 +16,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.mediaflow.app.R
 
-/**
- * Main "Descargar ahora" button. Its [enabled] state reflects whether a valid
- * HTTPS URL is present. It never starts a real download in this phase.
- */
 @Composable
 fun DownloadButton(
     enabled: Boolean,
@@ -27,8 +25,10 @@ fun DownloadButton(
     Button(
         onClick = onClick,
         enabled = enabled,
+        shape = RoundedCornerShape(14.dp),
         modifier = modifier
             .fillMaxWidth()
+            .height(52.dp)
             .testTag("download_button"),
     ) {
         Icon(Icons.Outlined.FileDownload, contentDescription = null)

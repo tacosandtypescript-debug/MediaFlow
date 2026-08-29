@@ -72,9 +72,7 @@ class XSpaceRepositoryImpl(
     override suspend fun getSpaceForMedia(mediaId: String): XSpace? {
         initJob.await()
         val spaceId = mediaToSpaceMap[mediaId] ?: mediaId
-        return _spaces.value[spaceId] ?: _spaces.value.values.firstOrNull { space ->
-            space.id in mediaId || mediaId.contains(space.id) || (space.title.isNotBlank() && mediaId.contains(space.title))
-        } ?: if (_spaces.value.size == 1) _spaces.value.values.first() else null
+        return lookupSpace(mediaId, _spaces.value, mediaToSpaceMap)
     }
 
     override fun observeAllSpaces(): Flow<Map<String, XSpace>> {
@@ -82,11 +80,20 @@ class XSpaceRepositoryImpl(
     }
 
     override fun observeSpaceForMedia(mediaId: String): Flow<XSpace?> {
-        return _spaces.map { map ->
-            val spaceId = mediaToSpaceMap[mediaId] ?: mediaId
-            map[spaceId] ?: map.values.firstOrNull { space ->
-                space.id in mediaId || mediaId.contains(space.id) || (space.title.isNotBlank() && mediaId.contains(space.title))
-            } ?: if (map.size == 1) map.values.first() else null
+        return _spaces.map { map -> lookupSpace(mediaId, map, mediaToSpaceMap) }
+    }
+
+    private fun lookupSpace(
+        mediaId: String,
+        map: Map<String, XSpace>,
+        mediaMap: Map<String, String>,
+    ): XSpace? {
+        val spaceId = mediaMap[mediaId] ?: mediaId
+        map[spaceId]?.let { return it }
+        return map.values.firstOrNull { space ->
+            space.id == mediaId ||
+                space.url == mediaId ||
+                space.audioStreamUrl == mediaId
         }
     }
 }

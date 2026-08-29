@@ -1,14 +1,13 @@
 package com.mediaflow.app.ui.player.miniplayer
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -30,22 +29,17 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.mediaflow.app.ui.theme.customColors
+import com.mediaflow.app.R
 import com.mediaflow.app.ui.common.media.MediaArtwork
-import com.mediaflow.app.ui.player.components.LiveStatusBadge
+import com.mediaflow.app.ui.theme.customColors
 import com.mediaflow.domain.player.EnginePlaybackState
 import com.mediaflow.domain.player.PlayerServiceState
 
-/**
- * Persistent Mini Player bar anchored above the bottom navigation bar.
- * Reads single source of truth from background playback service.
- */
 @Composable
 fun MiniPlayer(
     serviceState: PlayerServiceState,
@@ -58,23 +52,27 @@ fun MiniPlayer(
 
     AnimatedVisibility(
         visible = isVisible,
-        enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
-        exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
+        enter = slideInVertically(tween(280), initialOffsetY = { it }) + fadeIn(tween(280)),
+        exit = slideOutVertically(tween(280), targetOffsetY = { it }) + fadeOut(tween(280)),
         modifier = modifier,
     ) {
         val mediaUri = serviceState.filePath ?: serviceState.mediaId.orEmpty()
         val title = serviceState.title ?: mediaUri.substringAfterLast('/')
-        val author = serviceState.artistOrHost ?: if (serviceState.isLive) "Space en vivo" else "Audio"
+        val hostLabel = serviceState.artistOrHost
+            ?.removePrefix("Host: ")
+            ?.trim()
+            ?.takeIf { it.isNotBlank() }
+        val author = hostLabel ?: if (!serviceState.isLive) "Audio" else null
 
         Surface(
             color = MaterialTheme.customColors.miniPlayerBackground,
             border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.customColors.miniPlayerBorder),
-            tonalElevation = 6.dp,
-            shadowElevation = 8.dp,
-            shape = RoundedCornerShape(16.dp),
+            tonalElevation = 0.dp,
+            shadowElevation = 0.dp,
+            shape = RoundedCornerShape(12.dp),
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 6.dp)
+                .padding(horizontal = 8.dp, vertical = 4.dp)
                 .clickable { onOpenPlayer(mediaUri) }
                 .testTag("global_mini_player"),
         ) {
@@ -83,17 +81,15 @@ fun MiniPlayer(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                 ) {
-                    // Small Artwork
                     MediaArtwork(
-                        artworkUrl = serviceState.artworkUrl ?: mediaUri,
-                        size = 46.dp,
+                        artworkUrl = serviceState.artworkUrl,
+                        size = 48.dp,
                         isSpace = serviceState.isLive,
                         shape = RoundedCornerShape(10.dp),
                     )
 
                     Spacer(Modifier.width(12.dp))
 
-                    // Title & Subtitle
                     Column(
                         modifier = Modifier.weight(1f),
                         verticalArrangement = Arrangement.Center,
@@ -114,22 +110,30 @@ fun MiniPlayer(
                             horizontalArrangement = Arrangement.spacedBy(6.dp),
                         ) {
                             if (serviceState.isLive) {
-                                LiveStatusBadge()
+                                Text(
+                                    text = stringResource(R.string.miniplayer_live),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.customColors.live,
+                                    fontWeight = FontWeight.SemiBold,
+                                )
                             }
-                            Text(
-                                text = author,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
+                            if (!author.isNullOrBlank()) {
+                                Text(
+                                    text = author,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
                         }
                     }
 
-                    // Play/Pause Action
                     IconButton(
                         onClick = onTogglePlayPause,
-                        modifier = Modifier.testTag("mini_player_play_pause_btn"),
+                        modifier = Modifier
+                            .size(48.dp)
+                            .testTag("mini_player_play_pause_btn"),
                     ) {
                         Icon(
                             imageVector = if (serviceState.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
@@ -139,11 +143,12 @@ fun MiniPlayer(
                         )
                     }
 
-                    // Next Action (if queue has next item)
                     if (serviceState.hasNext) {
                         IconButton(
                             onClick = onSkipNext,
-                            modifier = Modifier.testTag("mini_player_next_btn"),
+                            modifier = Modifier
+                                .size(48.dp)
+                                .testTag("mini_player_next_btn"),
                         ) {
                             Icon(
                                 imageVector = Icons.Outlined.SkipNext,
@@ -155,7 +160,6 @@ fun MiniPlayer(
                     }
                 }
 
-                // Thin Progress Bar
                 MiniPlayerProgress(
                     progressFraction = serviceState.progressFraction,
                     isLive = serviceState.isLive,

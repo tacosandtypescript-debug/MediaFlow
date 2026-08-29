@@ -13,7 +13,7 @@
     <string name="go_to_home">Volver a Inicio</string>
 
     <!-- Home -->
-    <string name="home_subtitle">Descarga y organiza tus archivos multimedia</string>
+    <string name="home_subtitle">Pega un enlace de YouTube o un X Space y archívalo.</string>
     <string name="home_url_label">Enlace</string>
     <string name="home_url_placeholder">Pega aquí el enlace del vídeo o audio</string>
     <string name="home_clear">Limpiar enlace</string>
@@ -25,14 +25,14 @@
     <string name="home_info_download_pending">La descarga real se conectará en una fase posterior</string>
     <string name="analysis_loading">Analizando fuente…</string>
     <string name="analysis_ready">Fuente analizada</string>
-    <string name="analysis_failed">No se pudo analizar la fuente</string>
+    <string name="analysis_failed">No se pudo leer el enlace. Comprueba la URL e inténtalo de nuevo.</string>
     <string name="analysis_untitled">Vídeo sin título</string>
     <string name="analysis_formats">formatos disponibles</string>
     <string name="analysis_format_one">1 formato disponible</string>
     <string name="analysis_choose_format">Elige un formato real</string>
     <string name="analysis_thumbnail">Miniatura de la fuente</string>
     <string name="analysis_no_thumbnail">La fuente no proporcionó miniatura</string>
-    <string name="home_info_download_started">Descarga añadida. Puedes consultar el progreso en Descargas</string>
+    <string name="home_info_download_started">Descarga añadida. Síguela en Descargas.</string>
     <string name="home_media_type">Tipo de contenido</string>
     <string name="media_type_video">Vídeo</string>
     <string name="media_type_audio">Audio</string>
@@ -71,8 +71,51 @@
     <string name="download_status_completed">Completada</string>
     <string name="download_status_failed">Error</string>
     <string name="download_status_canceled">Cancelada</string>
-    <string name="downloads_empty_title">Todavía no tienes descargas</string>
-    <string name="downloads_empty_subtitle">Tus descargas aparecerán aquí.</string>
+    <string name="downloads_empty_title">Todavía no hay descargas</string>
+    <string name="downloads_empty_subtitle">Empieza desde Inicio con un enlace. El progreso aparece aquí.</string>
+    <string name="go_to_home_cta">Ir a Inicio</string>
+
+    <string name="library_title">Tu biblioteca</string>
+    <string name="library_audio_empty_title">No hay audios todavía</string>
+    <string name="library_audio_empty_subtitle">Descarga un audio o un X Space para escucharlo aquí.</string>
+    <string name="library_video_empty_title">No hay videos todavía</string>
+    <string name="library_video_empty_subtitle">Descarga un video para verlo aquí.</string>
+    <string name="favorites_empty_title">Aún no hay favoritos</string>
+    <string name="favorites_empty_subtitle">Toca el corazón en un audio o un Space para guardarlo aquí.</string>
+    <string name="favorites_title">Tus favoritos</string>
+    <string name="playlists_title">Tus playlists</string>
+    <string name="playlists_empty_title">Todavía no hay playlists</string>
+    <string name="playlists_empty_subtitle">Crea una para agrupar audios y Spaces.</string>
+    <string name="playlists_create">Crear playlist</string>
+    <string name="playlists_new">Nueva playlist</string>
+    <string name="player_error_title">No se pudo reproducir</string>
+    <string name="player_error_subtitle">El archivo no está disponible o está dañado.</string>
+    <string name="player_buffering">Cargando…</string>
+    <string name="miniplayer_live">En directo</string>
+    <string name="player_now_playing">Reproduciendo</string>
+    <string name="player_reconnecting">Reconectando…</string>
+    <string name="space_live_badge">EN VIVO</string>
+    <string name="space_ended_badge">FINALIZADO</string>
+    <string name="space_listen_live">Escuchar en vivo</string>
+    <string name="space_host_format">Host: %1$s</string>
+    <string name="space_listeners_format">%d oyentes</string>
+    <string name="space_auto_download_off">Descargar cuando termine</string>
+    <string name="space_auto_download_on">Descarga programada al terminar</string>
+    <string name="space_auto_download_hint">Se descargará al finalizar</string>
+    <string name="space_ended_title">Este Space ha finalizado</string>
+    <string name="space_ended_pill">Transmisión finalizada</string>
+    <string name="space_waiting_replay">Esperando repetición</string>
+    <string name="space_waiting_replay_body">X todavía está generando la grabación. No se inventa el archivo.</string>
+    <string name="space_replay_ready">La grabación está lista.</string>
+    <string name="space_download_replay">Descargar Space</string>
+    <string name="space_download_queued">Descarga añadida a la cola</string>
+    <string name="space_no_replay">El host no guardó la grabación.</string>
+    <string name="space_replay_timeout">La repetición no está lista. Inténtalo más tarde.</string>
+    <string name="space_check_again">Comprobar de nuevo</string>
+    <string name="space_still_live">El Space sigue en directo.</string>
+    <string name="space_upcoming">Este Space todavía no ha comenzado (Programado).</string>
+    <string name="space_on_air">En el aire</string>
+    <string name="space_default_title">X Space en vivo</string>
 
     <!-- Gallery -->
     <string name="gallery_filter_videos">Vídeos</string>

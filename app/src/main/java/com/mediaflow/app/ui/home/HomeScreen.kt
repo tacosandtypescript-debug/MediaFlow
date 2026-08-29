@@ -7,7 +7,10 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.slideInVertically
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -17,8 +20,6 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
@@ -34,14 +35,18 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.mediaflow.app.R
-import com.mediaflow.app.ui.components.EmptyState
+import com.mediaflow.app.ui.common.media.MediaArtwork
+import com.mediaflow.app.ui.common.media.preferredArtworkUrl
+import com.mediaflow.app.ui.downloads.DownloadStartResult
 import com.mediaflow.app.ui.home.components.DownloadButton
 import com.mediaflow.app.ui.home.components.FileNameField
 import com.mediaflow.app.ui.home.components.MediaTypeSelector
@@ -49,23 +54,17 @@ import com.mediaflow.app.ui.home.components.QualitySelector
 import com.mediaflow.app.ui.home.components.SourceAnalysisCard
 import com.mediaflow.app.ui.home.components.UrlInputField
 import com.mediaflow.app.ui.home.components.XSpaceCard
-import com.mediaflow.app.ui.downloads.DownloadStartResult
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.delay
+import com.mediaflow.core.model.DownloadItem
+import com.mediaflow.core.model.DownloadStatus
 import com.mediaflow.domain.repository.SourceResolver
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
-/** Staggered, test-safe entrance transition reused across Home blocks. */
 private fun staggeredEnter(delayMillis: Int = 0): EnterTransition =
-    fadeIn(tween(durationMillis = 500, delayMillis = delayMillis)) +
-        slideInVertically(tween(durationMillis = 500, delayMillis = delayMillis)) { it / 20 } +
-        scaleIn(tween(durationMillis = 500, delayMillis = delayMillis), initialScale = 0.97f)
+    fadeIn(tween(durationMillis = 280, delayMillis = delayMillis)) +
+        slideInVertically(tween(durationMillis = 280, delayMillis = delayMillis)) { it / 20 } +
+        scaleIn(tween(durationMillis = 280, delayMillis = delayMillis), initialScale = 0.97f)
 
-/**
- * Modern Home screen of MediaFlow.
- *
- * Keeps local validation while the navigation layer owns the real download
- * request. Adds staggered entrance animations and an expressive layout.
- */
 @Composable
 fun HomeScreen(
     modifier: Modifier = Modifier,
@@ -73,19 +72,21 @@ fun HomeScreen(
     sourceResolver: SourceResolver? = null,
     onDownloadRequested: ((HomeUiState) -> DownloadStartResult)? = null,
     onPlayLive: ((String) -> Unit)? = null,
+    recentDownloads: List<DownloadItem> = emptyList(),
+    onRecentClick: (DownloadItem) -> Unit = {},
 ) {
     val state by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val pendingDownloadMessage = stringResource(R.string.home_info_download_pending)
     val downloadAcceptedMessage = stringResource(R.string.home_info_download_started)
-    val directLivePlaybackMessage = "Iniciando reproducción en directo..."
+    val analyzingMessage = stringResource(R.string.analysis_loading)
+    val completedRecents = remember(recentDownloads) {
+        recentDownloads.filter { it.status == DownloadStatus.COMPLETED }.take(8)
+    }
 
     var entered by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { entered = true }
-    // Analyze once per URL. A Space is normalized to AUDIO after a successful
-    // analysis; including mediaType here would immediately cancel that result
-    // and start a second analysis, making the card disappear and reappear.
     LaunchedEffect(state.url, sourceResolver) {
         if (sourceResolver != null && state.validationState == ValidationState.Valid) {
             delay(500)
@@ -96,11 +97,15 @@ fun HomeScreen(
     val linkCardColor by animateColorAsState(
         targetValue = when {
             state.errorMessage != null -> MaterialTheme.colorScheme.errorContainer
-            state.validationState == ValidationState.Valid -> MaterialTheme.colorScheme.primaryContainer
             else -> MaterialTheme.colorScheme.surfaceContainerHigh
         },
         label = "linkCardColor",
     )
+    val linkBorder = when {
+        state.errorMessage != null -> MaterialTheme.colorScheme.error
+        state.validationState == ValidationState.Valid -> MaterialTheme.colorScheme.primary
+        else -> MaterialTheme.colorScheme.outline
+    }
 
     Scaffold(
         modifier = modifier,
@@ -123,15 +128,14 @@ fun HomeScreen(
                 .verticalScroll(rememberScrollState())
                 .imePadding()
                 .navigationBarsPadding()
-                .padding(horizontal = 20.dp, vertical = 20.dp),
+                .padding(horizontal = 16.dp, vertical = 16.dp),
         ) {
-            AnimatedVisibility(entered, enter = staggeredEnter(30)) {
+            AnimatedVisibility(entered, enter = staggeredEnter(0)) {
                 Column {
                     Text(
                         text = stringResource(R.string.app_name),
-                        style = MaterialTheme.typography.headlineLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary,
+                        style = MaterialTheme.typography.headlineMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
                     )
                     Text(
                         text = stringResource(R.string.home_subtitle),
@@ -144,12 +148,13 @@ fun HomeScreen(
 
             Spacer(Modifier.height(20.dp))
 
-            AnimatedVisibility(entered, enter = staggeredEnter(120)) {
+            AnimatedVisibility(entered, enter = staggeredEnter(40)) {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = MaterialTheme.shapes.large,
+                    shape = MaterialTheme.shapes.medium,
                     colors = CardDefaults.cardColors(containerColor = linkCardColor),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                    border = BorderStroke(1.dp, linkBorder),
                 ) {
                     Column(Modifier.padding(14.dp)) {
                         UrlInputField(
@@ -173,7 +178,6 @@ fun HomeScreen(
                     onPlayLive = { space ->
                         val streamUrl = space.audioStreamUrl
                         if (streamUrl != null) {
-                            scope.launch { snackbarHostState.showSnackbar(directLivePlaybackMessage) }
                             onPlayLive?.invoke(streamUrl)
                         }
                     },
@@ -190,7 +194,10 @@ fun HomeScreen(
                 modifier = Modifier.padding(bottom = 18.dp),
             )
 
-            AnimatedVisibility(sourceResolver == null || state.analysisState == AnalysisState.IDLE, enter = staggeredEnter(240)) {
+            AnimatedVisibility(
+                sourceResolver == null || state.analysisState == AnalysisState.IDLE,
+                enter = staggeredEnter(80),
+            ) {
                 MediaTypeSelector(
                     selected = state.mediaType,
                     onSelect = viewModel::onMediaTypeSelected,
@@ -199,7 +206,7 @@ fun HomeScreen(
 
             Spacer(Modifier.height(18.dp))
 
-            AnimatedVisibility(sourceResolver == null, enter = staggeredEnter(340)) {
+            AnimatedVisibility(sourceResolver == null, enter = staggeredEnter(120)) {
                 QualitySelector(
                     options = state.qualityOptions,
                     selected = state.quality,
@@ -209,7 +216,7 @@ fun HomeScreen(
 
             Spacer(Modifier.height(12.dp))
 
-            AnimatedVisibility(entered, enter = staggeredEnter(440)) {
+            AnimatedVisibility(entered, enter = staggeredEnter(160)) {
                 FileNameField(
                     fileName = state.fileName,
                     onFileNameChange = viewModel::onFileNameChanged,
@@ -218,18 +225,16 @@ fun HomeScreen(
 
             Spacer(Modifier.height(24.dp))
 
-            AnimatedVisibility(entered, enter = staggeredEnter(540)) {
+            AnimatedVisibility(entered, enter = staggeredEnter(200)) {
                 DownloadButton(
                     enabled = state.isDownloadButtonEnabled &&
                         (sourceResolver == null || state.analysisState == AnalysisState.READY),
                     onClick = {
-                        android.util.Log.d("MediaFlow", "DownloadButton clicked! state.analysisState=${state.analysisState}")
                         if (sourceResolver != null && state.analysisState != AnalysisState.READY) {
                             viewModel.analyze(sourceResolver)
-                            scope.launch { snackbarHostState.showSnackbar("Analizando la fuente…") }
+                            scope.launch { snackbarHostState.showSnackbar(analyzingMessage) }
                         } else {
                             val result = onDownloadRequested?.invoke(state)
-                            android.util.Log.d("MediaFlow", "onDownloadRequested result=$result")
                             when (result) {
                                 null -> scope.launch { snackbarHostState.showSnackbar(pendingDownloadMessage) }
                                 is DownloadStartResult.Accepted -> scope.launch {
@@ -245,34 +250,68 @@ fun HomeScreen(
                 )
             }
 
-            Spacer(Modifier.height(32.dp))
-
-            AnimatedVisibility(entered, enter = staggeredEnter(660)) {
-                Column {
-                    Text(
-                        text = stringResource(R.string.home_recent_downloads),
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 8.dp),
-                        shape = MaterialTheme.shapes.large,
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                        ),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-                    ) {
-                        EmptyState(
-                            icon = Icons.Outlined.Download,
-                            title = stringResource(R.string.home_recent_empty_title),
-                            subtitle = stringResource(R.string.home_recent_empty_subtitle),
-                            modifier = Modifier.padding(bottom = 8.dp),
+            if (completedRecents.isNotEmpty()) {
+                Spacer(Modifier.height(32.dp))
+                AnimatedVisibility(entered, enter = staggeredEnter(240)) {
+                    Column {
+                        Text(
+                            text = stringResource(R.string.home_recent_downloads),
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
                         )
+                        completedRecents.forEach { item ->
+                            RecentDownloadRow(
+                                item = item,
+                                onClick = { onRecentClick(item) },
+                            )
+                        }
                     }
                 }
             }
+
+            Spacer(Modifier.height(120.dp))
+        }
+    }
+}
+
+@Composable
+private fun RecentDownloadRow(
+    item: DownloadItem,
+    onClick: () -> Unit,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 8.dp)
+            .clickable(onClick = onClick)
+            .padding(vertical = 8.dp),
+    ) {
+        MediaArtwork(
+            artworkUrl = preferredArtworkUrl(item.thumbnailUri),
+            size = 72.dp,
+            mediaType = item.mediaType,
+        )
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .padding(horizontal = 12.dp),
+        ) {
+            Text(
+                text = item.title ?: item.fileName ?: item.sourceUrl,
+                style = MaterialTheme.typography.titleMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        item.durationSeconds?.let { seconds ->
+            val minutes = seconds / 60
+            val rest = seconds % 60
+            Text(
+                text = "%02d:%02d".format(minutes, rest),
+                style = MaterialTheme.typography.labelMedium.copy(fontFamily = FontFamily.Monospace),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }

@@ -16,8 +16,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.mediaflow.app.R
+import com.mediaflow.app.ui.common.media.preferredArtworkUrl
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.mediaflow.app.ui.common.media.DeleteMediaDialog
 import com.mediaflow.app.ui.favorites.FavoritesView
@@ -93,7 +96,7 @@ fun LibraryScreen(
     ) {
         // Header
         Text(
-            text = "Tu biblioteca",
+            text = stringResource(R.string.library_title),
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurface,
@@ -211,7 +214,7 @@ fun LibraryScreen(
     itemToDelete?.let { item ->
         val space = uiState.spacesMap[item.sourceUrl] ?: uiState.spacesMap[item.id]
         val title = space?.title ?: item.title ?: item.fileName ?: "Audio"
-        val artwork = space?.host?.avatarUrl ?: item.thumbnailUri ?: item.localUri
+        val artwork = preferredArtworkUrl(item.thumbnailUri, space?.host?.avatarUrl)
 
         DeleteMediaDialog(
             title = title,

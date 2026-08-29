@@ -33,6 +33,7 @@ fun PlayerHeaderContext(
     onBack: () -> Unit,
     onOptions: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
+    isLiveSession: Boolean = isLive,
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -56,8 +57,8 @@ fun PlayerHeaderContext(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.weight(1f),
         ) {
-            if (isLive) {
-                LiveStatusBadge()
+            if (isLiveSession) {
+                LiveStatusBadge(isLive = isLive)
             } else {
                 Surface(
                     shape = RoundedCornerShape(8.dp),

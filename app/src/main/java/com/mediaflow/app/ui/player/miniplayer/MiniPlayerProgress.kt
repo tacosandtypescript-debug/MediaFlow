@@ -9,24 +9,20 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.unit.dp
+import com.mediaflow.app.ui.theme.customColors
 
-/**
- * Thin progress bar for local files, styled seamlessly across light and dark themes.
- */
 @Composable
 fun MiniPlayerProgress(
     progressFraction: Float,
     isLive: Boolean,
     modifier: Modifier = Modifier,
 ) {
-    if (isLive) return
-
     LinearProgressIndicator(
-        progress = { progressFraction.coerceIn(0f, 1f) },
+        progress = { if (isLive) 1f else progressFraction.coerceIn(0f, 1f) },
         modifier = modifier
             .fillMaxWidth()
-            .height(2.5.dp),
-        color = MaterialTheme.colorScheme.primary,
+            .height(3.dp),
+        color = if (isLive) MaterialTheme.customColors.live else MaterialTheme.colorScheme.primary,
         trackColor = Color.Transparent,
         strokeCap = StrokeCap.Round,
     )

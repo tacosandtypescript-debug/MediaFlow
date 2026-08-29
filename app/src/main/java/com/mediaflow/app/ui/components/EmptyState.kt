@@ -47,7 +47,7 @@ fun EmptyState(
 
     AnimatedVisibility(
         visible = visible,
-        enter = fadeIn(tween(450)) + scaleIn(tween(450), initialScale = 0.94f),
+        enter = fadeIn(tween(280)) + scaleIn(tween(280), initialScale = 0.94f),
     ) {
         Column(
             modifier = modifier

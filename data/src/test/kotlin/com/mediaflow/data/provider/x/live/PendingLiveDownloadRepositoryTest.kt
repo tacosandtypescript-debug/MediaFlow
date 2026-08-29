@@ -51,4 +51,35 @@ class PendingLiveDownloadRepositoryTest {
         repo.removePendingDownload("space_123")
         assertFalse(repo.isAutoDownloadEnabled("space_123"))
     }
+
+    @Test
+    fun `isAutoDownloadEnabled is false when no row exists`() = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<android.app.Application>()
+        File(context.filesDir, "pending_live_downloads.json").delete()
+        val repo = PendingLiveDownloadRepositoryImpl(context)
+        assertFalse(repo.isAutoDownloadEnabled("missing_space"))
+    }
+
+    @Test
+    fun `attemptCount survives disk reload`() = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<android.app.Application>()
+        File(context.filesDir, "pending_live_downloads.json").delete()
+        val repo = PendingLiveDownloadRepositoryImpl(context)
+        repo.savePendingDownload(
+            PendingLiveDownload(
+                spaceId = "space_retry",
+                title = "Retry",
+                hostHandle = "@host",
+                sourceUrl = "https://x.com/i/spaces/space_retry",
+                autoDownloadAfterEnd = true,
+                status = PendingLiveDownloadStatus.RESOLVING_REPLAY,
+                attemptCount = 4,
+                nextRetryAtMs = 1234L,
+            ),
+        )
+        val reloaded = PendingLiveDownloadRepositoryImpl(context).getPendingDownload("space_retry")
+        assertEquals(4, reloaded?.attemptCount)
+        assertEquals(1234L, reloaded?.nextRetryAtMs)
+        assertTrue(reloaded?.autoDownloadAfterEnd == true)
+    }
 }

@@ -41,9 +41,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.mediaflow.app.R
 import com.mediaflow.core.model.ParticipantRole
 import com.mediaflow.core.model.XParticipant
 import com.mediaflow.core.model.XSpace
@@ -68,8 +70,12 @@ fun XSpaceCard(
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            if (space.isLive) com.mediaflow.app.ui.theme.LiveRed else MaterialTheme.colorScheme.outline,
+        ),
     ) {
         Column(modifier = Modifier.padding(18.dp)) {
             // Header Row: Space Badge + State Badge
@@ -247,19 +253,20 @@ fun XSpaceCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                // Duration
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Outlined.Schedule,
-                        contentDescription = null,
-                        modifier = Modifier.size(15.dp).padding(end = 4.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Text(
-                        text = space.formattedDuration,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                if (space.isEnded && space.durationSeconds > 0L) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Outlined.Schedule,
+                            contentDescription = null,
+                            modifier = Modifier.size(15.dp).padding(end = 4.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Text(
+                            text = space.formattedDuration,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
 
                 // Listeners / Replays
@@ -306,10 +313,11 @@ fun XSpaceCard(
                     onClick = { onPlayLive(space) },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 16.dp),
+                        .padding(top = 16.dp)
+                        .height(52.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                        containerColor = com.mediaflow.app.ui.theme.LiveRed,
+                        contentColor = com.mediaflow.app.ui.theme.OnLiveColor,
                     ),
                     shape = RoundedCornerShape(14.dp),
                 ) {
@@ -324,7 +332,7 @@ fun XSpaceCard(
                             modifier = Modifier.size(20.dp),
                         )
                         Text(
-                            text = "Escuchar en vivo",
+                            text = stringResource(R.string.space_listen_live),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                         )

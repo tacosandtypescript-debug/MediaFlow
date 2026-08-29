@@ -75,10 +75,7 @@ open class XSpaceMetadataResolver(
             if (space.audioStreamUrl == null && !mediaKey.isNullOrBlank()) {
                 val streamUrl = fetchLiveStreamPlaybackUrl(mediaKey)
                 if (streamUrl != null) {
-                    return@withContext space.copy(
-                        audioStreamUrl = streamUrl,
-                        recordingAvailable = true,
-                    )
+                    return@withContext space.copy(audioStreamUrl = streamUrl)
                 }
             }
             space
@@ -231,7 +228,7 @@ open class XSpaceMetadataResolver(
             startedAtMs = startedAtMs,
             endedAtMs = endedAtMs,
             durationSeconds = durationSeconds,
-            recordingAvailable = recordingAvailable || audioUrl != null,
+            recordingAvailable = recordingAvailable,
             liveListenersCount = liveListeners,
             replayCount = replayCount,
             audioStreamUrl = audioUrl,
@@ -263,7 +260,7 @@ open class XSpaceMetadataResolver(
         )
     }
 
-    private fun fallbackFromYtDlp(
+    internal fun fallbackFromYtDlp(
         spaceId: String,
         originalUrl: String,
         ytDlpJson: JSONObject?,
@@ -273,7 +270,9 @@ open class XSpaceMetadataResolver(
         val uploaderId = ytDlpJson?.optString("uploader_id", "host").orEmpty()
         val thumbnail = ytDlpJson?.optString("thumbnail")
         val duration = ytDlpJson?.optLong("duration", 0L) ?: 0L
-        val wasLive = ytDlpJson?.optBoolean("was_live", true) ?: true
+        val liveStatus = ytDlpJson?.optString("live_status").orEmpty()
+        val isLive = ytDlpJson?.optBoolean("is_live", false) == true || liveStatus == "is_live"
+        val wasLive = ytDlpJson?.optBoolean("was_live", false) == true || liveStatus == "was_live"
 
         val host = XParticipant(
             displayName = uploader,
@@ -293,13 +292,17 @@ open class XSpaceMetadataResolver(
             id = spaceId,
             url = originalUrl,
             title = title,
-            state = if (wasLive) XSpaceState.ENDED else XSpaceState.UNKNOWN,
+            state = when {
+                isLive -> XSpaceState.LIVE
+                wasLive -> XSpaceState.ENDED
+                else -> XSpaceState.UNKNOWN
+            },
             host = host,
             cohosts = emptyList(),
             speakers = emptyList(),
             participants = listOf(host),
             durationSeconds = duration,
-            recordingAvailable = audioUrl != null,
+            recordingAvailable = !isLive && wasLive && audioUrl != null,
             audioStreamUrl = audioUrl,
             rawMetadata = ytDlpJson?.toString(),
         )

@@ -91,6 +91,20 @@ class UseCaseDelegateTest {
     }
 
     @Test
+    fun `start download preserves thumbnail url`() = runTest {
+        val repository = FakeDownloadRepository()
+        val request = DownloadRequest(
+            sourceUrl = "https://example.com/v",
+            mediaType = MediaType.VIDEO,
+            thumbnailUrl = "https://example.com/thumb.jpg",
+        )
+
+        StartDownloadUseCase(repository)(request)
+
+        assertEquals("https://example.com/thumb.jpg", repository.requests.single().thumbnailUrl)
+    }
+
+    @Test
     fun `pause download delegates to repository`() = runTest {
         val repository = FakeDownloadRepository()
         PauseDownloadUseCase(repository)("d-9")

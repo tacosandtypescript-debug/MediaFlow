@@ -14,9 +14,11 @@ object PlatformFormatSelector {
 
     fun select(request: DownloadRequest): String = when {
         request.formatId == "space_audio_m4a" -> "b/best/0/bestaudio"
+        request.formatId == "anonymous" -> VIDEO_MP4_PREFERRED
         request.requiresMuxing && !request.formatId.isNullOrBlank() && request.formatId != "yt-dlp" ->
             muxedVideoAndAacAudio(request.formatId!!)
-        !request.formatId.isNullOrBlank() && request.formatId != "yt-dlp" -> request.formatId!!
+        !request.formatId.isNullOrBlank() && request.formatId != "yt-dlp" && request.formatId != "anonymous" ->
+            request.formatId!!
         request.mediaType == MediaType.AUDIO -> AUDIO_M4A_PREFERRED
         request.qualityLabel?.contains("1080") == true -> heightBoundedMp4(1080)
         request.qualityLabel?.contains("720") == true -> heightBoundedMp4(720)
