@@ -7,6 +7,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.mediaflow.app.ui.common.media.preferredArtworkUrl
+import com.mediaflow.core.model.DownloadItem
 import com.mediaflow.core.model.MediaType
 import com.mediaflow.core.model.Playlist
 import com.mediaflow.core.model.XSpace
@@ -249,9 +250,8 @@ class PlayerViewModel(
             embeddedTags.value = tags
 
             val download = withTimeoutOrNull(1_500) {
-                downloadRepo.observeDownloads().first().firstOrNull { item ->
-                    item.localUri == mediaUri || item.id == mediaUri || item.sourceUrl == mediaUri
-                }
+                val items = downloadRepo.observeDownloads().first()
+                items.firstOrNull { item -> matchesDownload(item, mediaUri) }
             }
             val artwork = tags.artworkUri ?: download?.thumbnailUri
             embeddedTags.value = tags.copy(artworkUri = artwork)
@@ -293,6 +293,12 @@ class PlayerViewModel(
                 context = app,
                 mediaUri = mediaUri,
                 title = resolvedTitle,
+                artist = space?.let { "Host: ${it.host.formattedHandle}" }
+                    ?: PlayerDisplayMetadata.artist(tags.artist, null),
+                artworkUrl = preferredArtworkUrl(
+                    artwork ?: preservedArtwork,
+                    space?.host?.avatarUrl,
+                ),
                 isLive = effectiveLive,
                 spaceId = space?.id,
                 spaceUrl = space?.url,
@@ -612,6 +618,15 @@ class PlayerViewModel(
         currentSpace.value = ended
         spaceRepository.saveSpace(ended, mediaId = ended.url)
         playerService.markBroadcastEnded()
+    }
+
+    private fun matchesDownload(item: DownloadItem, mediaUri: String): Boolean {
+        if (item.localUri == mediaUri || item.id == mediaUri || item.sourceUrl == mediaUri) return true
+        val needle = mediaUri.substringAfterLast('/').substringBefore('?')
+        if (needle.isBlank()) return false
+        if (item.id == needle || item.fileName == needle) return true
+        val itemLast = item.localUri?.substringAfterLast('/')?.substringBefore('?')
+        return itemLast == needle
     }
 
     private suspend fun resolveSpaceForMedia(mediaUri: String): XSpace? {

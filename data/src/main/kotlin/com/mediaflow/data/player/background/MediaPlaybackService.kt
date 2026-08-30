@@ -34,6 +34,8 @@ class MediaPlaybackService : Service() {
     companion object {
         const val EXTRA_MEDIA_URI = "extra_media_uri"
         const val EXTRA_TITLE = "extra_title"
+        const val EXTRA_ARTIST = "extra_artist"
+        const val EXTRA_ARTWORK = "extra_artwork"
         const val EXTRA_IS_LIVE = "extra_is_live"
         const val EXTRA_SPACE_ID = "extra_space_id"
         const val EXTRA_SPACE_URL = "extra_space_url"
@@ -43,6 +45,8 @@ class MediaPlaybackService : Service() {
             context: Context,
             mediaUri: String,
             title: String? = null,
+            artist: String? = null,
+            artworkUrl: String? = null,
             isLive: Boolean = false,
             spaceId: String? = null,
             spaceUrl: String? = null,
@@ -52,6 +56,8 @@ class MediaPlaybackService : Service() {
                 action = PlaybackNotificationManager.ACTION_PLAY
                 putExtra(EXTRA_MEDIA_URI, mediaUri)
                 putExtra(EXTRA_TITLE, title)
+                putExtra(EXTRA_ARTIST, artist)
+                putExtra(EXTRA_ARTWORK, artworkUrl)
                 putExtra(EXTRA_IS_LIVE, isLive)
                 putExtra(EXTRA_SPACE_ID, spaceId)
                 putExtra(EXTRA_SPACE_URL, spaceUrl)
@@ -170,24 +176,36 @@ class MediaPlaybackService : Service() {
                 autoDownloadWhenEnded = intent.getBooleanExtra(EXTRA_AUTO_DOWNLOAD, false)
 
                 if (!mediaUri.isNullOrBlank()) {
-                    // Load space metadata and artwork if available
+                    val artist = intent.getStringExtra(EXTRA_ARTIST)
+                    val artwork = intent.getStringExtra(EXTRA_ARTWORK)
                     serviceScope.launch {
                         currentSpace = activeSpaceId?.let { spaceRepository.getSpace(it) }
                             ?: spaceRepository.getSpaceForMedia(mediaUri)
 
-                        cachedArtwork = notificationManager.loadArtworkBitmap(currentSpace?.host?.avatarUrl)
+                        cachedArtwork = notificationManager.loadArtworkBitmap(
+                            artwork ?: currentSpace?.host?.avatarUrl,
+                        )
                         updateForegroundNotification()
                     }
 
-                    // Open media in shared player session
                     if (audioFocusManager.requestAudioFocus()) {
-                        playerService.openMedia(
-                            mediaId = mediaUri,
-                            filePath = mediaUri,
-                            title = title,
-                            autoPlay = true,
-                            isLive = isLive,
-                        )
+                        val current = playerService.uiState.value
+                        val sameMedia = current.mediaId == mediaUri || current.filePath == mediaUri
+                        val alreadyReady = sameMedia &&
+                            current.playbackState != EnginePlaybackState.IDLE
+                        if (alreadyReady) {
+                            if (!current.isPlaying) playerService.play()
+                        } else {
+                            playerService.openMedia(
+                                mediaId = mediaUri,
+                                filePath = mediaUri,
+                                title = title ?: current.title,
+                                artistOrHost = artist ?: current.artistOrHost,
+                                artworkUrl = artwork ?: current.artworkUrl,
+                                autoPlay = true,
+                                isLive = isLive,
+                            )
+                        }
                     }
                 } else {
                     if (audioFocusManager.requestAudioFocus()) {
