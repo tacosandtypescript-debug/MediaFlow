@@ -137,8 +137,8 @@ open class XSpaceMetadataResolver(
         }
 
         val recordingAvailable = metadata.optBoolean("is_space_available_for_replay", false)
-        val liveListeners = metadata.optInt("total_live_listeners", 0)
-        val replayCount = metadata.optInt("total_replay_watched", 0)
+        val liveListeners = optionalCount(metadata, "total_live_listeners")
+        val replayCount = optionalCount(metadata, "total_replay_watched")
 
         // Parse Host / Creator
         val creatorLegacy = metadata.optJSONObject("creator_results")
@@ -234,6 +234,12 @@ open class XSpaceMetadataResolver(
             audioStreamUrl = audioUrl,
             rawMetadata = json.toString(),
         )
+    }
+
+    /** Counts missing from GraphQL stay 0; callers must not treat 0 as a measured audience. */
+    internal fun optionalCount(obj: JSONObject, key: String): Int {
+        if (!obj.has(key) || obj.isNull(key)) return 0
+        return obj.optInt(key, 0)
     }
 
     private fun parseParticipant(obj: JSONObject, defaultRole: ParticipantRole): XParticipant? {
