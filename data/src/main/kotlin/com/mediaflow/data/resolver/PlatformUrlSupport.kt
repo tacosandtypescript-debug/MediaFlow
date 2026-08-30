@@ -27,7 +27,8 @@ object PlatformUrlSupport {
 
             hostIs("instagram.com") || hostIs("instagr.am") -> Platform.INSTAGRAM
 
-            hostIs("tiktok.com") || hostIs("douyin.com") -> Platform.TIKTOK
+            hostIs("tiktok.com") || hostIs("vm.tiktok.com") || hostIs("vt.tiktok.com") ||
+                hostIs("douyin.com") -> Platform.TIKTOK
 
             hostIs("youtube.com") || hostIs("youtu.be") -> Platform.YOUTUBE
 
