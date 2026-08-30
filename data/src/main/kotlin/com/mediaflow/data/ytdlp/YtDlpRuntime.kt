@@ -70,14 +70,13 @@ internal object YtDlpRuntime {
         val paths = JSONObject()
             .put("home", outputDirectory.absolutePath)
             .put("temp", outputDirectory.absolutePath)
-        // Chaquopy has no JS runtime. android_vr needs neither JS nor a PO token
-        // and still exposes AAC/m4a (140). tv is the existing no-cookie fallback;
-        // web is SABR-only without a PO token so it is omitted.
-        // Do not pin a global Chrome User-Agent: yt-dlp attaches the player
-        // client's UA on each format. Overriding it 403s YouTube CDN.
+        // Aug 2026: android_vr HTTPS formats 403 without a GVS PO token except
+        // sometimes 18. The android client still returns a progressive MP4.
+        // tv needs JS/nsig (Chaquopy has no runtime). Do not pin Chrome UA:
+        // it 403s player-client CDN URLs.
         val youtubeArgs = JSONObject().put(
             "player_client",
-            JSONArray().put("android_vr").put("tv"),
+            JSONArray().put("android").put("tv_simply").put("android_vr"),
         )
         return JSONObject()
             .put("outtmpl", absoluteTemplate)
@@ -169,8 +168,28 @@ internal object YtDlpRuntime {
                 except Exception:
                     pass
             opts['progress_hooks'] = [hook]
-            with yt_dlp.YoutubeDL(opts) as ydl:
-                ydl.download([url])
+            clients = [['android'], ['tv_simply'], ['android_vr']]
+            last = None
+            for client in clients:
+                attempt = dict(opts)
+                ea = dict(attempt.get('extractor_args') or {})
+                yt = dict(ea.get('youtube') or {})
+                yt['player_client'] = client
+                ea['youtube'] = yt
+                attempt['extractor_args'] = ea
+                attempt['progress_hooks'] = [hook]
+                try:
+                    with yt_dlp.YoutubeDL(attempt) as ydl:
+                        ydl.download([url])
+                    last = None
+                    break
+                except Exception as e:
+                    last = e
+                    msg = str(e)
+                    if '403' not in msg and 'Forbidden' not in msg and 'Requested format' not in msg:
+                        raise
+            if last is not None:
+                raise last
             """.trimIndent(),
             mapOf(
                 "url" to PlatformUrlSupport.canonicalExtractionUrl(url),

@@ -35,7 +35,7 @@ class YtDlpRuntimeTest {
         assertTrue(outtmpl.startsWith(dir.absolutePath))
         assertTrue(outtmpl.contains("analysis_%(id)s.%(ext)s"))
         assertEquals(
-            listOf("android_vr", "tv"),
+            listOf("android", "tv_simply", "android_vr"),
             opts.getJSONObject("extractor_args")
                 .getJSONObject("youtube")
                 .getJSONArray("player_client")

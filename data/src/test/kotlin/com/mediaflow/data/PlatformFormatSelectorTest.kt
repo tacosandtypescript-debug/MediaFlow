@@ -131,13 +131,13 @@ class PlatformFormatSelectorTest {
 
     @Test
     fun `audio selector prefers mp4 before unfiltered bestaudio`() {
-        assertTrue(AUDIO_SELECTOR.contains("ba[ext=m4a]/b[ext=mp4]/b"))
-        assertFalse(AUDIO_SELECTOR.contains("/bestaudio/"))
+        assertTrue(AUDIO_SELECTOR.startsWith("b[ext=mp4]/18/"))
+        assertTrue(AUDIO_SELECTOR.contains("/140/"))
         assertFalse(AUDIO_SELECTOR.contains("/ba/"))
     }
 
     private companion object {
         const val AUDIO_SELECTOR =
-            "bestaudio[ext=m4a]/bestaudio[acodec^=mp4a]/bestaudio[ext=mp3]/140/ba[ext=m4a]/b[ext=mp4]/b"
+            "b[ext=mp4]/18/bestaudio[ext=m4a]/bestaudio[acodec^=mp4a]/140/ba[ext=m4a]/bestaudio/b"
     }
 }

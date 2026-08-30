@@ -12,8 +12,9 @@ object PlatformFormatSelector {
     private const val VIDEO_MP4_PREFERRED = "bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/b"
     // Never put unfiltered `bestaudio` before an MP4: YouTube would pick Opus/webm
     // (format 251), which MediaExtractor cannot save as m4a.
+    // Prefer progressive MP4 (18) first: android_vr/tv m4a (140) 403s without a PO token.
     private const val AUDIO_M4A_PREFERRED =
-        "bestaudio[ext=m4a]/bestaudio[acodec^=mp4a]/bestaudio[ext=mp3]/140/ba[ext=m4a]/b[ext=mp4]/b"
+        "b[ext=mp4]/18/bestaudio[ext=m4a]/bestaudio[acodec^=mp4a]/140/ba[ext=m4a]/bestaudio/b"
 
     fun select(request: DownloadRequest): String = when {
         request.formatId == "space_audio_m4a" -> "b/best/0/bestaudio"
