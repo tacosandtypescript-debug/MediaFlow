@@ -43,6 +43,10 @@ data class PlayerServiceState(
     val queue: List<PlaybackQueueItem> = emptyList(),
     val queueIndex: Int = -1,
     val playbackContext: String? = null,
+    /** True when pause came from the user, not audio-focus interruption. */
+    val pausedByUser: Boolean = false,
+    /** True when pause came from audio-focus loss (engine remains playable). */
+    val pausedByAudioFocus: Boolean = false,
 ) {
     val isPlaying: Boolean
         get() = playbackState == EnginePlaybackState.PLAYING
@@ -341,12 +345,17 @@ class PlayerService(
 
     fun play() {
         if (isReleased) return
+        _uiState.value = _uiState.value.copy(pausedByUser = false, pausedByAudioFocus = false)
         engine.play()
     }
 
-    fun pause() {
+    fun pause(fromUser: Boolean = true) {
         if (isReleased) return
         engine.pause()
+        _uiState.value = _uiState.value.copy(
+            pausedByUser = fromUser,
+            pausedByAudioFocus = !fromUser,
+        )
         serviceScope.launch {
             saveCurrentProgressNow(isEof = false)
         }

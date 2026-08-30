@@ -124,11 +124,14 @@ class MediaPlaybackService : Service() {
 
         audioFocusManager = AudioFocusManager(
             context = this,
-            onPauseRequested = { playerService.pause() },
+            onPauseRequested = { playerService.pause(fromUser = false) },
             onResumeRequested = { playerService.play() },
             onStopRequested = {
-                playerService.stop()
-                stopForegroundAndSelf()
+                // Permanent focus loss must not stop/release the engine.
+                playerService.pause(fromUser = false)
+            },
+            onVolumeDuckRequested = { ducked ->
+                playerService.setVolume(if (ducked) 30 else 100)
             },
         )
 
@@ -139,7 +142,10 @@ class MediaPlaybackService : Service() {
                     playerService.play()
                 }
             },
-            onPauseRequested = { playerService.pause() },
+            onPauseRequested = {
+                audioFocusManager.markPausedByUser()
+                playerService.pause(fromUser = true)
+            },
             onStopRequested = {
                 playerService.stop()
                 stopForegroundAndSelf()
@@ -222,7 +228,8 @@ class MediaPlaybackService : Service() {
             }
             PlaybackNotificationManager.ACTION_PAUSE,
             PlaybackTransportActions.ACTION_PAUSE -> {
-                playerService.pause()
+                audioFocusManager.markPausedByUser()
+                playerService.pause(fromUser = true)
             }
             PlaybackNotificationManager.ACTION_STOP,
             PlaybackTransportActions.ACTION_STOP -> {

@@ -20,43 +20,76 @@ class AudioFocusManager(
     private val audioManager = context.applicationContext.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
     private var hasFocus = false
     private var resumeOnFocusGain = false
+    private var pausedByUser = false
+    private var pausedByAudioFocus = false
     private var focusRequest: AudioFocusRequest? = null
 
+    val hasAudioFocus: Boolean get() = hasFocus
+    val isPausedByUser: Boolean get() = pausedByUser
+    val isPausedByAudioFocus: Boolean get() = pausedByAudioFocus
+
     private val focusChangeListener = AudioManager.OnAudioFocusChangeListener { focusChange ->
+        dispatchFocusChange(focusChange)
+    }
+
+    /**
+     * Visible for tests. Permanent LOSS pauses without auto-resume and without
+     * telling the caller to stop/release the engine.
+     */
+    fun dispatchFocusChange(focusChange: Int) {
         when (focusChange) {
             AudioManager.AUDIOFOCUS_GAIN -> {
                 hasFocus = true
                 onVolumeDuckRequested(false)
-                if (resumeOnFocusGain) {
+                if (resumeOnFocusGain && !pausedByUser) {
                     resumeOnFocusGain = false
+                    pausedByAudioFocus = false
                     onResumeRequested()
                 }
             }
             AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
-                // Duck volume or pause
                 onVolumeDuckRequested(true)
             }
             AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> {
-                // Pause temporarily for phone call or other app transient playback
-                resumeOnFocusGain = true
+                resumeOnFocusGain = !pausedByUser
                 hasFocus = false
+                pausedByAudioFocus = true
                 onPauseRequested()
             }
             AudioManager.AUDIOFOCUS_LOSS -> {
-                // Permanent focus loss
+                // Permanent loss: pause in place. Do not auto-resume on GAIN.
                 resumeOnFocusGain = false
                 hasFocus = false
-                onStopRequested()
+                pausedByAudioFocus = true
+                onPauseRequested()
             }
         }
+    }
+
+    /** User tapped pause: never auto-resume on AUDIOFOCUS_GAIN. */
+    fun markPausedByUser() {
+        pausedByUser = true
+        pausedByAudioFocus = false
+        resumeOnFocusGain = false
     }
 
     /**
      * Requests audio focus. Returns true if granted.
      */
     fun requestAudioFocus(): Boolean {
-        if (audioManager == null) return true
-        if (hasFocus) return true
+        if (audioManager == null) {
+            pausedByUser = false
+            pausedByAudioFocus = false
+            resumeOnFocusGain = false
+            hasFocus = true
+            return true
+        }
+        if (hasFocus) {
+            pausedByUser = false
+            pausedByAudioFocus = false
+            resumeOnFocusGain = false
+            return true
+        }
 
         val result = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val playbackAttributes = AudioAttributes.Builder()
@@ -82,6 +115,11 @@ class AudioFocusManager(
         }
 
         hasFocus = (result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED)
+        if (hasFocus) {
+            pausedByUser = false
+            pausedByAudioFocus = false
+            resumeOnFocusGain = false
+        }
         return hasFocus
     }
 

@@ -423,4 +423,47 @@ class PlayerServiceTest {
         assertEquals(EnginePlaybackState.ERROR, service.uiState.value.playbackState)
         assertEquals("Decoder failed", service.uiState.value.errorMessage)
     }
+
+    @Test
+    fun `audio focus LOSS pauses without releasing engine and play continues from position`() = runTest {
+        val (service, engine, _) = createService()
+        engine.simulateDuration(100_000L)
+        service.openMedia("vid-focus", "/storage/focus.mp4", autoPlay = true)
+        runCurrent()
+        engine.simulatePosition(12_000L)
+        runCurrent()
+
+        service.pause(fromUser = false)
+        runCurrent()
+
+        assertEquals(EnginePlaybackState.PAUSED, service.uiState.value.playbackState)
+        assertTrue(service.uiState.value.pausedByAudioFocus)
+        assertFalse(service.uiState.value.pausedByUser)
+        assertFalse(engine.isReleased)
+        assertEquals(12_000L, service.uiState.value.currentPositionMs)
+        assertEquals(EnginePlaybackState.PAUSED, engine.state.value.playbackState)
+
+        service.play()
+        runCurrent()
+
+        assertEquals(EnginePlaybackState.PLAYING, engine.state.value.playbackState)
+        assertEquals(12_000L, engine.state.value.currentPositionMs)
+        assertFalse(service.uiState.value.pausedByAudioFocus)
+        assertFalse(engine.isReleased)
+    }
+
+    @Test
+    fun `pausedByUser does not look like audio-focus pause`() = runTest {
+        val (service, engine, _) = createService()
+        service.openMedia("vid-user-pause", "/storage/u.mp4", autoPlay = true)
+        runCurrent()
+
+        service.pause(fromUser = true)
+        runCurrent()
+
+        assertTrue(service.uiState.value.pausedByUser)
+        assertFalse(service.uiState.value.pausedByAudioFocus)
+        assertEquals(EnginePlaybackState.PAUSED, engine.state.value.playbackState)
+        assertFalse(engine.isReleased)
+    }
 }
