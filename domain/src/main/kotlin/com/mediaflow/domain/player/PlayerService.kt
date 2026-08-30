@@ -43,6 +43,7 @@ data class PlayerServiceState(
     val queue: List<PlaybackQueueItem> = emptyList(),
     val queueIndex: Int = -1,
     val playbackContext: String? = null,
+    val isShuffle: Boolean = false,
 ) {
     val isPlaying: Boolean
         get() = playbackState == EnginePlaybackState.PLAYING
@@ -175,6 +176,7 @@ class PlayerService(
         items: List<PlaybackQueueItem>,
         startIndex: Int = 0,
         context: String? = null,
+        shuffle: Boolean = false,
     ) {
         if (items.isEmpty() || isReleased) return
         val validIndex = startIndex.coerceIn(0, items.lastIndex)
@@ -186,6 +188,7 @@ class PlayerService(
             playbackContext = context,
             artistOrHost = target.artistOrHost,
             artworkUrl = target.artworkUrl,
+            isShuffle = shuffle,
         )
 
         openMedia(
@@ -427,6 +430,10 @@ class PlayerService(
 
     fun setPlaybackContext(context: String?) {
         _uiState.value = _uiState.value.copy(playbackContext = context)
+    }
+
+    fun setShuffle(enabled: Boolean) {
+        _uiState.value = _uiState.value.copy(isShuffle = enabled)
     }
 
     fun seekTo(positionMs: Long) {

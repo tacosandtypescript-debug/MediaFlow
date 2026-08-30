@@ -250,8 +250,25 @@ class LibraryViewModel(
         }
     }
 
-    fun playQueue(items: List<DownloadItem>, startIndex: Int, context: String? = null) {
-        val queueItems = items.map { item ->
+    fun playQueue(
+        items: List<DownloadItem>,
+        startIndex: Int,
+        context: String? = null,
+        shuffle: Boolean = false,
+    ) {
+        val queue = LibraryAudioQueueBuilder.tapIndex(items, startIndex, shuffle)
+        playLibraryAudioQueue(queue, context)
+    }
+
+    fun playAllAudio(visible: List<DownloadItem>, context: String = LIBRARY_AUDIO_QUEUE_CONTEXT) {
+        playLibraryAudioQueue(LibraryAudioQueueBuilder.playAll(visible), context)
+    }
+
+    fun playLibraryAudioQueue(
+        queue: LibraryAudioQueue<DownloadItem>,
+        context: String? = LIBRARY_AUDIO_QUEUE_CONTEXT,
+    ) {
+        val queueItems = queue.items.map { item ->
             val uri = item.localUri ?: item.id
             val space = uiState.value.spacesMap[item.sourceUrl] ?: uiState.value.spacesMap[item.id]
             PlaybackQueueItem(
@@ -263,7 +280,8 @@ class LibraryViewModel(
                 isLive = false,
             )
         }
-        playerService.playQueue(queueItems, startIndex, context)
+        playerService.playQueue(queueItems, queue.currentIndex, context, queue.shuffle)
+        playerService.setShuffle(queue.shuffle)
     }
 
     private fun attachCachedVideoThumbs(
@@ -333,6 +351,10 @@ class LibraryViewModel(
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             return LibraryViewModel(application) as T
         }
+    }
+
+    companion object {
+        const val LIBRARY_AUDIO_QUEUE_CONTEXT = "Biblioteca"
     }
 }
 

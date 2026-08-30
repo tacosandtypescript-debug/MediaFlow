@@ -45,6 +45,18 @@ class LibraryScreenTest {
     }
 
     @Test
+    fun audioLibraryViewSource_includesPlayAllWithoutEmoji() {
+        val source = java.io.File("src/main/java/com/mediaflow/app/ui/library/components/AudioLibraryView.kt")
+            .readText()
+        assertTrue(source.contains("library_play_all"))
+        val strings = java.io.File("src/main/res/values/strings.xml").readText()
+        assertTrue(strings.contains("name=\"library_play_all\""))
+        val playAll = Regex("<string name=\"library_play_all\">([^<]+)</string>").find(strings)?.groupValues?.get(1).orEmpty()
+        assertTrue(playAll.isNotBlank())
+        assertTrue("Play All label must not include emojis", playAll.none { it.category == CharCategory.SURROGATE || it.code > 0x2600 })
+    }
+
+    @Test
     fun libraryScreen_switchingToPlaylistsTab_showsPlaylistsHeader() {
         composeRule.setContent {
             MediaFlowTheme {

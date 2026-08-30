@@ -232,8 +232,14 @@ fun LibraryScreen(
                 playingMediaId = uiState.playingMediaId,
                 isPlayerPlaying = uiState.isPlayerPlaying,
                 favoriteUris = uiState.favoriteUris,
+                onPlayAll = {
+                    if (visibleAudio.isNotEmpty()) {
+                        viewModel.playAllAudio(visibleAudio)
+                        onOpenItem(visibleAudio.first())
+                    }
+                },
                 onPlayItem = { item, index ->
-                    viewModel.playQueue(visibleAudio, index, "Biblioteca")
+                    viewModel.playQueue(visibleAudio, index, LibraryViewModel.LIBRARY_AUDIO_QUEUE_CONTEXT)
                     onOpenItem(item)
                 },
                 onToggleFavorite = { uri -> viewModel.toggleFavorite(uri) },
