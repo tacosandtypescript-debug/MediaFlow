@@ -11,6 +11,8 @@ import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.mediaflow.app.ui.player.PlayerScreen
 import com.mediaflow.app.ui.player.SeekFeedbackEvent
+import com.mediaflow.app.ui.player.SpaceRecordingUi
+import com.mediaflow.data.provider.x.recording.RecordingPhase
 import com.mediaflow.app.ui.player.components.AudioPlayerView
 import com.mediaflow.app.ui.player.components.LivePlayerView
 import com.mediaflow.app.ui.player.components.PlayPauseButton
@@ -202,7 +204,7 @@ class PlayerScreenTest {
                 )
             }
         }
-        composeRule.onNodeWithText("EN VIVO").assertIsDisplayed()
+        composeRule.onAllNodesWithText("EN VIVO")[0].assertIsDisplayed()
         composeRule.onNodeWithText("Space en vivo").assertIsDisplayed()
         composeRule.onNodeWithText("En el aire").assertExists()
         composeRule.onNodeWithTag("auto_download_toggle").assertExists()
@@ -237,7 +239,7 @@ class PlayerScreenTest {
                 )
             }
         }
-        composeRule.onNodeWithText("FINALIZADO").assertIsDisplayed()
+        composeRule.onAllNodesWithText("FINALIZADO")[0].assertIsDisplayed()
         composeRule.onNodeWithText("Esperando repetición").assertIsDisplayed()
     }
 
@@ -274,6 +276,8 @@ class PlayerScreenTest {
         }
         composeRule.onNodeWithTag("xspace_jump_live").assertIsDisplayed()
         composeRule.onNodeWithText("LIVE").assertIsDisplayed()
+        composeRule.onNodeWithTag("xspace_record_toggle").assertIsDisplayed()
+        composeRule.onNodeWithText("Grabar").assertIsDisplayed()
         composeRule.onAllNodesWithText("--").assertCountEquals(0)
     }
 
@@ -310,7 +314,46 @@ class PlayerScreenTest {
         }
         composeRule.onNodeWithTag("xspace_jump_live").assertDoesNotExist()
         composeRule.onNodeWithTag("xspace_replay_mode").assertIsDisplayed()
+        composeRule.onNodeWithTag("xspace_record_toggle").assertDoesNotExist()
         composeRule.onNodeWithText("1 h 53 min").assertIsDisplayed()
+    }
+
+    @Test
+    fun livePlayerShowsRecordingHintWhenRecordOn() {
+        val liveSpace = XSpace(
+            id = "1rGmqplYpggGy",
+            url = "https://x.com/i/spaces/1rGmqplYpggGy",
+            title = "Santo Rosario",
+            state = XSpaceState.LIVE,
+            host = XParticipant(
+                displayName = "Bárbara V.",
+                username = "barvabe",
+                role = ParticipantRole.HOST,
+            ),
+        )
+        composeRule.setContent {
+            MediaFlowTheme {
+                LivePlayerView(
+                    space = liveSpace,
+                    playbackState = EnginePlaybackState.PLAYING,
+                    liveEndState = LiveSpaceEndState.ActiveLive,
+                    isAutoDownloadEnabled = false,
+                    onTogglePlayPause = {},
+                    onToggleAutoDownload = {},
+                    onDownloadReplay = {},
+                    onCheckReplayAgain = {},
+                    isBroadcastLive = true,
+                    recording = SpaceRecordingUi(
+                        recordEnabled = true,
+                        phase = RecordingPhase.RECORDING,
+                        elapsedMs = 1_000L,
+                    ),
+                )
+            }
+        }
+        composeRule.onNodeWithText("Grabando").assertIsDisplayed()
+        composeRule.onNodeWithTag("xspace_record_hint").assertIsDisplayed()
+        composeRule.onNodeWithText("La pausa no detiene la grabación").assertIsDisplayed()
     }
 
     @Test

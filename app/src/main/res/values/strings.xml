@@ -164,6 +164,12 @@
     <string name="space_playback_paused">Pausa</string>
     <string name="space_connection_connecting">Conectando…</string>
     <string name="space_connection_connected">Conectado</string>
+    <string name="space_record_off">Grabar</string>
+    <string name="space_record_on">Grabando</string>
+    <string name="space_record_mark">Marcar</string>
+    <string name="space_record_hint">La pausa no detiene la grabación</string>
+    <string name="space_record_saved">Grabación guardada</string>
+    <string name="space_play_replay">Reproducir repetición</string>
 
     <!-- Gallery -->
     <string name="gallery_filter_videos">Vídeos</string>

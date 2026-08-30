@@ -17,8 +17,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -39,8 +41,10 @@ import com.mediaflow.app.ui.player.components.PlaybackControls
 import com.mediaflow.app.ui.player.components.PlayerTimeline
 import com.mediaflow.app.ui.player.live.AutoDownloadToggle
 import com.mediaflow.app.ui.player.live.LiveEndedContent
+import com.mediaflow.app.ui.player.SpaceRecordingUi
 import com.mediaflow.app.ui.theme.customColors
 import com.mediaflow.core.model.XSpace
+import com.mediaflow.data.provider.x.recording.RecordingPhase
 import com.mediaflow.data.provider.x.spaces.XSpaceCapabilities
 import com.mediaflow.data.provider.x.spaces.XSpaceFieldAvailability
 import com.mediaflow.domain.live.LiveSpaceEndState
@@ -75,6 +79,9 @@ fun XSpaceLivePlayerView(
     isError: Boolean = false,
     errorMessage: String? = null,
     artworkUrl: String? = null,
+    recording: SpaceRecordingUi = SpaceRecordingUi(),
+    onToggleRecord: () -> Unit = {},
+    onMarkRecording: () -> Unit = {},
 ) {
     val isBroadcastLive = playerState.playback == XSpacePlaybackMode.LIVE ||
         playerState.playback == XSpacePlaybackMode.BEHIND_LIVE ||
@@ -206,6 +213,16 @@ fun XSpaceLivePlayerView(
         }
 
         if (showEndedOverlay) {
+            if (recording.phase == RecordingPhase.SAVED || recording.savedPath != null) {
+                Text(
+                    text = stringResource(R.string.space_record_saved),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier
+                        .padding(bottom = 8.dp)
+                        .testTag("xspace_record_saved"),
+                )
+            }
             LiveEndedContent(
                 endState = liveEndState,
                 onDownloadReplay = onDownloadReplay,
@@ -261,6 +278,12 @@ fun XSpaceLivePlayerView(
 
                 if (playerState.liveControlActive) {
                     Spacer(Modifier.height(12.dp))
+                    SpaceRecordControls(
+                        recording = recording,
+                        onToggleRecord = onToggleRecord,
+                        onMark = onMarkRecording,
+                    )
+                    Spacer(Modifier.height(8.dp))
                     AutoDownloadToggle(
                         enabled = isAutoDownloadEnabled,
                         onToggle = { onToggleAutoDownload() },
@@ -276,6 +299,58 @@ fun XSpaceLivePlayerView(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun SpaceRecordControls(
+    recording: SpaceRecordingUi,
+    onToggleRecord: () -> Unit,
+    onMark: () -> Unit,
+) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            OutlinedButton(
+                onClick = onToggleRecord,
+                modifier = Modifier.testTag("xspace_record_toggle"),
+            ) {
+                Text(
+                    if (recording.recordEnabled) {
+                        stringResource(R.string.space_record_on)
+                    } else {
+                        stringResource(R.string.space_record_off)
+                    },
+                )
+            }
+            TextButton(
+                onClick = onMark,
+                enabled = recording.recordEnabled,
+                modifier = Modifier.testTag("xspace_record_mark"),
+            ) {
+                Text(stringResource(R.string.space_record_mark))
+            }
+        }
+        if (recording.recordEnabled) {
+            Text(
+                text = stringResource(R.string.space_record_hint),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier
+                    .padding(top = 4.dp)
+                    .testTag("xspace_record_hint"),
+            )
+        }
+        if (recording.phase == RecordingPhase.SAVED) {
+            Text(
+                text = stringResource(R.string.space_record_saved),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.testTag("xspace_record_saved"),
+            )
         }
     }
 }

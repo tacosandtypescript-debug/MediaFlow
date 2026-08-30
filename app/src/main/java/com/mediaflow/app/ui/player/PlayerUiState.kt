@@ -3,6 +3,7 @@ package com.mediaflow.app.ui.player
 import com.mediaflow.core.model.PlaybackQueueItem
 import com.mediaflow.core.model.Playlist
 import com.mediaflow.core.model.XSpace
+import com.mediaflow.data.provider.x.recording.RecordingPhase
 import com.mediaflow.data.provider.x.spaces.XSpaceCapabilities
 import com.mediaflow.domain.live.LiveSpaceEndState
 import com.mediaflow.domain.player.EnginePlaybackState
@@ -12,6 +13,14 @@ import com.mediaflow.domain.player.xspace.XSpaceLivePlayerState
 /**
  * Ephemeral event for animated seek feedback (±10s).
  */
+data class SpaceRecordingUi(
+    val recordEnabled: Boolean = false,
+    val phase: RecordingPhase = RecordingPhase.OFF,
+    val elapsedMs: Long = 0L,
+    val markerCount: Int = 0,
+    val savedPath: String? = null,
+)
+
 sealed class SeekFeedbackEvent {
     data class Rewind(val seconds: Int = 10, val timestamp: Long = System.currentTimeMillis()) : SeekFeedbackEvent()
     data class Forward(val seconds: Int = 10, val timestamp: Long = System.currentTimeMillis()) : SeekFeedbackEvent()
@@ -41,6 +50,7 @@ data class PlayerUiState(
     val playlists: List<Playlist> = emptyList(),
     val spacePlayer: XSpaceLivePlayerState = XSpaceLivePlayerState(),
     val spaceCapabilities: XSpaceCapabilities? = null,
+    val spaceRecording: SpaceRecordingUi = SpaceRecordingUi(),
 ) {
     val isPlaying: Boolean
         get() = serviceState.isPlaying

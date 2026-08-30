@@ -2,6 +2,7 @@ package com.mediaflow.app.ui.player.components
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import com.mediaflow.app.ui.player.SpaceRecordingUi
 import com.mediaflow.app.ui.player.xspace.XSpaceLivePlayerView
 import com.mediaflow.core.model.XSpace
 import com.mediaflow.data.provider.x.spaces.XSpaceCapabilities
@@ -35,6 +36,9 @@ fun LivePlayerView(
     durationMs: Long = 0L,
     onJumpToLiveEdge: () -> Unit = {},
     onSeekTo: (Long) -> Unit = {},
+    recording: SpaceRecordingUi = SpaceRecordingUi(),
+    onToggleRecord: () -> Unit = {},
+    onMarkRecording: () -> Unit = {},
 ) {
     val playerState = spacePlayerState ?: inferredState(
         space = space,
@@ -58,6 +62,9 @@ fun LivePlayerView(
         onToggleAutoDownload = onToggleAutoDownload,
         onDownloadReplay = onDownloadReplay,
         onCheckReplayAgain = onCheckReplayAgain,
+        recording = recording,
+        onToggleRecord = onToggleRecord,
+        onMarkRecording = onMarkRecording,
         modifier = modifier,
         isError = isError,
         errorMessage = errorMessage,

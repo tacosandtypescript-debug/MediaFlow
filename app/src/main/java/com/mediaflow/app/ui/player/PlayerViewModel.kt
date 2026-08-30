@@ -16,6 +16,10 @@ import com.mediaflow.data.media.metadata.EmbeddedTrackMetadata
 import com.mediaflow.data.media.metadata.EmbeddedTrackTags
 import com.mediaflow.data.player.background.MediaPlaybackService
 import com.mediaflow.data.player.background.PlayerSessionHolder
+import com.mediaflow.data.player.background.SpaceRecordingService
+import com.mediaflow.data.provider.x.recording.RecordedSpaceLibrary
+import com.mediaflow.data.provider.x.recording.RecordingPhase
+import com.mediaflow.data.provider.x.recording.SpaceRecorder
 import com.mediaflow.data.provider.x.XUrlParser
 import com.mediaflow.data.provider.x.spaces.XSpaceCapabilities
 import com.mediaflow.data.provider.x.live.LiveSpaceEndMonitor
@@ -99,6 +103,9 @@ class PlayerViewModel(
     private val liveEndState = MutableStateFlow<LiveSpaceEndState>(LiveSpaceEndState.ActiveLive)
     private val isAutoDownloadEnabled = MutableStateFlow(false)
     private val spacePlayer = MutableStateFlow(XSpaceLivePlayerMachine.initial())
+    private val spaceRecording = MutableStateFlow(SpaceRecordingUi())
+    private var spaceRecorder: SpaceRecorder? = null
+    private var recorderTickJob: Job? = null
 
     private val downloadRepo: DownloadRepository = downloadRepository ?: Media3DownloadRepository.get(app)
 
@@ -123,6 +130,7 @@ class PlayerViewModel(
         embeddedTags,
         taggedMediaUri,
         spacePlayer,
+        spaceRecording,
     ) { args: Array<Any?> ->
         val service = args[0] as PlayerServiceState
         val controls = args[1] as Boolean
@@ -140,6 +148,7 @@ class PlayerViewModel(
         val rawTags = args[11] as EmbeddedTrackTags
         val tagsUri = args[12] as? String
         val spaceSession = args[13] as XSpaceLivePlayerState
+        val recording = args[14] as SpaceRecordingUi
         val uri = service.filePath.orEmpty()
         val tags = if (PlayerDisplayMetadata.tagsBelongToCurrent(tagsUri, service.filePath, service.mediaId)) {
             rawTags
@@ -177,6 +186,7 @@ class PlayerViewModel(
             playlists = playlists,
             spacePlayer = spaceSession,
             spaceCapabilities = space?.let { XSpaceCapabilities.from(it) },
+            spaceRecording = recording,
         )
     }.stateIn(viewModelScope, SharingStarted.Eagerly, PlayerUiState())
 
@@ -254,6 +264,7 @@ class PlayerViewModel(
         openJob = viewModelScope.launch {
             val space = resolveSpaceForMedia(mediaUri)
             currentSpace.value = space
+            attachSpaceRecorder(space)
             val effectiveLive = isLive || space?.isLive == true
             val caps = space?.let { XSpaceCapabilities.from(it) }
             if (space?.isEnded == true) {
@@ -397,15 +408,18 @@ class PlayerViewModel(
             state.isPlaying -> {
                 playerService.pause()
                 reduceSpacePlayer(XSpaceLivePlayerEvent.Pause)
+                spaceRecorder?.playbackPaused = true
             }
             state.isEnded -> {
                 playerService.seekTo(0L)
                 playerService.play()
                 reduceSpacePlayer(XSpaceLivePlayerEvent.Resume)
+                spaceRecorder?.playbackPaused = false
             }
             else -> {
                 playerService.play()
                 reduceSpacePlayer(XSpaceLivePlayerEvent.Resume)
+                spaceRecorder?.playbackPaused = false
             }
         }
     }
@@ -414,6 +428,25 @@ class PlayerViewModel(
         showControlsTemporarily()
         reduceSpacePlayer(XSpaceLivePlayerEvent.JumpToLiveEdge)
         playerService.play()
+        spaceRecorder?.playbackPaused = false
+    }
+
+    fun toggleSpaceRecord() {
+        val recorder = spaceRecorder ?: return
+        val enable = !recorder.recordEnabled
+        recorder.setRecordEnabled(enable)
+        publishRecordingUi()
+        if (enable) {
+            SpaceRecordingService.start(app, recorder.elapsedMs)
+            ensureRecorderTicks()
+        } else if (recorder.phase == RecordingPhase.OFF || recorder.phase == RecordingPhase.SAVED) {
+            SpaceRecordingService.stop(app)
+        }
+    }
+
+    fun markSpaceRecording() {
+        spaceRecorder?.mark()
+        publishRecordingUi()
     }
 
     fun seekTo(positionMs: Long) {
@@ -738,12 +771,68 @@ class PlayerViewModel(
         currentSpace.value = ended
         spaceRepository.saveSpace(ended, mediaId = ended.url)
         playerService.markBroadcastEnded()
+        finalizeSpaceRecording(ended.state)
         val caps = XSpaceCapabilities.from(ended)
         if (!ended.audioStreamUrl.isNullOrBlank()) {
             reduceSpacePlayer(XSpaceLivePlayerEvent.StartReplay(seekAllowed = caps.stream.seekSupported))
         } else {
             reduceSpacePlayer(XSpaceLivePlayerEvent.IngestEnded)
         }
+    }
+
+    private fun attachSpaceRecorder(space: XSpace?) {
+        recorderTickJob?.cancel()
+        recorderTickJob = null
+        SpaceRecordingService.stop(app)
+        if (space == null || space.isEnded) {
+            spaceRecorder = null
+            spaceRecording.value = SpaceRecordingUi()
+            return
+        }
+        val workDir = java.io.File(app.filesDir, "xspace-record/${space.id}").apply { mkdirs() }
+        val libraryFile = java.io.File(app.filesDir, "xspace-record/library.json")
+        spaceRecorder = SpaceRecorder(
+            workDir = workDir,
+            library = RecordedSpaceLibrary(libraryFile),
+            spaceId = space.id,
+            originalUrl = space.url,
+        )
+        spaceRecording.value = SpaceRecordingUi()
+        ensureRecorderTicks()
+    }
+
+    private fun ensureRecorderTicks() {
+        if (recorderTickJob?.isActive == true) return
+        recorderTickJob = viewModelScope.launch(Dispatchers.IO) {
+            while (true) {
+                val rec = spaceRecorder ?: break
+                rec.acceptRecorderTick(ByteArray(TICK_BYTES))
+                publishRecordingUi()
+                if (rec.recordEnabled && rec.phase == RecordingPhase.RECORDING) {
+                    SpaceRecordingService.start(app, rec.elapsedMs)
+                }
+                delay(TICK_INTERVAL_MS)
+            }
+        }
+    }
+
+    private fun finalizeSpaceRecording(state: XSpaceState) {
+        recorderTickJob?.cancel()
+        recorderTickJob = null
+        val saved = spaceRecorder?.onLiveEnded(state)
+        SpaceRecordingService.stop(app)
+        publishRecordingUi(savedPath = saved?.filePath)
+    }
+
+    private fun publishRecordingUi(savedPath: String? = spaceRecording.value.savedPath) {
+        val rec = spaceRecorder
+        spaceRecording.value = SpaceRecordingUi(
+            recordEnabled = rec?.recordEnabled == true,
+            phase = rec?.phase ?: RecordingPhase.OFF,
+            elapsedMs = rec?.elapsedMs ?: 0L,
+            markerCount = rec?.markers?.size ?: 0,
+            savedPath = savedPath,
+        )
     }
 
     private fun reduceSpacePlayer(event: XSpaceLivePlayerEvent) {
@@ -809,7 +898,14 @@ class PlayerViewModel(
         seekFeedbackJob?.cancel()
         openJob?.cancel()
         liveEndJob?.cancel()
+        recorderTickJob?.cancel()
+        SpaceRecordingService.stop(app)
         super.onCleared()
+    }
+
+    private companion object {
+        const val TICK_BYTES = 500
+        const val TICK_INTERVAL_MS = 500L
     }
 
     class Factory(

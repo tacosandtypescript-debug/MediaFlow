@@ -169,6 +169,9 @@ fun PlayerScreen(
                         onToggleAutoDownload = viewModel::toggleAutoDownload,
                         onDownloadReplay = viewModel::downloadSpaceReplay,
                         onCheckReplayAgain = viewModel::checkReplayAgain,
+                        recording = uiState.spaceRecording,
+                        onToggleRecord = viewModel::toggleSpaceRecord,
+                        onMarkRecording = viewModel::markSpaceRecording,
                         modifier = Modifier.weight(1f),
                     )
 

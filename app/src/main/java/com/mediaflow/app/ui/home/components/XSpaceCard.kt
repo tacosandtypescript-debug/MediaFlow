@@ -37,6 +37,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
@@ -307,17 +308,25 @@ fun XSpaceCard(
                 }
             }
 
-            // Primary Live Action Button
-            if (space.isLive && onPlayLive != null) {
+            if (onPlayLive != null) {
                 Button(
                     onClick = { onPlayLive(space) },
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(top = 16.dp)
-                        .height(52.dp),
+                        .height(52.dp)
+                        .testTag(if (space.isLive) "xspace_listen_live" else "xspace_play_replay"),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = com.mediaflow.app.ui.theme.LiveRed,
-                        contentColor = com.mediaflow.app.ui.theme.OnLiveColor,
+                        containerColor = if (space.isLive) {
+                            com.mediaflow.app.ui.theme.LiveRed
+                        } else {
+                            MaterialTheme.colorScheme.primary
+                        },
+                        contentColor = if (space.isLive) {
+                            com.mediaflow.app.ui.theme.OnLiveColor
+                        } else {
+                            MaterialTheme.colorScheme.onPrimary
+                        },
                     ),
                     shape = RoundedCornerShape(14.dp),
                 ) {
@@ -332,7 +341,9 @@ fun XSpaceCard(
                             modifier = Modifier.size(20.dp),
                         )
                         Text(
-                            text = stringResource(R.string.space_listen_live),
+                            text = stringResource(
+                                if (space.isLive) R.string.space_listen_live else R.string.space_play_replay,
+                            ),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                         )

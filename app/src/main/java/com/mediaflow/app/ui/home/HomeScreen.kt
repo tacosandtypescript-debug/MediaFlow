@@ -151,10 +151,8 @@ fun HomeScreen(
                     space = spaceMetadata,
                     modifier = Modifier.padding(bottom = 16.dp),
                     onPlayLive = { space ->
-                        val streamUrl = space.audioStreamUrl
-                        if (streamUrl != null) {
-                            onPlayLive?.invoke(streamUrl)
-                        }
+                        val streamUrl = space.audioStreamUrl?.takeIf { it.isNotBlank() } ?: space.url
+                        onPlayLive?.invoke(streamUrl)
                     },
                 )
             }
