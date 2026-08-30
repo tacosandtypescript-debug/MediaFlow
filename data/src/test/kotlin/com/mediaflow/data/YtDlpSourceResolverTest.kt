@@ -136,4 +136,31 @@ class YtDlpSourceResolverTest {
         assertFalse(message.contains("yt-dlp -U"))
         assertTrue(message.length < 220)
     }
+
+    @Test
+    fun `parses YouTube playlist entries without downloading them yet`() = runTest {
+        val resolver = YtDlpSourceResolver(RuntimeEnvironment.getApplication())
+        val info = resolver.parseForTest(
+            "https://www.youtube.com/playlist?list=PLtest",
+            """
+            {
+              "_type": "playlist",
+              "title": "Mi lista",
+              "entries": [
+                {"id": "aaa", "title": "Primero", "thumbnail": "https://i.ytimg.com/vi/aaa/hqdefault.jpg", "duration": 12},
+                {"id": "bbb", "title": "Segundo", "webpage_url": "https://www.youtube.com/watch?v=bbb", "duration": 30},
+                {"id": "ccc"}
+              ]
+            }
+            """.trimIndent(),
+        )
+
+        assertEquals("Mi lista", info.title)
+        assertEquals(3, info.playlistEntries.size)
+        assertEquals("https://www.youtube.com/watch?v=aaa", info.playlistEntries[0].sourceUrl)
+        assertEquals("Primero", info.playlistEntries[0].title)
+        assertEquals("https://www.youtube.com/watch?v=bbb", info.playlistEntries[1].sourceUrl)
+        assertTrue(info.availableFormats.any { it.mediaType == MediaType.VIDEO })
+        assertTrue(info.availableFormats.any { it.mediaType == MediaType.AUDIO })
+    }
 }

@@ -58,6 +58,10 @@ fun AudioMediaRow(
     onToggleFavorite: () -> Unit,
     onAddToPlaylist: () -> Unit,
     onAddToQueue: (() -> Unit)? = null,
+    shareUri: String? = null,
+    shareMimeType: String? = null,
+    shareTitle: String? = null,
+    shareIsAudio: Boolean = true,
     onDelete: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -194,6 +198,10 @@ fun AudioMediaRow(
                 onAddToPlaylist = onAddToPlaylist,
                 onToggleFavorite = onToggleFavorite,
                 onAddToQueue = onAddToQueue,
+                shareUri = shareUri,
+                shareMimeType = shareMimeType,
+                shareTitle = shareTitle,
+                shareIsAudio = shareIsAudio,
                 onDelete = onDelete,
                 modifier = Modifier.size(48.dp),
             )

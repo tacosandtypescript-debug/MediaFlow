@@ -10,6 +10,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.PlaylistAdd
 import androidx.compose.material.icons.outlined.QueueMusic
+import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.Speed
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
@@ -22,8 +23,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.mediaflow.app.R
 
 /**
  * Secondary actions row positioned below the playback controls (Queue, Add to playlist, Speed, Delete).
@@ -36,6 +39,7 @@ fun PlayerSecondaryActions(
     onSpeedChange: (Float) -> Unit,
     onAddToPlaylist: () -> Unit,
     onOpenQueue: () -> Unit,
+    onShare: (() -> Unit)? = null,
     onDelete: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -87,6 +91,20 @@ fun PlayerSecondaryActions(
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(24.dp),
             )
+        }
+
+        if (onShare != null) {
+            IconButton(
+                onClick = onShare,
+                modifier = Modifier.testTag("player_share_btn"),
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Share,
+                    contentDescription = stringResource(R.string.share),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(24.dp),
+                )
+            }
         }
 
         // Open Queue

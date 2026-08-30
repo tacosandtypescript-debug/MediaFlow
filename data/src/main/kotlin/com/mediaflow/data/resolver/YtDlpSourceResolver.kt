@@ -11,6 +11,7 @@ import com.mediaflow.data.provider.x.spaces.XSpaceMetadataResolver
 import com.mediaflow.data.provider.x.spaces.XSpaceStore
 import com.mediaflow.data.repository.XSpaceRepositoryImpl
 import com.mediaflow.data.ytdlp.YtDlpRuntime
+import com.mediaflow.domain.repository.PlaylistEntry
 import com.mediaflow.domain.repository.SourceInfo
 import com.mediaflow.domain.repository.SourceResolver
 import com.mediaflow.domain.repository.XSpaceRepository
@@ -79,7 +80,12 @@ class YtDlpSourceResolver(
 
         runCatching {
             try {
-                val json = YtDlpRuntime.extractJson(appContext, trimmed, analysisDirectory)
+                val json = YtDlpRuntime.extractJson(
+                    appContext,
+                    trimmed,
+                    analysisDirectory,
+                    allowPlaylist = PlatformUrlSupport.isYoutubePlaylist(trimmed),
+                )
                 check(json.isNotBlank() && json != "None") {
                     "El extractor no pudo analizar la fuente."
                 }
@@ -238,18 +244,21 @@ class YtDlpSourceResolver(
             resolved
         } else null
 
-        val effectiveFormats = if (spaceMetadata != null && formats.isEmpty()) {
-            spaceResolver.createMediaFormats(spaceMetadata)
-        } else {
-            formats
+        val playlistEntries = parsePlaylistEntries(root)
+        val effectiveFormats = when {
+            spaceMetadata != null && formats.isEmpty() -> spaceResolver.createMediaFormats(spaceMetadata)
+            playlistEntries.isNotEmpty() && formats.isEmpty() -> playlistFormats()
+            else -> formats
         }
 
-        check(effectiveFormats.isNotEmpty() || spaceMetadata != null) { "La fuente no devolvió formatos descargables." }
+        check(effectiveFormats.isNotEmpty() || spaceMetadata != null || playlistEntries.isNotEmpty()) {
+            "La fuente no devolvió formatos descargables."
+        }
 
         return SourceInfo(
             sourceUrl = sourceUrl,
             title = spaceMetadata?.title ?: title,
-            thumbnailUrl = spaceMetadata?.host?.avatarUrl ?: thumbnail,
+            thumbnailUrl = spaceMetadata?.host?.avatarUrl ?: thumbnail ?: playlistEntries.firstOrNull()?.thumbnailUrl,
             durationSeconds = spaceMetadata?.durationSeconds?.takeIf { it > 0 } ?: duration,
             availableFormats = effectiveFormats.sortedWith(
                 compareByDescending<MediaFormat> { it.height ?: 0 }
@@ -257,8 +266,73 @@ class YtDlpSourceResolver(
                     .thenByDescending { it.bitrate ?: 0L },
             ),
             spaceMetadata = spaceMetadata,
+            playlistEntries = playlistEntries,
         )
     }
+
+    private fun parsePlaylistEntries(root: JSONObject): List<PlaylistEntry> {
+        val type = root.optString("_type")
+        val array = root.optJSONArray("entries") ?: return emptyList()
+        if (type.isNotBlank() && type != "playlist" && array.length() == 0) return emptyList()
+        val entries = buildList {
+            for (index in 0 until minOf(array.length(), YtDlpRuntime.MAX_PLAYLIST_ITEMS)) {
+                val json = array.optJSONObject(index) ?: continue
+                val url = playlistEntryUrl(json) ?: continue
+                val duration = json.optDouble("duration", Double.NaN)
+                    .takeIf { !it.isNaN() && it >= 0 }
+                    ?.toLong()
+                add(
+                    PlaylistEntry(
+                        sourceUrl = url,
+                        title = json.optString("title").takeIf { it.isNotBlank() },
+                        thumbnailUrl = playlistThumbnail(json),
+                        durationSeconds = duration,
+                    ),
+                )
+            }
+        }
+        return entries.distinctBy { it.sourceUrl }
+    }
+
+    private fun playlistEntryUrl(json: JSONObject): String? {
+        val direct = listOf("webpage_url", "original_url", "url")
+            .map { json.optString(it) }
+            .firstOrNull { it.startsWith("https://", ignoreCase = true) }
+        if (direct != null) return direct
+        val id = json.optString("id").takeIf { it.isNotBlank() && !it.contains(' ') } ?: return null
+        return "https://www.youtube.com/watch?v=$id"
+    }
+
+    private fun playlistThumbnail(json: JSONObject): String? {
+        json.optString("thumbnail").takeIf { it.startsWith("https://") }?.let { return it }
+        val thumbs = json.optJSONArray("thumbnails") ?: return null
+        for (index in thumbs.length() - 1 downTo 0) {
+            val url = thumbs.optJSONObject(index)?.optString("url").orEmpty()
+            if (url.startsWith("https://")) return url
+        }
+        return null
+    }
+
+    private fun playlistFormats(): List<MediaFormat> = listOf(
+        MediaFormat(
+            formatId = "yt-dlp",
+            extension = "mp4",
+            mimeType = "video/mp4",
+            mediaType = MediaType.VIDEO,
+            qualityLabel = "Automática",
+            isProgressive = true,
+            requiresMuxing = false,
+        ),
+        MediaFormat(
+            formatId = "bestaudio",
+            extension = "m4a",
+            mimeType = "audio/mp4",
+            mediaType = MediaType.AUDIO,
+            qualityLabel = "Audio",
+            isProgressive = true,
+            requiresMuxing = false,
+        ),
+    )
 
     private fun toMediaFormat(json: JSONObject, duration: Long?): MediaFormat? {
         val formatId = json.optString("format_id").takeIf { it.isNotBlank() }

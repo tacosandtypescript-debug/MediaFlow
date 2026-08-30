@@ -23,9 +23,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import android.net.Uri
 import coil.compose.SubcomposeAsyncImage
 import coil.request.ImageRequest
 import com.mediaflow.core.model.MediaType
+import java.io.File
 
 private val IMAGE_EXTENSIONS = setOf("jpg", "jpeg", "png", "webp", "gif")
 private val MEDIA_FILE_EXTENSIONS = setOf(
@@ -51,10 +53,18 @@ fun isLoadableArtworkUrl(url: String?): Boolean {
         if (extension in IMAGE_EXTENSIONS) return true
         return lower.contains("/images") || lower.contains("image")
     }
-    if (lower.startsWith("file://") || lower.startsWith("/")) {
+    if (lower.startsWith("file:") || lower.startsWith("/")) {
         return extension in IMAGE_EXTENSIONS
     }
     return false
+}
+
+internal fun coilArtworkModel(url: String): Any {
+    if (url.startsWith("file:") || url.startsWith("/")) {
+        val path = if (url.startsWith("file:")) Uri.parse(url).path else url
+        if (!path.isNullOrBlank()) return File(path)
+    }
+    return url
 }
 
 fun preferredArtworkUrl(thumbnailUri: String?, spaceAvatarUrl: String? = null): String? =
@@ -103,8 +113,8 @@ fun MediaArtwork(
         if (loadable) {
             SubcomposeAsyncImage(
                 model = ImageRequest.Builder(context)
-                    .data(artworkUrl)
-                    .crossfade(250)
+                    .data(coilArtworkModel(artworkUrl!!))
+                    .crossfade(false)
                     .build(),
                 contentDescription = contentDescription,
                 contentScale = ContentScale.Crop,

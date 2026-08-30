@@ -9,6 +9,13 @@ import com.mediaflow.core.model.XSpace
  * A result must contain only formats returned by the source analyser. Empty
  * formats plus an error means the source was not analysed successfully.
  */
+data class PlaylistEntry(
+    val sourceUrl: String,
+    val title: String? = null,
+    val thumbnailUrl: String? = null,
+    val durationSeconds: Long? = null,
+)
+
 data class SourceInfo(
     val sourceUrl: String,
     val title: String? = null,
@@ -17,6 +24,7 @@ data class SourceInfo(
     val availableFormats: List<MediaFormat> = emptyList(),
     val errorMessage: String? = null,
     val spaceMetadata: XSpace? = null,
+    val playlistEntries: List<PlaylistEntry> = emptyList(),
 )
 
 /**

@@ -19,6 +19,7 @@ import androidx.compose.material.icons.outlined.Pause
 import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.Radio
 import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.Stop
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -35,10 +36,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.mediaflow.app.R
 import com.mediaflow.app.ui.common.media.MediaArtwork
+import com.mediaflow.app.ui.common.media.MediaShare
 import com.mediaflow.app.ui.common.media.preferredArtworkUrl
 import com.mediaflow.app.ui.components.EmptyState
 import com.mediaflow.app.ui.theme.customColors
@@ -65,6 +69,7 @@ fun DownloadsScreen(
     onRetry: (String) -> Unit = {},
     onRemove: (String) -> Unit = {},
 ) {
+    val context = LocalContext.current
     Scaffold(
         modifier = modifier,
         containerColor = Color.Transparent,
@@ -116,6 +121,7 @@ fun DownloadsScreen(
                         onRetry = { onRetry(item.id) },
                         onRemove = { onRemove(item.id) },
                         onOpen = { onOpen(item) },
+                        onShare = { MediaShare.share(context, item) },
                     )
                 }
             }
@@ -134,6 +140,7 @@ private fun DownloadCard(
     onRetry: () -> Unit,
     onRemove: () -> Unit,
     onOpen: () -> Unit,
+    onShare: () -> Unit,
 ) {
     Card(
         modifier = Modifier
@@ -278,6 +285,15 @@ private fun DownloadCard(
                         }
                     }
                     DownloadStatus.COMPLETED -> {
+                        IconButton(
+                            onClick = onShare,
+                            modifier = Modifier.testTag("download_share_btn"),
+                        ) {
+                            Icon(
+                                Icons.Outlined.Share,
+                                contentDescription = stringResource(R.string.share),
+                            )
+                        }
                         IconButton(onClick = onOpen) {
                             Icon(Icons.AutoMirrored.Outlined.OpenInNew, contentDescription = stringResource(R.string.gallery_open))
                         }

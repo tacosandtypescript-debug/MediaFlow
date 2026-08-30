@@ -174,6 +174,10 @@ fun FavoritesView(
                         onToggleFavorite = { onToggleFavorite(uri) },
                         onAddToPlaylist = { onAddToPlaylist(item) },
                         onAddToQueue = { onAddToQueue(item) },
+                        shareUri = item.localUri,
+                        shareMimeType = item.selectedFormat?.mimeType,
+                        shareTitle = title,
+                        shareIsAudio = true,
                         onDelete = { onDeleteMedia(item) },
                     )
                 }

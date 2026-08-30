@@ -9,14 +9,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -46,10 +43,8 @@ import java.net.URL
 fun SourceAnalysisCard(
     state: AnalysisState,
     sourceInfo: SourceInfo?,
-    formats: List<MediaFormat>,
     selectedType: ContentType,
-    selectedFormatId: String?,
-    onFormatSelected: (String) -> Unit,
+    selectedFormat: MediaFormat?,
     errorMessage: String?,
     modifier: Modifier = Modifier,
 ) {
@@ -84,20 +79,20 @@ fun SourceAnalysisCard(
             if (state == AnalysisState.READY && sourceInfo != null) {
                 ThumbnailPreview(sourceInfo.thumbnailUrl)
                 Text(sourceInfo.title ?: stringResource(R.string.analysis_untitled), style = MaterialTheme.typography.titleLarge)
-                Text(
-                    text = buildString {
-                        sourceInfo.durationSeconds?.let { append(formatDuration(it)) }
-                        if (isNotEmpty()) append(" · ")
-                        append(
-                            if (formats.size == 1) {
-                                stringResource(R.string.analysis_format_one)
-                            } else {
-                                "${formats.size} ${stringResource(R.string.analysis_formats)}"
-                            },
+                val playlistCount = sourceInfo.playlistEntries.size
+                if (playlistCount > 0) {
+                    Text(
+                        text = stringResource(R.string.analysis_playlist_count, playlistCount),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else {
+                    sourceInfo.durationSeconds?.let { seconds ->
+                        Text(
+                            text = formatDuration(seconds),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
-                    },
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                    }
+                }
                 Text(
                     text = stringResource(
                         R.string.analysis_download_type,
@@ -105,41 +100,16 @@ fun SourceAnalysisCard(
                     ),
                     style = MaterialTheme.typography.labelLarge,
                 )
-                Text(
-                    text = stringResource(R.string.analysis_choose_format),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                LazyColumn(
-                    modifier = Modifier.height((formats.size.coerceAtMost(6) * 64).dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    items(formats, key = { it.formatId }) { format ->
-                        FormatChip(
-                            format = format,
-                            selected = format.formatId == selectedFormatId,
-                            onClick = { onFormatSelected(format.formatId) },
-                        )
-                    }
+                if (selectedFormat != null) {
+                    Text(
+                        text = formatLabel(selectedFormat),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
         }
     }
-}
-
-@Composable
-private fun FormatChip(format: MediaFormat, selected: Boolean, onClick: () -> Unit) {
-    FilterChip(
-        selected = selected,
-        onClick = onClick,
-        modifier = Modifier.fillMaxWidth().testTag("format_${format.formatId}"),
-        label = {
-            Text(
-                text = formatLabel(format),
-                maxLines = 2,
-            )
-        },
-    )
 }
 
 @Composable

@@ -6,11 +6,6 @@ import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
 import android.util.Size
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
@@ -160,26 +155,20 @@ fun GalleryScreen(
                 .padding(horizontal = 16.dp),
         ) {
             GalleryControls(state, viewModel)
-            AnimatedVisibility(visible = selectedItem != null) {
-                selectedItem?.let { item ->
-                    GallerySelectionBar(
-                        item = item,
-                        onOpen = { openAction(item) },
-                        onDelete = { showDeleteConfirmation = true },
-                        onClear = { selectedId = null },
-                    )
-                }
+            selectedItem?.let { item ->
+                GallerySelectionBar(
+                    item = item,
+                    onOpen = { openAction(item) },
+                    onDelete = { showDeleteConfirmation = true },
+                    onClear = { selectedId = null },
+                )
             }
             Spacer(Modifier.height(12.dp))
-            AnimatedContent(
-                targetState = Triple(hasPermission, state.isLoading, state.items),
-                transitionSpec = { fadeIn() togetherWith fadeOut() },
-                label = "galleryContent",
-                modifier = Modifier.weight(1f),
-            ) { (allowed, loading, items) ->
+            Box(modifier = Modifier.weight(1f)) {
+                val items = state.items
                 when {
-                    !allowed -> GalleryPermissionState { }
-                    loading -> LoadingGalleryState()
+                    !hasPermission -> GalleryPermissionState { }
+                    state.isLoading -> LoadingGalleryState()
                     state.errorMessage != null -> GalleryErrorState(onRetry = { viewModel.refresh() })
                     items.isEmpty() -> EmptyGalleryState(onBackToHome)
                     state.viewMode == GalleryViewMode.GRID -> GalleryGrid(

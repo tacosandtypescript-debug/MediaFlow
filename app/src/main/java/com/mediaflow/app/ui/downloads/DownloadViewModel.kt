@@ -134,6 +134,43 @@ class DownloadViewModel(
                 check(selected != null) { "La calidad seleccionada no está disponible en esta fuente." }
 
                 val space = source.spaceMetadata
+                val playlistEntries = source.playlistEntries
+                val startDownload = StartDownloadUseCase(repository)
+
+                if (playlistEntries.isNotEmpty()) {
+                    var lastId = ""
+                    playlistEntries.forEach { entry ->
+                        lastId = startDownload(
+                            request.copy(
+                                sourceUrl = entry.sourceUrl,
+                                fileName = state.fileName.ifBlank {
+                                    entry.title ?: source.title ?: request.fileName
+                                },
+                                mediaType = selected.mediaType,
+                                formatId = selected.formatId,
+                                mimeType = selected.mimeType ?: request.mimeType,
+                                extension = selected.extension ?: request.extension,
+                                durationSeconds = entry.durationSeconds,
+                                requiresMuxing = selected.requiresMuxing,
+                                width = selected.width,
+                                height = selected.height,
+                                fps = selected.fps,
+                                container = selected.container,
+                                videoCodec = selected.videoCodec,
+                                audioCodec = selected.audioCodec,
+                                thumbnailUrl = entry.thumbnailUrl ?: source.thumbnailUrl,
+                                streamUrl = null,
+                            ),
+                        )
+                    }
+                    android.util.Log.d(
+                        "MediaFlow",
+                        "Playlist download started with ${playlistEntries.size} items, last id=$lastId",
+                    )
+                    _events.emit(DownloadEvent.Started(lastId))
+                    return@runCatching
+                }
+
                 val finalFileName = if (state.fileName.isNotBlank()) {
                     state.fileName
                 } else if (space != null) {
@@ -149,7 +186,7 @@ class DownloadViewModel(
                     spaceRepository.saveSpace(space, mediaId = request.sourceUrl)
                 }
 
-                val downloadId = StartDownloadUseCase(repository)(request.copy(
+                val downloadId = startDownload(request.copy(
                     fileName = finalFileName,
                     mediaType = selected.mediaType,
                     formatId = selected.formatId,

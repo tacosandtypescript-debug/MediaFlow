@@ -59,6 +59,8 @@
     <string name="home_download_now">Descargar ahora</string>
     <string name="home_download_video">Descargar vídeo con audio</string>
     <string name="home_download_audio">Descargar solo audio</string>
+    <string name="home_download_playlist">Descargar lista (%1$d %2$s)</string>
+    <string name="analysis_playlist_count">Lista de %1$d vídeos. Se descargará cada uno.</string>
     <string name="home_recent_downloads">Descargas recientes</string>
     <string name="home_recent_empty_title">Sin descargas todavía</string>
     <string name="home_recent_empty_subtitle">Las descargas aparecerán aquí.</string>
@@ -72,6 +74,10 @@
     <string name="download_retry">Reintentar descarga</string>
     <string name="download_remove">Eliminar del historial</string>
     <string name="download_open">Abrir archivo descargado</string>
+    <string name="share">Compartir</string>
+    <string name="share_video">Compartir vídeo</string>
+    <string name="share_audio">Compartir audio</string>
+    <string name="share_failed">No se pudo compartir. El archivo ya no está disponible.</string>
     <string name="download_status_idle">En espera</string>
     <string name="download_status_queued">En cola</string>
     <string name="download_status_analyzing">Analizando</string>

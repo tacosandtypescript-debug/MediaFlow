@@ -134,7 +134,7 @@ class YtDlpPlatformDownloader(
         cookieHeader: String?,
         userAgent: String = ANONYMOUS_BROWSER_USER_AGENT,
     ): Boolean {
-        val baseName = sanitize(request.fileName?.substringBeforeLast('.') ?: "mediaflow_$id")
+        val baseName = YtDlpRuntime.restrictStem(request.fileName, "mediaflow_$id")
         val output = File(outputDirectory, "$baseName.mp4")
         val partial = File(outputDirectory, "$baseName.mp4.part")
         val outcome = runCatching {
@@ -222,7 +222,7 @@ class YtDlpPlatformDownloader(
                 ?: xSpaceStore.loadAllSync().values.firstOrNull { it.url == current.sourceUrl || it.id in current.sourceUrl }
             val metadata = space?.let { s -> MediaMetadata.fromXSpace(s) }
                 ?: MediaMetadata(
-                    title = request.fileName?.substringBeforeLast('.')?.ifBlank { null } ?: current.title?.ifBlank { null },
+                    title = YtDlpRuntime.fileStem(request.fileName) ?: current.title?.ifBlank { null },
                 )
             mediaMetadataWriter.writeMetadata(output, metadata)
         }.onFailure { error ->
@@ -254,7 +254,7 @@ class YtDlpPlatformDownloader(
     }
 
     private fun executeDownload(id: String, request: DownloadRequest, sourceUrl: String) {
-        val baseName = sanitize(request.fileName?.substringBeforeLast('.') ?: "mediaflow_$id")
+        val baseName = YtDlpRuntime.restrictStem(request.fileName, "mediaflow_$id")
         deleteStaleOutputs(baseName)
         val platform = PlatformUrlSupport.platformFor(sourceUrl)
 
@@ -306,7 +306,7 @@ class YtDlpPlatformDownloader(
         referer: String?,
         allowProgressiveFallback: Boolean = true,
     ) {
-        val baseName = sanitize(request.fileName?.substringBeforeLast('.') ?: "mediaflow_$id")
+        val baseName = YtDlpRuntime.restrictStem(request.fileName, "mediaflow_$id")
         deleteStaleOutputs(baseName)
         val template = File(outputDirectory, "$baseName.%(ext)s").absolutePath
         val startedAt = System.currentTimeMillis()
@@ -419,7 +419,7 @@ class YtDlpPlatformDownloader(
 
                 ThumbnailPersister.harvestFromDirectory(context, id, workDirectory)
 
-                val baseName = sanitize(request.fileName?.substringBeforeLast('.') ?: "mediaflow_$id")
+                val baseName = YtDlpRuntime.restrictStem(request.fileName, "mediaflow_$id")
                 val output = File(outputDirectory, "$baseName.${request.extension ?: "mp4"}")
                 MediaTrackMuxer.mergeMp4(videoFile, audioFile, output).getOrThrow()
                 completeFile(id, request, output)
@@ -463,7 +463,7 @@ class YtDlpPlatformDownloader(
 
     /** Accepts mp4/mkv/webm produced for this session; never renames webm/mkv to .mp4. */
     private fun findSessionOutput(id: String, request: DownloadRequest, startedAt: Long): File? {
-        val baseName = sanitize(request.fileName?.substringBeforeLast('.') ?: "mediaflow_$id")
+        val baseName = YtDlpRuntime.restrictStem(request.fileName, "mediaflow_$id")
         val found = YtDlpRuntime.findOutputFile(
             directory = outputDirectory,
             startedAt = startedAt,
@@ -550,7 +550,7 @@ class YtDlpPlatformDownloader(
                 ?: xSpaceStore.loadAllSync().values.firstOrNull { it.url == current.sourceUrl || it.id in current.sourceUrl }
             val metadata = space?.let { s -> MediaMetadata.fromXSpace(s) }
                 ?: MediaMetadata(
-                    title = request.fileName?.substringBeforeLast('.')?.ifBlank { null } ?: current.title?.ifBlank { null },
+                    title = YtDlpRuntime.fileStem(request.fileName) ?: current.title?.ifBlank { null },
                 )
             mediaMetadataWriter.writeMetadata(output, metadata)
         }.onFailure { error ->
@@ -597,7 +597,7 @@ class YtDlpPlatformDownloader(
 
     /** Removes yt-dlp output candidates after cancellation or a failed run. */
     private fun cleanupPartial(fileName: String?, id: String, startedAt: Long) {
-        val baseName = sanitize(fileName?.substringBeforeLast('.') ?: "mediaflow_$id")
+        val baseName = YtDlpRuntime.restrictStem(fileName, "mediaflow_$id")
         val restricted = YtDlpRuntime.restrictFileName(baseName)
         outputDirectory.listFiles()
             .orEmpty()
@@ -723,7 +723,7 @@ class YtDlpPlatformDownloader(
                 asset to "https://www.instagram.com/"
             }
             PlatformUrlSupport.Platform.TIKTOK -> {
-                val baseName = sanitize(request.fileName?.substringBeforeLast('.') ?: "mediaflow_$id")
+                val baseName = YtDlpRuntime.restrictStem(request.fileName, "mediaflow_$id")
                 val output = File(outputDirectory, "$baseName.mp4")
                 val saved = runCatching {
                     TikTokAnonymousResolver().downloadTo(sourceUrl, output) { downloaded, total ->

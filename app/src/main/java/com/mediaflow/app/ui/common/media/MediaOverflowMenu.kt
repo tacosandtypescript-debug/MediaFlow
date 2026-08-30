@@ -8,6 +8,7 @@ import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.PlaylistAdd
 import androidx.compose.material.icons.outlined.QueueMusic
+import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -20,7 +21,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
+import com.mediaflow.app.R
 
 /**
  * Reusable 3-dots overflow contextual menu for audio and video media items.
@@ -32,10 +36,15 @@ fun MediaOverflowMenu(
     onAddToPlaylist: () -> Unit,
     onToggleFavorite: () -> Unit,
     onAddToQueue: (() -> Unit)? = null,
+    shareUri: String? = null,
+    shareMimeType: String? = null,
+    shareTitle: String? = null,
+    shareIsAudio: Boolean = false,
     onDelete: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var expanded by remember { mutableStateOf(false) }
+    val context = LocalContext.current
 
     IconButton(
         onClick = { expanded = true },
@@ -90,6 +99,23 @@ fun MediaOverflowMenu(
                     onClick = {
                         expanded = false
                         onAddToQueue()
+                    },
+                )
+            }
+
+            if (!shareUri.isNullOrBlank()) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.share)) },
+                    leadingIcon = { Icon(Icons.Outlined.Share, contentDescription = null) },
+                    onClick = {
+                        expanded = false
+                        MediaShare.share(
+                            context = context,
+                            uriString = shareUri,
+                            mimeType = shareMimeType,
+                            title = shareTitle,
+                            isAudio = shareIsAudio,
+                        )
                     },
                 )
             }

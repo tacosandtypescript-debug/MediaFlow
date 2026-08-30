@@ -22,7 +22,7 @@ class YtDlpRuntimeTest {
         assertTrue(opts.getBoolean("simulate"))
         assertFalse(opts.getBoolean("writethumbnail"))
         assertFalse(opts.getBoolean("check_formats"))
-        assertTrue(opts.getBoolean("restrictfilenames"))
+        assertFalse(opts.getBoolean("restrictfilenames"))
         assertTrue(opts.getBoolean("nopart"))
         assertFalse(opts.getBoolean("continuedl"))
         assertTrue(opts.getBoolean("overwrites"))
@@ -68,6 +68,20 @@ class YtDlpRuntimeTest {
         assertEquals("0.0.0.0", opts.getString("source_address"))
         assertEquals(3, opts.getInt("retries"))
         assertTrue(opts.getBoolean("writethumbnail"))
+    }
+
+    @Test
+    fun `file stem keeps titles that contain dots and only strips media extensions`() {
+        val dottedTitle = "2.1M views Ya viene Halloween &#127875;"
+        val stem = YtDlpRuntime.fileStem(dottedTitle)
+        assertTrue(stem!!.startsWith("2.1M views Ya viene Halloween"))
+        assertTrue(stem.length > 3)
+        assertEquals(
+            "2.1M views Ya viene Halloween",
+            YtDlpRuntime.restrictStem("2.1M views Ya viene Halloween", "mediaflow_1"),
+        )
+        assertEquals("Mi video", YtDlpRuntime.fileStem("Mi video.mp4"))
+        assertEquals("clip", YtDlpRuntime.fileStem("clip.m4a"))
     }
 
     @Test

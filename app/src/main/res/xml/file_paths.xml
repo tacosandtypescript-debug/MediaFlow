@@ -3,4 +3,13 @@
     <files-path
         name="completed_downloads"
         path="downloads/" />
+    <files-path
+        name="app_files"
+        path="." />
+    <cache-path
+        name="cache"
+        path="." />
+    <external-files-path
+        name="external_files"
+        path="." />
 </paths>

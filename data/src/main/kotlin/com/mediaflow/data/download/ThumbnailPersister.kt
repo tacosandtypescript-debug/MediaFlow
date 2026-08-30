@@ -1,6 +1,7 @@
 package com.mediaflow.data.download
 
 import android.content.Context
+import android.net.Uri
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
@@ -23,7 +24,7 @@ internal object ThumbnailPersister {
                 file.nameWithoutExtension == downloadId &&
                 file.extension.lowercase() in IMAGE_EXTENSIONS
         }
-        return match?.toURI()?.toString()
+        return match?.let(::fileUri)
     }
 
     fun persist(context: Context, downloadId: String, remoteUrl: String?): String? {
@@ -36,7 +37,10 @@ internal object ThumbnailPersister {
             connection.instanceFollowRedirects = true
             connection.connectTimeout = 15_000
             connection.readTimeout = 20_000
-            connection.setRequestProperty("User-Agent", "MediaFlow")
+            connection.setRequestProperty(
+                "User-Agent",
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.6778.139 Safari/537.36",
+            )
             check(connection.responseCode in 200..299) {
                 "Miniatura HTTP ${connection.responseCode}"
             }
@@ -44,7 +48,7 @@ internal object ThumbnailPersister {
                 dest.outputStream().use { output -> input.copyTo(output) }
             }
             check(dest.length() > 0L) { "Miniatura vacía" }
-            dest.toURI().toString()
+            fileUri(dest)
         }.getOrElse {
             dest.delete()
             null
@@ -87,7 +91,7 @@ internal object ThumbnailPersister {
             sidecar.copyTo(dest, overwrite = true)
             check(dest.length() > 0L) { "Miniatura vacía" }
             sidecar.delete()
-            dest.toURI().toString()
+            fileUri(dest)
         }.getOrElse {
             dest.delete()
             null
@@ -150,4 +154,7 @@ internal object ThumbnailPersister {
         val lower = extension.lowercase()
         return if (lower in IMAGE_EXTENSIONS) lower else "jpg"
     }
+
+    /** Coil and isLoadableArtworkUrl need file:/// (three slashes), not File.toURI()'s file:/. */
+    private fun fileUri(file: File): String = Uri.fromFile(file).toString()
 }

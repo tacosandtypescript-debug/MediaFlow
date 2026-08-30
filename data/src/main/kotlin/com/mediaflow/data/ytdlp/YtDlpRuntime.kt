@@ -17,16 +17,24 @@ internal object YtDlpRuntime {
     const val USER_AGENT =
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.7103.113 Safari/537.36"
     const val FILE_TIME_TOLERANCE_MS = 1_000L
+    const val MAX_PLAYLIST_ITEMS = 50
 
     private val cwdLock = Any()
     @Volatile private var cwdInitialized = false
 
-    fun analysisOptions(outputDirectory: File): JSONObject =
-        baseOptions(outputDirectory, "analysis_%(id)s.%(ext)s")
+    fun analysisOptions(outputDirectory: File, allowPlaylist: Boolean = false): JSONObject {
+        val opts = baseOptions(outputDirectory, "analysis_%(id)s.%(ext)s")
             .put("skip_download", true)
             .put("simulate", true)
             .put("quiet", true)
             .put("no_warnings", true)
+            .put("noplaylist", !allowPlaylist)
+        if (allowPlaylist) {
+            opts.put("extract_flat", "in_playlist")
+            opts.put("playlistend", MAX_PLAYLIST_ITEMS)
+        }
+        return opts
+    }
 
     fun downloadOptions(
         outputDirectory: File,
@@ -59,7 +67,7 @@ internal object YtDlpRuntime {
         return JSONObject()
             .put("outtmpl", absoluteTemplate)
             .put("paths", paths)
-            .put("restrictfilenames", true)
+            .put("restrictfilenames", false)
             .put("nopart", true)
             .put("continuedl", false)
             .put("overwrites", true)
@@ -93,7 +101,12 @@ internal object YtDlpRuntime {
         }
     }
 
-    fun extractJson(context: Context, url: String, outputDirectory: File): String {
+    fun extractJson(
+        context: Context,
+        url: String,
+        outputDirectory: File,
+        allowPlaylist: Boolean = false,
+    ): String {
         ensureReady(context)
         outputDirectory.mkdirs()
         val globals = runScript(
@@ -108,7 +121,7 @@ internal object YtDlpRuntime {
             mapOf(
                 "url" to url,
                 "out_dir" to outputDirectory.absolutePath,
-                "opts_json" to analysisOptions(outputDirectory).toString(),
+                "opts_json" to analysisOptions(outputDirectory, allowPlaylist).toString(),
             ),
         )
         return globals.callAttr("__getitem__", "result").toString()
@@ -197,12 +210,40 @@ internal object YtDlpRuntime {
         "jpg", "jpeg", "png", "webp", "gif", "json", "vtt", "srt", "nfo", "description",
     )
 
-    fun restrictFileName(value: String): String = value
+    fun restrictFileName(value: String): String = decodeHtmlEntities(value)
         .replace(Regex("[\\\\/:*?\"<>|\\u0000-\\u001F]"), "")
-        .replace(Regex("[^A-Za-z0-9._-]"), "_")
-        .replace(Regex("_+"), "_")
-        .trim('_')
+        .replace(Regex("\\s+"), " ")
+        .trim()
+        .trimEnd('.')
+        .take(120)
         .ifBlank { "mediaflow_download" }
+
+    fun decodeHtmlEntities(value: String): String {
+        if (!value.contains('&')) return value
+        return android.text.Html.fromHtml(value, android.text.Html.FROM_HTML_MODE_COMPACT)
+            .toString()
+            .replace('\u00A0', ' ')
+            .trim()
+    }
+
+    /** Keeps titles like "2.1M views" intact; only strips a real media extension. */
+    fun fileStem(fileName: String?): String? {
+        val decoded = decodeHtmlEntities(fileName?.trim().orEmpty())
+        if (decoded.isEmpty()) return null
+        val ext = decoded.substringAfterLast('.', missingDelimiterValue = "").lowercase()
+        return if (ext in KNOWN_MEDIA_EXTENSIONS && decoded.length > ext.length + 1) {
+            decoded.substringBeforeLast('.')
+        } else {
+            decoded
+        }
+    }
+
+    fun restrictStem(fileName: String?, fallback: String): String =
+        restrictFileName(fileStem(fileName) ?: fallback)
+
+    private val KNOWN_MEDIA_EXTENSIONS = setOf(
+        "mp4", "m4v", "m4a", "webm", "mkv", "mov", "mp3", "aac", "opus", "ogg", "wav",
+    )
 
     private fun runScript(script: String, bindings: Map<String, Any?>): PyObject {
         val py = Python.getInstance()

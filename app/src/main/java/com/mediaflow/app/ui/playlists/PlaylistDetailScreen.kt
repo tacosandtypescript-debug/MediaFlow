@@ -199,6 +199,10 @@ fun PlaylistDetailScreen(
                             onToggleFavorite = { onToggleFavorite(uri) },
                             onAddToPlaylist = { },
                             onAddToQueue = null,
+                            shareUri = item.localUri,
+                            shareMimeType = item.selectedFormat?.mimeType,
+                            shareTitle = item.title ?: item.fileName,
+                            shareIsAudio = true,
                             onDelete = { onRemoveFromPlaylist(uri) },
                         )
                     }

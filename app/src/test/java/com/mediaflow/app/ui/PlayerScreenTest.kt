@@ -14,6 +14,7 @@ import com.mediaflow.app.ui.player.SeekFeedbackEvent
 import com.mediaflow.app.ui.player.components.AudioPlayerView
 import com.mediaflow.app.ui.player.components.LivePlayerView
 import com.mediaflow.app.ui.player.components.PlayPauseButton
+import com.mediaflow.app.ui.player.components.PlayerSecondaryActions
 import com.mediaflow.app.ui.player.components.PlayerTimeline
 import com.mediaflow.app.ui.player.components.SeekFeedback
 import com.mediaflow.app.ui.player.live.LiveEndedContent
@@ -59,6 +60,27 @@ class PlayerScreenTest {
         }
         composeRule.onNodeWithContentDescription("Volver").performClick()
         assertTrue("Back button should invoke the callback", backClicked)
+    }
+
+    @Test
+    fun shareButtonInvokesCallback() {
+        var shared = false
+        composeRule.setContent {
+            MediaFlowTheme {
+                PlayerSecondaryActions(
+                    speed = 1.0f,
+                    queueCount = 1,
+                    isLive = false,
+                    onSpeedChange = {},
+                    onAddToPlaylist = {},
+                    onOpenQueue = {},
+                    onShare = { shared = true },
+                    onDelete = {},
+                )
+            }
+        }
+        composeRule.onNodeWithTag("player_share_btn").assertIsDisplayed().performClick()
+        assertTrue(shared)
     }
 
     @Test

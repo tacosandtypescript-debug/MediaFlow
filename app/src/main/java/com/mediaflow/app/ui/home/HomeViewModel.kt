@@ -27,6 +27,8 @@ class HomeViewModel : ViewModel() {
     private var analysisJob: Job? = null
 
     fun onUrlChanged(url: String) {
+        val trimmed = url.trim()
+        if (trimmed.isNotEmpty() && trimmed == _uiState.value.url) return
         analysisJob?.cancel()
         updateUrlValidation(url)
     }

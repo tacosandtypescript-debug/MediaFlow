@@ -80,6 +80,29 @@ class HomeViewModelTest {
     }
 
     @Test
+    fun `same url does not reset a completed analysis`() {
+        val vm = newViewModel()
+        vm.onUrlChanged("https://example.com/video")
+        vm.analyze(object : SourceResolver {
+            override suspend fun analyze(sourceUrl: String) = SourceInfo(
+                sourceUrl = sourceUrl,
+                title = "Clip",
+                availableFormats = listOf(
+                    MediaFormat("22", "mp4", "video/mp4", MediaType.VIDEO, "720p", height = 720),
+                ),
+            )
+        })
+        assertEquals(AnalysisState.READY, vm.uiState.value.analysisState)
+
+        vm.onUrlChanged("https://example.com/video")
+        vm.onUrlChanged("  https://example.com/video  ")
+
+        assertEquals(AnalysisState.READY, vm.uiState.value.analysisState)
+        assertEquals("Clip", vm.uiState.value.sourceInfo?.title)
+        assertEquals("22", vm.uiState.value.selectedFormatId)
+    }
+
+    @Test
     fun `https url is accepted`() {
         val vm = newViewModel()
         vm.onUrlChanged("https://example.com/watch?v=abc")

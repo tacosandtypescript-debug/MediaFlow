@@ -38,6 +38,24 @@ object PlatformUrlSupport {
         return platformFor(url) != null || isGenericYtDlpPage(url)
     }
 
+    /** YouTube playlist pages and watch URLs that carry an explicit playlist id. */
+    fun isYoutubePlaylist(url: String): Boolean {
+        if (platformFor(url) != Platform.YOUTUBE) return false
+        val uri = runCatching { URI(url.trim()) }.getOrNull() ?: return false
+        val path = uri.path.orEmpty().lowercase()
+        if (path.contains("/playlist")) return true
+        val list = uri.query.orEmpty()
+            .split('&')
+            .firstOrNull { it.startsWith("list=", ignoreCase = true) }
+            ?.substringAfter('=')
+            ?.takeIf { it.isNotBlank() }
+            ?: return false
+        return list.startsWith("PL", ignoreCase = true) ||
+            list.startsWith("UU", ignoreCase = true) ||
+            list.startsWith("FL", ignoreCase = true) ||
+            list.startsWith("OL", ignoreCase = true)
+    }
+
     /** Any HTTPS page is delegated to yt-dlp unless it is a known direct file. */
     fun isGenericYtDlpPage(url: String): Boolean {
         val uri = runCatching { URI(url.trim()) }.getOrNull() ?: return false

@@ -1,11 +1,5 @@
 package com.mediaflow.app.ui.player.miniplayer
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -49,13 +43,9 @@ fun MiniPlayer(
     modifier: Modifier = Modifier,
 ) {
     val isVisible = serviceState.playbackState != EnginePlaybackState.IDLE && !serviceState.filePath.isNullOrBlank()
+    if (!isVisible) return
 
-    AnimatedVisibility(
-        visible = isVisible,
-        enter = slideInVertically(tween(280), initialOffsetY = { it }) + fadeIn(tween(280)),
-        exit = slideOutVertically(tween(280), targetOffsetY = { it }) + fadeOut(tween(280)),
-        modifier = modifier,
-    ) {
+    Column(modifier = modifier) {
         val mediaUri = serviceState.filePath ?: serviceState.mediaId.orEmpty()
         val title = serviceState.title ?: mediaUri.substringAfterLast('/')
         val hostLabel = serviceState.artistOrHost

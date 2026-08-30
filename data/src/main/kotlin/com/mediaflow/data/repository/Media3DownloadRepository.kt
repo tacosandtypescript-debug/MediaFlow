@@ -235,7 +235,7 @@ class Media3DownloadRepository private constructor(
             // Attempt non-blocking metadata embedding
             runCatching {
                 val mediaMetadata = MediaMetadata(
-                    title = safeName.substringBeforeLast('.').ifBlank { null },
+                    title = com.mediaflow.data.ytdlp.YtDlpRuntime.fileStem(safeName),
                 )
                 mediaMetadataWriter.writeMetadata(output, mediaMetadata)
             }.onFailure { error ->

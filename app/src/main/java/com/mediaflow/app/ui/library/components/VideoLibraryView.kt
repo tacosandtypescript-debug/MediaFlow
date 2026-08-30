@@ -151,6 +151,10 @@ fun VideoLibraryView(
                                 onAddToPlaylist = { },
                                 onToggleFavorite = { onToggleFavorite(uri) },
                                 onAddToQueue = null,
+                                shareUri = item.localUri,
+                                shareMimeType = item.selectedFormat?.mimeType,
+                                shareTitle = item.title ?: item.fileName,
+                                shareIsAudio = false,
                                 onDelete = { onDeleteMedia(item) },
                             )
                         }

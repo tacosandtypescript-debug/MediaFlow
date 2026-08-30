@@ -1,15 +1,8 @@
 package com.mediaflow.app.navigation
 
 import android.net.Uri
-import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -32,13 +25,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -46,6 +37,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.mediaflow.app.ui.home.HomeViewModel
 import com.mediaflow.app.R
 import com.mediaflow.app.ui.components.MediaFlowBackground
 import com.mediaflow.app.ui.downloads.DownloadEvent
@@ -64,19 +56,6 @@ import com.mediaflow.data.player.background.PlayerSessionHolder
 import com.mediaflow.data.resolver.YtDlpSourceResolver
 import kotlinx.coroutines.launch
 
-private val navEnter: AnimatedContentTransitionScope<NavBackStackEntry>.() -> EnterTransition? = {
-    fadeIn(tween(250)) + slideInVertically(tween(250)) { it / 12 }
-}
-private val navExit: AnimatedContentTransitionScope<NavBackStackEntry>.() -> ExitTransition? = {
-    fadeOut(tween(150))
-}
-private val navPopEnter: AnimatedContentTransitionScope<NavBackStackEntry>.() -> EnterTransition? = {
-    fadeIn(tween(250))
-}
-private val navPopExit: AnimatedContentTransitionScope<NavBackStackEntry>.() -> ExitTransition? = {
-    fadeOut(tween(150)) + slideOutVertically(tween(250)) { it / 12 }
-}
-
 /** Root navigation, mini player integration, and app-level download/theme state wiring. */
 @Composable
 fun AppNavigation(
@@ -88,6 +67,7 @@ fun AppNavigation(
     val downloadViewModel: DownloadViewModel = viewModel(
         factory = DownloadViewModel.Factory(application),
     )
+    val homeViewModel: HomeViewModel = viewModel()
     val sourceResolver = remember(application) { YtDlpSourceResolver(application) }
     val themeMode by themeViewModel.themeMode.collectAsState()
     val downloads by downloadViewModel.downloads.collectAsState()
@@ -158,11 +138,6 @@ fun AppNavigation(
                             ) {
                                 MediaFlowDestination.bottomBarItems.forEach { destination ->
                                     val selected = destination.route == currentRoute
-                                    val iconScale by animateFloatAsState(
-                                        targetValue = if (selected) 1.12f else 1f,
-                                        animationSpec = tween(220),
-                                        label = "navIconScale",
-                                    )
                                     NavigationBarItem(
                                         selected = selected,
                                         modifier = Modifier.testTag("tab_${destination.route}"),
@@ -186,12 +161,7 @@ fun AppNavigation(
                                             Icon(
                                                 imageVector = destination.icon!!,
                                                 contentDescription = stringResource(destination.labelRes),
-                                                modifier = Modifier
-                                                    .size(24.dp)
-                                                    .graphicsLayer {
-                                                        scaleX = iconScale
-                                                        scaleY = iconScale
-                                                    },
+                                                modifier = Modifier.size(24.dp),
                                             )
                                         },
                                         label = { Text(stringResource(destination.labelRes)) },
@@ -206,15 +176,14 @@ fun AppNavigation(
                     navController = navController,
                     startDestination = MediaFlowDestination.Home.route,
                     modifier = Modifier.padding(innerPadding),
+                    enterTransition = { EnterTransition.None },
+                    exitTransition = { ExitTransition.None },
+                    popEnterTransition = { EnterTransition.None },
+                    popExitTransition = { ExitTransition.None },
                 ) {
-                    composable(
-                        route = MediaFlowDestination.Home.route,
-                        enterTransition = navEnter,
-                        exitTransition = navExit,
-                        popEnterTransition = navPopEnter,
-                        popExitTransition = navPopExit,
-                    ) {
+                    composable(route = MediaFlowDestination.Home.route) {
                         HomeScreen(
+                            viewModel = homeViewModel,
                             sourceResolver = sourceResolver,
                             onPlayLive = { liveUrl ->
                                 navController.navigate(
@@ -232,13 +201,7 @@ fun AppNavigation(
                         )
                     }
 
-                    composable(
-                        route = MediaFlowDestination.Gallery.route,
-                        enterTransition = navEnter,
-                        exitTransition = navExit,
-                        popEnterTransition = navPopEnter,
-                        popExitTransition = navPopExit,
-                    ) {
+                    composable(route = MediaFlowDestination.Gallery.route) {
                         LibraryScreen(
                             onOpenItem = { item ->
                                 val uri = item.localUri ?: item.id
@@ -249,13 +212,7 @@ fun AppNavigation(
                         )
                     }
 
-                    composable(
-                        route = MediaFlowDestination.Downloads.route,
-                        enterTransition = navEnter,
-                        exitTransition = navExit,
-                        popEnterTransition = navPopEnter,
-                        popExitTransition = navPopExit,
-                    ) {
+                    composable(route = MediaFlowDestination.Downloads.route) {
                         DownloadsScreen(
                             downloads = downloads,
                             spacesMap = spacesMap,
@@ -280,13 +237,7 @@ fun AppNavigation(
                         )
                     }
 
-                    composable(
-                        route = MediaFlowDestination.Settings.route,
-                        enterTransition = navEnter,
-                        exitTransition = navExit,
-                        popEnterTransition = navPopEnter,
-                        popExitTransition = navPopExit,
-                    ) {
+                    composable(route = MediaFlowDestination.Settings.route) {
                         SettingsScreen(
                             themeMode = themeMode,
                             onThemeModeChange = themeViewModel::setThemeMode,
@@ -298,10 +249,6 @@ fun AppNavigation(
                         arguments = listOf(
                             navArgument("mediaId") { type = NavType.StringType },
                         ),
-                        enterTransition = navEnter,
-                        exitTransition = navExit,
-                        popEnterTransition = navPopEnter,
-                        popExitTransition = navPopExit,
                     ) { entry ->
                         val encodedMediaId = entry.arguments?.getString("mediaId").orEmpty()
                         val mediaUri = Uri.decode(encodedMediaId)

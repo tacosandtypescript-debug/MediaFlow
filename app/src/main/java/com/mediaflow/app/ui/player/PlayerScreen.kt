@@ -37,6 +37,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.mediaflow.app.R
+import com.mediaflow.app.ui.common.media.MediaShare
 import com.mediaflow.app.ui.common.media.preferredArtworkUrl
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -260,6 +261,15 @@ fun PlayerScreen(
                         onSpeedChange = viewModel::setSpeed,
                         onAddToPlaylist = { showAddToPlaylistSheet = true },
                         onOpenQueue = { showQueueSheet = true },
+                        onShare = {
+                            val path = uiState.serviceState.filePath ?: uiState.mediaUri
+                            MediaShare.share(
+                                context = context,
+                                uriString = path,
+                                title = displayTitle,
+                                isAudio = uiState.isAudioOnly,
+                            )
+                        },
                         onDelete = { showDeleteDialog = true },
                     )
 

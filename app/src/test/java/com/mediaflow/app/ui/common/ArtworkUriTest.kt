@@ -42,6 +42,7 @@ class ArtworkUriTest {
         assertTrue(isLoadableArtworkUrl("https://i.ytimg.com/vi/abc/hqdefault.jpg"))
         assertTrue(isLoadableArtworkUrl("http://example.com/cover.webp"))
         assertTrue(isLoadableArtworkUrl("file:///data/user/0/com.mediaflow.app/files/thumbs/id.jpg"))
+        assertTrue(isLoadableArtworkUrl("file:/data/user/0/com.mediaflow.app/files/thumbs/id.jpg"))
         assertTrue(isLoadableArtworkUrl("content://media/external/images/media/12"))
     }
 

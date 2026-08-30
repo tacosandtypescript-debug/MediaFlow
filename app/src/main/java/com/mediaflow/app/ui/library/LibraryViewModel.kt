@@ -8,6 +8,7 @@ import androidx.lifecycle.viewModelScope
 import com.mediaflow.app.ui.common.media.preferredArtworkUrl
 import com.mediaflow.app.ui.library.components.AudioLibraryTab
 import com.mediaflow.core.model.DownloadItem
+import com.mediaflow.core.model.DownloadStatus
 import com.mediaflow.core.model.MediaType
 import com.mediaflow.core.model.PlaybackQueueItem
 import com.mediaflow.data.player.background.PlayerSessionHolder
@@ -212,7 +213,9 @@ internal fun overlayThumbnails(
     items: List<DownloadItem>,
     downloads: List<DownloadItem>,
 ): List<DownloadItem> {
-    if (items.isEmpty() || downloads.isEmpty()) return items
+    val completed = downloads.filter { it.status == DownloadStatus.COMPLETED && !it.localUri.isNullOrBlank() }
+    if (items.isEmpty()) return completed
+    if (downloads.isEmpty()) return items
     val thumbs = HashMap<String, String>()
     downloads.forEach { item ->
         val uri = item.thumbnailUri?.takeIf(::isLoadableArtworkUrl) ?: return@forEach

@@ -1,8 +1,10 @@
 package com.mediaflow.data.resolver
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class PlatformUrlSupportTest {
@@ -39,6 +41,22 @@ class PlatformUrlSupportTest {
         expected.forEach { (url, platform) ->
             assertEquals(url, platform, PlatformUrlSupport.platformFor(url))
         }
+    }
+
+    @Test
+    fun `detects YouTube playlist urls and ignores mix lists`() {
+        assertTrue(
+            PlatformUrlSupport.isYoutubePlaylist(
+                "https://www.youtube.com/playlist?list=PLrAXtmErZgOeiKm4sgNOknGvNjby9efdf",
+            ),
+        )
+        assertTrue(
+            PlatformUrlSupport.isYoutubePlaylist(
+                "https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=PLrAXtmErZgOeiKm4sgNOknGvNjby9efdf",
+            ),
+        )
+        assertFalse(PlatformUrlSupport.isYoutubePlaylist("https://www.youtube.com/watch?v=dQw4w9WgXcQ"))
+        assertFalse(PlatformUrlSupport.isYoutubePlaylist("https://youtu.be/dQw4w9WgXcQ"))
     }
 
     @Test
