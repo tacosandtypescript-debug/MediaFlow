@@ -81,6 +81,7 @@ fun MediaArtwork(
     mediaType: MediaType = MediaType.AUDIO,
     contentDescription: String? = null,
     fillMax: Boolean = false,
+    fullResolution: Boolean = false,
 ) {
     val context = LocalContext.current
     val fallbackIcon: ImageVector = when {
@@ -116,7 +117,9 @@ fun MediaArtwork(
             SubcomposeAsyncImage(
                 model = ImageRequest.Builder(context)
                     .data(coilArtworkModel(artworkUrl!!))
-                    .size(Size.ORIGINAL)
+                    .apply {
+                        if (fullResolution) size(Size.ORIGINAL)
+                    }
                     .crossfade(false)
                     .build(),
                 contentDescription = contentDescription,

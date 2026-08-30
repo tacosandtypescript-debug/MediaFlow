@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.LibraryMusic
 import androidx.compose.runtime.Composable
@@ -77,10 +78,9 @@ fun LibraryAllView(
                 onDelete = { onDeletePlaylist(playlist.id) },
             )
         }
-        items(items, key = { it.id }) { item ->
+        itemsIndexed(items, key = { _, item -> item.id }) { index, item ->
             val uri = item.localUri ?: item.id
             val space = spacesMap[item.sourceUrl] ?: spacesMap[item.id]
-            val index = items.indexOfFirst { it.id == item.id }
             val title = space?.title ?: item.title ?: item.fileName ?: "Media"
             val subtitle = space?.let { "Host: ${it.host.formattedHandle}" }
                 ?: if (item.mediaType == MediaType.VIDEO) stringResource(R.string.player_media_video)

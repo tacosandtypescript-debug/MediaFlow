@@ -80,6 +80,7 @@ fun AudioPlayerView(
                         mediaType = MediaType.AUDIO,
                         contentDescription = title,
                         fillMax = true,
+                        fullResolution = true,
                     )
                 }
             }
@@ -91,6 +92,7 @@ fun AudioPlayerView(
                 isSpace = space != null,
                 mediaType = MediaType.AUDIO,
                 contentDescription = title,
+                fullResolution = true,
             )
         }
 
