@@ -53,6 +53,18 @@ class MediaFileValidatorTest {
     }
 
     @Test
+    fun `empty file is rejected and is not a completed download`() {
+        val file = createDummyFile("empty.mp4", sizeBytes = 0L)
+        val result = MediaFileValidator.validate(
+            file = file,
+            expectedType = MediaType.VIDEO,
+            expectedExtension = "mp4",
+        )
+        assertTrue(result.isFailure)
+        assertTrue(result.exceptionOrNull()?.message.orEmpty().contains("vacío"))
+    }
+
+    @Test
     fun `validate identical duration succeeds and adopts duration`() {
         val file = createDummyFile("stream.mp4")
         val audioFormat = MediaFormat.createAudioFormat("audio/mp4a-latm", 44100, 2).apply {

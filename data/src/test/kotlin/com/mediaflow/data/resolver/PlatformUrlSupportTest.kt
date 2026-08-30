@@ -32,6 +32,8 @@ class PlatformUrlSupportTest {
             "https://vm.tiktok.com/ZSVPEWsKB/" to PlatformUrlSupport.Platform.TIKTOK,
             "https://www.tiktok.com/@user/video/123" to PlatformUrlSupport.Platform.TIKTOK,
             "https://youtu.be/dQw4w9WgXcQ" to PlatformUrlSupport.Platform.YOUTUBE,
+            "https://youtu.be/dQw4w9WgXcQ?si=sharetoken" to PlatformUrlSupport.Platform.YOUTUBE,
+            "https://www.youtube.com/shorts/dQw4w9WgXcQ" to PlatformUrlSupport.Platform.YOUTUBE,
             "https://m.youtube.com/watch?v=dQw4w9WgXcQ" to PlatformUrlSupport.Platform.YOUTUBE,
             "https://music.youtube.com/watch?v=dQw4w9WgXcQ" to PlatformUrlSupport.Platform.YOUTUBE,
             "https://twitter.com/user/status/123" to PlatformUrlSupport.Platform.X,
@@ -97,5 +99,29 @@ class PlatformUrlSupportTest {
     fun `does not treat unrelated hosts as a social platform`() {
         assertNull(PlatformUrlSupport.platformFor("https://example.com/watch/video"))
         assertNotNull(PlatformUrlSupport.platformFor("https://www.facebook.com/share/r/abc"))
+    }
+
+    @Test
+    fun `direct mp4 and m4a urls are DIRECT not a generic yt-dlp page`() {
+        val mp4 = "https://cdn.example.com/clip.mp4"
+        val m4a = "https://cdn.example.com/audio.m4a?token=abc"
+        assertEquals(PlatformUrlSupport.Platform.DIRECT, PlatformUrlSupport.platformFor(mp4))
+        assertEquals(PlatformUrlSupport.Platform.DIRECT, PlatformUrlSupport.platformFor(m4a))
+        assertTrue(PlatformUrlSupport.isDirectMedia(mp4))
+        assertFalse(PlatformUrlSupport.isGenericYtDlpPage(mp4))
+        assertFalse(PlatformUrlSupport.isGenericYtDlpPage(m4a))
+        assertTrue(PlatformUrlSupport.isGenericYtDlpPage("https://example.com/watch/video"))
+    }
+
+    @Test
+    fun `YouTube shorts canonicalize to a watch video id`() {
+        assertEquals(
+            "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+            PlatformUrlSupport.canonicalExtractionUrl("https://www.youtube.com/shorts/dQw4w9WgXcQ"),
+        )
+        assertEquals(
+            "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+            PlatformUrlSupport.canonicalExtractionUrl("https://youtu.be/dQw4w9WgXcQ?si=sharetoken"),
+        )
     }
 }

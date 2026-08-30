@@ -10,6 +10,7 @@ object PlatformUrlSupport {
         INSTAGRAM("Instagram", "instagram"),
         TIKTOK("TikTok", "tiktok"),
         YOUTUBE("YouTube", "youtube"),
+        DIRECT("Directo", "direct"),
     }
 
     fun platformFor(url: String): Platform? {
@@ -29,6 +30,8 @@ object PlatformUrlSupport {
             hostIs("tiktok.com") || hostIs("douyin.com") -> Platform.TIKTOK
 
             hostIs("youtube.com") || hostIs("youtu.be") -> Platform.YOUTUBE
+
+            isDirectMediaPath(uri.path) -> Platform.DIRECT
 
             else -> null
         }
@@ -75,12 +78,18 @@ object PlatformUrlSupport {
         return match.groupValues[2].takeIf { it.matches(YOUTUBE_VIDEO_ID) }
     }
 
+    fun isDirectMedia(url: String): Boolean = platformFor(url) == Platform.DIRECT
+
     /** Any HTTPS page is delegated to yt-dlp unless it is a known direct file. */
     fun isGenericYtDlpPage(url: String): Boolean {
         val uri = runCatching { URI(url.trim()) }.getOrNull() ?: return false
         if (!uri.scheme.equals("https", ignoreCase = true) || uri.host.isNullOrBlank()) return false
-        val extension = uri.path.orEmpty().substringAfterLast('.', "").lowercase()
-        return extension !in DIRECT_MEDIA_EXTENSIONS
+        return !isDirectMediaPath(uri.path)
+    }
+
+    private fun isDirectMediaPath(path: String?): Boolean {
+        val extension = path.orEmpty().substringAfterLast('.', "").lowercase()
+        return extension in DIRECT_MEDIA_EXTENSIONS
     }
 
     private val DIRECT_MEDIA_EXTENSIONS = setOf(
