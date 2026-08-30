@@ -221,20 +221,7 @@ class YtDlpSourceResolver(
             .takeIf { !it.isNaN() && it >= 0 }
             ?.toLong()
 
-        val parsedFormats = root.optJSONArray("formats")?.let { array ->
-            buildList {
-                for (index in 0 until array.length()) {
-                    val format = array.optJSONObject(index) ?: continue
-                    toMediaFormat(format, duration)?.let(::add)
-                }
-            }
-        }.orEmpty().distinctBy { it.formatId }
-
-        val formats = if (parsedFormats.isNotEmpty()) {
-            parsedFormats
-        } else {
-            listOfNotNull(toMediaFormat(root, duration))
-        }
+        val formats = com.mediaflow.data.download.extractors.YtDlpFormatParser.parseRoot(output)
 
         // Check if content is an X Space
         val isSpace = XContentDetector.detectFromYtDlpJson(root) == com.mediaflow.core.model.XContentType.SPACE ||

@@ -761,12 +761,8 @@ class YtDlpPlatformDownloader(
         platform: PlatformUrlSupport.Platform?,
     ): Boolean {
         val streamUrl = request.streamUrl?.takeIf { it.startsWith("https://") } ?: return false
-        val referer = when (platform) {
-            PlatformUrlSupport.Platform.TIKTOK -> "https://www.tiktok.com/"
-            PlatformUrlSupport.Platform.INSTAGRAM -> "https://www.instagram.com/"
-            PlatformUrlSupport.Platform.FACEBOOK -> "https://www.facebook.com/"
-            else -> null
-        } ?: return false
+        val referer = com.mediaflow.data.download.extractors.PlatformDownloadProfiles
+            .forPlatform(platform)?.pageReferer ?: return false
         val cookies = if (platform == PlatformUrlSupport.Platform.TIKTOK) {
             runCatching { TikTokAnonymousResolver().sessionCookieHeader(sourceUrl) }.getOrNull()
         } else {
