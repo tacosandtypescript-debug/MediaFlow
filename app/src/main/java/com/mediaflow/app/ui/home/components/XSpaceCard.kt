@@ -221,6 +221,49 @@ fun XSpaceCard(
                 }
             }
 
+            if (onPlayLive != null) {
+                Button(
+                    onClick = { onPlayLive(space) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 16.dp)
+                        .height(52.dp)
+                        .testTag(if (space.isLive) "xspace_listen_live" else "xspace_play_replay"),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (space.isLive) {
+                            com.mediaflow.app.ui.theme.LiveRed
+                        } else {
+                            MaterialTheme.colorScheme.primary
+                        },
+                        contentColor = if (space.isLive) {
+                            com.mediaflow.app.ui.theme.OnLiveColor
+                        } else {
+                            MaterialTheme.colorScheme.onPrimary
+                        },
+                    ),
+                    shape = RoundedCornerShape(14.dp),
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.padding(vertical = 4.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Headphones,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp),
+                        )
+                        Text(
+                            text = stringResource(
+                                if (space.isLive) R.string.space_listen_live else R.string.space_play_replay,
+                            ),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                        )
+                    }
+                }
+            }
+
             // Speakers & Cohosts Section
             val otherSpeakers = space.allSpeakers.filter { !it.cleanUsername.equals(space.host.cleanUsername, ignoreCase = true) }
             if (otherSpeakers.isNotEmpty()) {
@@ -305,49 +348,6 @@ fun XSpaceCard(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                }
-            }
-
-            if (onPlayLive != null) {
-                Button(
-                    onClick = { onPlayLive(space) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 16.dp)
-                        .height(52.dp)
-                        .testTag(if (space.isLive) "xspace_listen_live" else "xspace_play_replay"),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (space.isLive) {
-                            com.mediaflow.app.ui.theme.LiveRed
-                        } else {
-                            MaterialTheme.colorScheme.primary
-                        },
-                        contentColor = if (space.isLive) {
-                            com.mediaflow.app.ui.theme.OnLiveColor
-                        } else {
-                            MaterialTheme.colorScheme.onPrimary
-                        },
-                    ),
-                    shape = RoundedCornerShape(14.dp),
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.padding(vertical = 4.dp),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.Headphones,
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp),
-                        )
-                        Text(
-                            text = stringResource(
-                                if (space.isLive) R.string.space_listen_live else R.string.space_play_replay,
-                            ),
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                        )
-                    }
                 }
             }
         }

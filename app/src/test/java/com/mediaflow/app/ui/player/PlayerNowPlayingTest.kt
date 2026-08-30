@@ -1,7 +1,12 @@
 package com.mediaflow.app.ui.player
 
+import com.mediaflow.core.model.ParticipantRole
+import com.mediaflow.core.model.XParticipant
+import com.mediaflow.core.model.XSpace
+import com.mediaflow.core.model.XSpaceState
 import com.mediaflow.domain.player.EnginePlaybackState
 import com.mediaflow.domain.player.PlayerServiceState
+import com.mediaflow.domain.player.xspace.XSpacePlaybackMode
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -126,5 +131,36 @@ class PlayerNowPlayingTest {
             55_000L,
             state.copy(isScrubbing = false).currentPositionMs,
         )
+    }
+
+    @Test
+    fun endedSpaceUsesDedicatedLiveSessionNotAudioNowPlaying() {
+        val ended = XSpace(
+            id = "1NGarowkqQlJj",
+            url = "https://x.com/i/spaces/1NGarowkqQlJj",
+            title = "RESACATULIA #343: MAÑANA TURBULENTA",
+            state = XSpaceState.ENDED,
+            host = XParticipant(displayName = "Host", username = "respaldodeandre", role = ParticipantRole.HOST),
+            durationSeconds = 6828L,
+            recordingAvailable = true,
+            audioStreamUrl = "https://prod-fastly.video.pscp.tv/replay.m3u8",
+        )
+        val state = PlayerUiState(
+            spaceMetadata = ended,
+            spacePlayer = com.mediaflow.domain.player.xspace.XSpaceLivePlayerState(
+                playback = XSpacePlaybackMode.REPLAY,
+                liveControlActive = false,
+                replaySeekAllowed = true,
+            ),
+            serviceState = PlayerServiceState(
+                playbackState = EnginePlaybackState.PLAYING,
+                isLive = false,
+                durationMs = 6_822_000L,
+            ),
+        )
+        assertTrue(state.isLiveSession)
+        assertFalse(state.isBroadcastLive)
+        assertEquals(XSpacePlaybackMode.REPLAY, state.spacePlayer.playback)
+        assertFalse(state.spacePlayer.liveControlActive)
     }
 }

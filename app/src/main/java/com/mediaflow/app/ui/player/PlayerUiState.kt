@@ -100,7 +100,7 @@ data class PlayerUiState(
 
     val isLiveSession: Boolean
         get() = serviceState.isLive ||
-            spaceMetadata?.isLive == true ||
+            spaceMetadata != null ||
             liveEndState !is LiveSpaceEndState.ActiveLive
 
     val isLive: Boolean
