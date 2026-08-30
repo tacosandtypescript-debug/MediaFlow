@@ -114,6 +114,7 @@ class MpvPlaybackEngine(
                     val vid = mpv.getPropertyString("vid")
                     val hasVideo = vid != null && vid != "no" && vid != "auto"
 
+                    playbackFinishedGate.markStarted()
                     _state.value = _state.value.copy(
                         durationMs = durMs,
                         playbackState = if (_state.value.isPaused) EnginePlaybackState.PAUSED else EnginePlaybackState.PLAYING,

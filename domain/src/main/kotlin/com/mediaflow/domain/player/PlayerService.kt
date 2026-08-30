@@ -140,12 +140,15 @@ class PlayerService(
                         }
                     }
                     is PlaybackEvent.PlaybackFinished -> {
-                        _uiState.value = _uiState.value.copy(status = PlaybackStatus.COMPLETED)
+                        val currentState = _uiState.value
+                        if (event.mediaId != currentState.mediaId) {
+                            return@collect
+                        }
+                        _uiState.value = currentState.copy(status = PlaybackStatus.COMPLETED)
                         saveCurrentProgressNow(isEof = true)
 
-                        // Auto-advance in queue if available
-                        val currentState = _uiState.value
-                        if (currentState.hasNext) {
+                        val afterSave = _uiState.value
+                        if (afterSave.hasNext && afterSave.mediaId == event.mediaId) {
                             playNext()
                         }
                     }
@@ -187,6 +190,7 @@ class PlayerService(
             artworkUrl = target.artworkUrl,
             autoPlay = true,
             isLive = target.isLive,
+            replaceQueue = false,
         )
     }
 
@@ -201,6 +205,7 @@ class PlayerService(
         artworkUrl: String? = null,
         autoPlay: Boolean = true,
         isLive: Boolean = false,
+        replaceQueue: Boolean = true,
     ) {
         if (isReleased) return
 
@@ -253,10 +258,28 @@ class PlayerService(
                 )
                 progressRepository.saveProgress(initialProgress)
 
+                val displayTitle = title ?: filePath.substringAfterLast('/')
+                val nextQueue: List<PlaybackQueueItem>
+                val nextIndex: Int
+                if (replaceQueue) {
+                    nextQueue = listOf(
+                        PlaybackQueueItem(
+                            mediaUri = mediaId,
+                            title = displayTitle,
+                            artistOrHost = artistOrHost,
+                            artworkUrl = artworkUrl,
+                            isLive = false,
+                        ),
+                    )
+                    nextIndex = 0
+                } else {
+                    nextQueue = _uiState.value.queue
+                    nextIndex = _uiState.value.queueIndex
+                }
                 _uiState.value = _uiState.value.copy(
                     mediaId = mediaId,
                     filePath = filePath,
-                    title = title ?: filePath.substringAfterLast('/'),
+                    title = displayTitle,
                     artistOrHost = artistOrHost,
                     artworkUrl = artworkUrl,
                     playbackState = EnginePlaybackState.PREPARING,
@@ -264,6 +287,8 @@ class PlayerService(
                     durationMs = saved?.totalDurationMs ?: 0L,
                     status = initialStatus,
                     isLive = false,
+                    queue = nextQueue,
+                    queueIndex = nextIndex,
                 )
 
                 engine.load(mediaSource = filePath, startPositionMs = startPos, autoPlay = autoPlay)
@@ -370,6 +395,7 @@ class PlayerService(
             artworkUrl = item.artworkUrl,
             autoPlay = true,
             isLive = item.isLive,
+            replaceQueue = false,
         )
     }
 

@@ -105,6 +105,32 @@ class PlayerServiceQueueTest {
         assertFalse(playerService.uiState.value.hasNext)
     }
 
+    @Test
+    fun openMedia_replacesStaleQueueSoFinishedDoesNotSkipToAnotherTrack() = runTest {
+        val (playerService, engine) = createService()
+        val items = listOf(
+            PlaybackQueueItem("uri1", "Song 1"),
+            PlaybackQueueItem("uri2", "Song 2"),
+            PlaybackQueueItem("2 (1).mp4", "Video"),
+        )
+        playerService.playQueue(items, startIndex = 0)
+        runCurrent()
+        assertEquals(3, playerService.uiState.value.queue.size)
+
+        playerService.openMedia("uri-solo", "/storage/song.m4a", "Solo")
+        runCurrent()
+
+        assertEquals("uri-solo", playerService.uiState.value.mediaId)
+        assertEquals(1, playerService.uiState.value.queue.size)
+        assertFalse(playerService.uiState.value.hasNext)
+
+        engine.emitFinished("uri-solo")
+        runCurrent()
+
+        assertEquals("uri-solo", playerService.uiState.value.mediaId)
+        assertFalse(playerService.uiState.value.hasNext)
+    }
+
     private class FakePlaybackEngine : PlaybackEngine {
         private val _state = MutableStateFlow(EngineState())
         override val state = _state.asStateFlow()
@@ -129,6 +155,10 @@ class PlayerServiceQueueTest {
         override fun attachSurface(surface: Any?) {}
         override fun detachSurface() {}
         override fun release() {}
+
+        fun emitFinished(mediaId: String) {
+            _events.tryEmit(PlaybackEvent.PlaybackFinished(mediaId, 1_000L))
+        }
     }
 
     private class FakeProgressRepository : ProgressRepository {
