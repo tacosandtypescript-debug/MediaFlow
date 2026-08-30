@@ -19,10 +19,48 @@ data class TikTokResolvedLink(
     val redirectChain: List<String>,
     val canonicalUrl: String,
     val videoId: String,
-)
+    val extractor: String = TikTokResolveTrace.EXTRACTOR,
+) {
+    val trace: TikTokResolveTrace
+        get() = TikTokResolveTrace(
+            inputUrl = input,
+            sanitizedUrl = sanitizedUrl,
+            redirectChain = redirectChain,
+            canonicalUrl = canonicalUrl,
+            videoId = videoId,
+            extractor = extractor,
+        )
+}
+
+data class TikTokResolveTrace(
+    val inputUrl: String,
+    val sanitizedUrl: String,
+    val redirectChain: List<String>,
+    val canonicalUrl: String,
+    val videoId: String,
+    val extractor: String = EXTRACTOR,
+) {
+    /** input URL -> sanitized URL -> redirect chain -> canonical URL -> video ID -> extractor */
+    val pipeline: String
+        get() = listOf(
+            "input=$inputUrl",
+            "sanitized=$sanitizedUrl",
+            "redirects=${redirectChain.joinToString(">")}",
+            "canonical=$canonicalUrl",
+            "videoId=$videoId",
+            "extractor=$extractor",
+        ).joinToString(" -> ")
+
+    companion object {
+        const val EXTRACTOR = "TikTokExtractPipeline"
+    }
+}
 
 sealed class TikTokResolveResult {
-    data class Success(val link: TikTokResolvedLink) : TikTokResolveResult()
+    data class Success(
+        val link: TikTokResolvedLink,
+        val trace: TikTokResolveTrace = link.trace,
+    ) : TikTokResolveResult()
     data class Failure(
         val stage: TikTokResolveStage,
         val message: String,

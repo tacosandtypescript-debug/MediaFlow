@@ -123,6 +123,62 @@ class TikTokLinkResolverTest {
         assertEquals(null, TikTokVideoId.fromUrl("https://vm.tiktok.com/ZSVPEWsKB/"))
     }
 
+    @Test
+    fun `m tiktok host is TikTok and canonicalizes video id`() {
+        val paste = "https://m.tiktok.com/@demo/video/$videoId?utm_campaign=share"
+        assertTrue(TikTokUrlSanitizer.looksLikeTikTokHost(paste))
+        val success = resolver().resolve(paste) as TikTokResolveResult.Success
+        assertEquals(videoId, success.link.videoId)
+        assertEquals(canonical, success.link.canonicalUrl)
+        assertFalse(success.link.sanitizedUrl.contains("utm_"))
+        assertPipeline(success)
+    }
+
+    @Test
+    fun `scheme-less vm and vt hosts are TikTok`() {
+        val vm = "vm.tiktok.com/ZSVPEWsKB/"
+        val vt = "vt.tiktok.com/ZSxyz/"
+        assertTrue(TikTokUrlSanitizer.looksLikeTikTokHost(vm))
+        assertTrue(TikTokUrlSanitizer.looksLikeTikTokHost(vt))
+        assertTrue(TikTokUrlSanitizer.isShortHost(vm))
+        assertTrue(TikTokUrlSanitizer.isShortHost(vt))
+        val extractedVm = TikTokUrlSanitizer.extractUrl("mira $vm extra")!!
+        assertTrue(extractedVm.startsWith("https://"))
+        val hopper = mapHopper(
+            "https://vm.tiktok.com/ZSVPEWsKB/" to canonical,
+        )
+        val success = TikTokLinkResolver(hopper).resolve("compartido $vm") as TikTokResolveResult.Success
+        assertEquals(videoId, success.link.videoId)
+        assertPipeline(success)
+        assertTrue(success.trace.pipeline.contains("sanitized=https://vm.tiktok.com/ZSVPEWsKB/"))
+        assertTrue(success.trace.pipeline.contains("videoId=$videoId"))
+        assertTrue(success.trace.pipeline.contains("extractor=${TikTokResolveTrace.EXTRACTOR}"))
+    }
+
+    @Test
+    fun `resolve trace pipeline is input sanitized redirects canonical videoId extractor`() {
+        val success = resolver().resolve("https://www.tiktok.com/@demo/video/$videoId") as TikTokResolveResult.Success
+        assertPipeline(success)
+        val pipeline = success.trace.pipeline
+        assertTrue(pipeline.startsWith("input="))
+        assertTrue(pipeline.contains(" -> sanitized="))
+        assertTrue(pipeline.contains(" -> redirects="))
+        assertTrue(pipeline.contains(" -> canonical="))
+        assertTrue(pipeline.contains(" -> videoId=$videoId"))
+        assertTrue(pipeline.endsWith(" -> extractor=${TikTokResolveTrace.EXTRACTOR}"))
+    }
+
+    private fun assertPipeline(success: TikTokResolveResult.Success) {
+        val pipeline = success.trace.pipeline
+        assertTrue(pipeline.contains("input="))
+        assertTrue(pipeline.contains("sanitized="))
+        assertTrue(pipeline.contains("redirects="))
+        assertTrue(pipeline.contains("canonical="))
+        assertTrue(pipeline.contains("videoId="))
+        assertTrue(pipeline.contains("extractor="))
+        assertEquals(success.link.trace.pipeline, success.trace.pipeline)
+    }
+
     private fun resolver() = TikTokLinkResolver(
         hopper = TikTokHttpHopper { error("no network") },
     )

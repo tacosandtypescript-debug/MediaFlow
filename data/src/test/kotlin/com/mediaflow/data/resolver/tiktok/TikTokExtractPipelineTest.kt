@@ -49,6 +49,8 @@ class TikTokExtractPipelineTest {
             "https://www.tiktok.com/@user/video/7555123456789012345",
             resolved.canonicalUrl,
         )
+        assertTrue(resolved.trace.pipeline.contains("videoId=7555123456789012345"))
+        assertTrue(resolved.trace.pipeline.contains("extractor=${TikTokResolveTrace.EXTRACTOR}"))
     }
 
     @Test

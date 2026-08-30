@@ -4,7 +4,7 @@ import java.net.URI
 
 object TikTokUrlSanitizer {
     private val EMBEDDED_URL = Regex(
-        """https?://(?:www\.|m\.|vm\.|vt\.)?tiktok\.com/[^\s<>"']+""",
+        """(?:https?://)?(?:www\.|m\.|vm\.|vt\.)?tiktok\.com/[^\s<>"']+""",
         RegexOption.IGNORE_CASE,
     )
 
@@ -29,14 +29,18 @@ object TikTokUrlSanitizer {
 
     fun extractUrl(paste: String): String? {
         val trimmed = paste.trim()
-        EMBEDDED_URL.find(trimmed)?.value?.trimEnd('.', ',', ';', ')', ']')?.let { return it }
+        EMBEDDED_URL.find(trimmed)?.value?.trimEnd('.', ',', ';', ')', ']')?.let {
+            return ensureScheme(it)
+        }
         val firstToken = trimmed.split(Regex("\\s+")).firstOrNull().orEmpty()
-        return firstToken.takeIf { looksLikeTikTokHost(it) }
+            .trimEnd('.', ',', ';', ')', ']')
+        return firstToken.takeIf { looksLikeTikTokHost(it) }?.let { ensureScheme(it) }
     }
 
     fun sanitize(url: String): String {
-        val uri = runCatching { URI(url.trim()) }.getOrNull() ?: return url.trim()
-        val host = uri.host ?: return url.trim()
+        val withScheme = ensureScheme(url.trim())
+        val uri = runCatching { URI(withScheme) }.getOrNull() ?: return withScheme
+        val host = uri.host ?: return withScheme
         val keptQuery = stripTracking(uri.rawQuery)
         val scheme = if (uri.scheme.equals("http", ignoreCase = true)) "https" else (uri.scheme ?: "https")
         val path = uri.path.orEmpty().ifBlank { "/" }
@@ -45,16 +49,30 @@ object TikTokUrlSanitizer {
     }
 
     fun looksLikeTikTokHost(url: String): Boolean {
-        val uri = runCatching { URI(url.trim()) }.getOrNull() ?: return false
-        val host = uri.host?.lowercase()?.trimEnd('.') ?: return false
+        val host = hostOf(url) ?: return false
         val clean = host.removePrefix("www.").removePrefix("m.")
         return clean == "tiktok.com" || clean.endsWith(".tiktok.com")
     }
 
     fun isShortHost(url: String): Boolean {
-        val host = runCatching { URI(url.trim()).host?.lowercase()?.trimEnd('.') }.getOrNull() ?: return false
+        val host = hostOf(url) ?: return false
         return host == "vm.tiktok.com" || host == "vt.tiktok.com" ||
             host.endsWith(".vm.tiktok.com") || host.endsWith(".vt.tiktok.com")
+    }
+
+    fun ensureScheme(url: String): String {
+        val trimmed = url.trim()
+        if (trimmed.startsWith("http://", ignoreCase = true) ||
+            trimmed.startsWith("https://", ignoreCase = true)
+        ) {
+            return trimmed
+        }
+        return "https://$trimmed"
+    }
+
+    private fun hostOf(url: String): String? {
+        val uri = runCatching { URI(ensureScheme(url)) }.getOrNull() ?: return null
+        return uri.host?.lowercase()?.trimEnd('.')
     }
 
     private fun stripTracking(rawQuery: String?): String? {
