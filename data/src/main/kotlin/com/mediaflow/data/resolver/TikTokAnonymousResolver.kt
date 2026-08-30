@@ -95,6 +95,7 @@ class TikTokAnonymousResolver {
             connection.setRequestProperty("Accept", "text/html,application/xhtml+xml")
             connection.setRequestProperty("Accept-Language", "en-US,en;q=0.9")
             connection.setRequestProperty("Referer", "https://www.tiktok.com/")
+            connection.setRequestProperty("Origin", "https://www.tiktok.com")
             if (cookies.isNotEmpty()) {
                 connection.setRequestProperty(
                     "Cookie",
@@ -109,6 +110,9 @@ class TikTokAnonymousResolver {
                         ?: error("TikTok redirigió sin Location")
                     current = resolveRedirect(current, location)
                     return@repeat
+                }
+                if (code == 403 || code == 429) {
+                    error("TikTok bloqueó la petición (HTTP $code)")
                 }
                 check(code in 200..299) { "TikTok respondió HTTP $code" }
                 return connection.inputStream.use { it.bufferedReader(Charsets.UTF_8).readText() }

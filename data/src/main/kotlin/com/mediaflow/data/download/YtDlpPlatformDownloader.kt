@@ -9,6 +9,9 @@ import com.mediaflow.domain.repository.DownloadRequest
 import com.mediaflow.data.resolver.PlatformUrlSupport
 import com.mediaflow.data.resolver.InstagramAnonymousResolver
 import com.mediaflow.data.resolver.TikTokAnonymousResolver
+import com.mediaflow.data.resolver.tiktok.TikTokExtractPipeline
+import com.mediaflow.data.resolver.tiktok.TikTokResolveException
+import com.mediaflow.data.resolver.tiktok.TikTokResolveStage
 import com.mediaflow.data.media.DownloadedMediaPurger
 import com.mediaflow.data.media.MediaStorePublisher
 import com.mediaflow.data.media.MediaFileValidator
@@ -261,10 +264,19 @@ class YtDlpPlatformDownloader(
     }
 
     private fun executeDownload(id: String, request: DownloadRequest, sourceUrl: String) {
-        val extractionUrl = PlatformUrlSupport.canonicalExtractionUrl(sourceUrl)
+        val platform = PlatformUrlSupport.platformFor(sourceUrl)
+        val extractionUrl = if (platform == PlatformUrlSupport.Platform.TIKTOK) {
+            val resolved = runCatching { TikTokExtractPipeline.resolveCanonical(sourceUrl) }
+                .getOrElse { error ->
+                    updateFailed(id, error)
+                    return
+                }
+            resolved.canonicalUrl
+        } else {
+            PlatformUrlSupport.canonicalExtractionUrl(sourceUrl)
+        }
         val baseName = YtDlpRuntime.restrictStem(request.fileName, "mediaflow_$id")
         deleteStaleOutputs(baseName)
-        val platform = PlatformUrlSupport.platformFor(sourceUrl)
 
         if (request.mediaType != MediaType.AUDIO &&
             tryDirectStreamUrl(id, request, extractionUrl, platform)
@@ -721,6 +733,26 @@ class YtDlpPlatformDownloader(
             isSpace -> "este Space"
             mediaType == MediaType.AUDIO -> "este audio"
             else -> "este vídeo"
+        }
+        val resolveStage = (error as? TikTokResolveException)?.stage
+            ?: (error.cause as? TikTokResolveException)?.stage
+        if (resolveStage != null) {
+            return when (resolveStage) {
+                TikTokResolveStage.URL_RESOLUTION_FAILED ->
+                    "No se pudo resolver el enlace de TikTok."
+                TikTokResolveStage.REDIRECT_FAILED ->
+                    "TikTok no completó la redirección del enlace corto."
+                TikTokResolveStage.VIDEO_ID_NOT_FOUND ->
+                    "TikTok no devolvió un /video/{id} canónico."
+                TikTokResolveStage.TIKTOK_BLOCKED ->
+                    "TikTok bloqueó la petición (HTTP 403/429). MediaFlow no usa cookies de sesión."
+                TikTokResolveStage.EXTRACTOR_FAILED ->
+                    "El extractor no pudo leer la URL canónica de TikTok."
+                TikTokResolveStage.MEDIA_URL_FAILED ->
+                    "TikTok no publicó una URL de vídeo descargable."
+                TikTokResolveStage.DOWNLOAD_FAILED ->
+                    "La descarga de TikTok falló después de resolver la URL canónica."
+            }
         }
         return when {
             platformType == PlatformUrlSupport.Platform.INSTAGRAM &&
