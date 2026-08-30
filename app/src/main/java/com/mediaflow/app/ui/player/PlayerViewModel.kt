@@ -271,6 +271,12 @@ class PlayerViewModel(
                 reduceSpacePlayer(
                     XSpaceLivePlayerEvent.OpenReplay(seekAllowed = caps?.stream?.seekSupported == true),
                 )
+                val replayUrl = space.audioStreamUrl
+                liveEndState.value = if (!replayUrl.isNullOrBlank()) {
+                    LiveSpaceEndState.EndedReplayAvailable(replayUrl)
+                } else {
+                    LiveSpaceEndState.EndedReplayProcessing("Esperando repetición")
+                }
             } else if (effectiveLive || space?.isLive == true) {
                 reduceSpacePlayer(
                     XSpaceLivePlayerEvent.OpenLive(liveSeekAllowed = caps?.liveSeekAllowed == true),
@@ -300,22 +306,25 @@ class PlayerViewModel(
             val artwork = tags.artworkUri ?: download?.thumbnailUri
             embeddedTags.value = tags.copy(artworkUri = artwork)
             taggedMediaUri.value = mediaUri
+            val playUri = space?.audioStreamUrl?.takeIf { it.isNotBlank() } ?: mediaUri
             val resolvedTitle = PlayerDisplayMetadata.title(
                 taggedTitle = tags.title ?: space?.title ?: title,
                 serviceTitle = download?.title,
-                fileName = download?.fileName ?: mediaUri.substringAfterLast('/'),
-                uri = mediaUri,
+                fileName = download?.fileName ?: playUri.substringAfterLast('/'),
+                uri = playUri,
             )
 
             val activeState = playerService.uiState.value
-            val queueIndex = activeState.queue.indexOfFirst { it.mediaUri == mediaUri }
-            val alreadyThisTrack = activeState.mediaId == mediaUri &&
+            val queueIndex = activeState.queue.indexOfFirst {
+                it.mediaUri == playUri || it.mediaUri == mediaUri
+            }
+            val alreadyThisTrack = (activeState.mediaId == playUri || activeState.mediaId == mediaUri) &&
                 activeState.playbackState != EnginePlaybackState.IDLE
             if (alreadyThisTrack || (queueIndex >= 0 && activeState.queueIndex == queueIndex &&
                     activeState.playbackState != EnginePlaybackState.IDLE)
             ) {
                 startPlaybackService(
-                    mediaUri = mediaUri,
+                    mediaUri = playUri,
                     resolvedTitle = resolvedTitle,
                     space = space,
                     tags = tags,
@@ -331,7 +340,7 @@ class PlayerViewModel(
             if (queueIndex >= 0) {
                 playerService.skipToIndex(queueIndex)
                 startPlaybackService(
-                    mediaUri = mediaUri,
+                    mediaUri = playUri,
                     resolvedTitle = resolvedTitle,
                     space = space,
                     tags = tags,
@@ -342,16 +351,20 @@ class PlayerViewModel(
                 return@launch
             }
 
-            if (activeState.mediaId != null && activeState.mediaId != mediaUri) {
+            if (activeState.mediaId != null &&
+                activeState.mediaId != mediaUri &&
+                activeState.mediaId != playUri
+            ) {
                 playerService.stop()
             }
 
             val preservedArtwork = activeState.artworkUrl.takeIf {
-                activeState.mediaId == mediaUri || activeState.filePath == mediaUri
+                activeState.mediaId == mediaUri || activeState.filePath == mediaUri ||
+                    activeState.mediaId == playUri
             }
             playerService.openMedia(
-                mediaId = mediaUri,
-                filePath = mediaUri,
+                mediaId = playUri,
+                filePath = playUri,
                 title = resolvedTitle,
                 artistOrHost = space?.let { "Host: ${it.host.formattedHandle}" }
                     ?: PlayerDisplayMetadata.artist(tags.artist, null),
@@ -364,7 +377,7 @@ class PlayerViewModel(
             )
 
             startPlaybackService(
-                mediaUri = mediaUri,
+                mediaUri = playUri,
                 resolvedTitle = resolvedTitle,
                 space = space,
                 tags = tags,
@@ -844,8 +857,12 @@ class PlayerViewModel(
         when (state.playbackState) {
             EnginePlaybackState.PREPARING -> reduceSpacePlayer(XSpaceLivePlayerEvent.Buffering)
             EnginePlaybackState.PLAYING -> {
-                if (space.isLive && spacePlayer.value.liveLagMs == 0L) {
-                    reduceSpacePlayer(XSpaceLivePlayerEvent.ConnectedAtLiveEdge)
+                when {
+                    space.isEnded || spacePlayer.value.connection ==
+                        com.mediaflow.domain.player.xspace.XSpaceConnectionState.ENDED ->
+                        reduceSpacePlayer(XSpaceLivePlayerEvent.Resume)
+                    space.isLive && spacePlayer.value.liveLagMs == 0L ->
+                        reduceSpacePlayer(XSpaceLivePlayerEvent.ConnectedAtLiveEdge)
                 }
             }
             EnginePlaybackState.ERROR -> reduceSpacePlayer(XSpaceLivePlayerEvent.Error())

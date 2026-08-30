@@ -156,8 +156,11 @@ object XSpaceLivePlayerMachine {
                 }
             }
             XSpaceLivePlayerEvent.Buffering -> {
-                if (state.connection == XSpaceConnectionState.ENDED) {
-                    state.copy(playback = XSpacePlaybackMode.BUFFERING)
+                if (state.connection == XSpaceConnectionState.ENDED ||
+                    state.playback == XSpacePlaybackMode.REPLAY
+                ) {
+                    // Replay stays REPLAY while the engine prepares HLS; do not look live/buffering-only.
+                    state.copy(playback = XSpacePlaybackMode.REPLAY, liveControlActive = false)
                 } else {
                     state.copy(playback = XSpacePlaybackMode.BUFFERING)
                 }

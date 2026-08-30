@@ -72,6 +72,21 @@ class XSpaceLivePlayerMachineTest {
         assertFalse(replay.liveControlActive)
     }
 
+    @Test
+    fun endedReplayStaysReplayWhileEngineBuffers() {
+        val replay = XSpaceLivePlayerMachine.reduce(
+            XSpaceLivePlayerMachine.initial(),
+            XSpaceLivePlayerEvent.OpenReplay(seekAllowed = true),
+        )
+        val buffering = XSpaceLivePlayerMachine.reduce(replay, XSpaceLivePlayerEvent.Buffering)
+        assertEquals(XSpacePlaybackMode.REPLAY, buffering.playback)
+        assertEquals(XSpaceConnectionState.ENDED, buffering.connection)
+        assertFalse(buffering.liveControlActive)
+        val playing = XSpaceLivePlayerMachine.reduce(buffering, XSpaceLivePlayerEvent.Resume)
+        assertEquals(XSpacePlaybackMode.REPLAY, playing.playback)
+        assertFalse(playing.liveControlActive)
+    }
+
     private fun openLiveThenPause(): XSpaceLivePlayerState {
         val live = XSpaceLivePlayerMachine.reduce(
             XSpaceLivePlayerMachine.initial(),
