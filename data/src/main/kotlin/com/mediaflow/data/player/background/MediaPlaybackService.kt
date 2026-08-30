@@ -16,6 +16,9 @@ import com.mediaflow.data.provider.x.live.PendingLiveDownloadRepositoryImpl
 import com.mediaflow.data.provider.x.spaces.XSpaceMetadataResolver
 import com.mediaflow.data.repository.Media3DownloadRepository
 import com.mediaflow.data.repository.XSpaceRepositoryImpl
+import com.mediaflow.data.player.external.PlayerExternalSnapshotFactory
+import com.mediaflow.data.player.notification.PlaybackTransportActions
+import com.mediaflow.data.player.widget.PlaybackWidgetBroadcast
 import com.mediaflow.domain.player.EnginePlaybackState
 import com.mediaflow.domain.player.PlaybackEvent
 import com.mediaflow.domain.player.PlayerService
@@ -92,6 +95,8 @@ class MediaPlaybackService : Service() {
 
     private var currentSpace: XSpace? = null
     private var cachedArtwork: Bitmap? = null
+    private var lastArtworkUrl: String? = null
+    private var lastVisualKey: String? = null
     private var isForegroundActive = false
     private var activeSpaceId: String? = null
     private var activeSpaceUrl: String? = null
@@ -140,6 +145,8 @@ class MediaPlaybackService : Service() {
                 stopForegroundAndSelf()
             },
             onSeekRequested = { pos -> playerService.seekTo(pos) },
+            onSkipNextRequested = { playerService.playNext() },
+            onSkipPreviousRequested = { playerService.playPrevious() },
         )
 
         notificationManager = PlaybackNotificationManager(this)
@@ -213,12 +220,22 @@ class MediaPlaybackService : Service() {
                     }
                 }
             }
-            PlaybackNotificationManager.ACTION_PAUSE -> {
+            PlaybackNotificationManager.ACTION_PAUSE,
+            PlaybackTransportActions.ACTION_PAUSE -> {
                 playerService.pause()
             }
-            PlaybackNotificationManager.ACTION_STOP -> {
+            PlaybackNotificationManager.ACTION_STOP,
+            PlaybackTransportActions.ACTION_STOP -> {
                 playerService.stop()
                 stopForegroundAndSelf()
+            }
+            PlaybackNotificationManager.ACTION_NEXT,
+            PlaybackTransportActions.ACTION_NEXT -> {
+                playerService.playNext()
+            }
+            PlaybackNotificationManager.ACTION_PREV,
+            PlaybackTransportActions.ACTION_PREV -> {
+                playerService.playPrevious()
             }
         }
 
@@ -229,17 +246,42 @@ class MediaPlaybackService : Service() {
         serviceScope.launch {
             playerService.uiState.collect { state ->
                 mediaSessionController.updatePlaybackState(state)
+                val snapshot = PlayerExternalSnapshotFactory.from(state, currentSpace)
+                mediaSessionController.updateMetadata(
+                    title = snapshot.title,
+                    artist = snapshot.artist,
+                    album = "MediaFlow",
+                    durationMs = snapshot.durationMs,
+                    artworkBitmap = cachedArtwork,
+                )
 
                 if (state.isPlaying) {
                     networkMonitor.clearReconnecting()
                     wakeLockManager.acquireLocks(isLive = state.isLive)
-                    updateForegroundNotification()
                 } else {
                     wakeLockManager.releaseLocks()
                     if (state.playbackState == EnginePlaybackState.ENDED || state.playbackState == EnginePlaybackState.IDLE) {
                         audioFocusManager.abandonAudioFocus()
                     }
+                }
+
+                val artUrl = state.artworkUrl ?: currentSpace?.host?.avatarUrl
+                if (artUrl != lastArtworkUrl) {
+                    lastArtworkUrl = artUrl
+                    cachedArtwork = notificationManager.loadArtworkBitmap(artUrl)
+                    mediaSessionController.updateMetadata(
+                        title = snapshot.title,
+                        artist = snapshot.artist,
+                        album = "MediaFlow",
+                        durationMs = snapshot.durationMs,
+                        artworkBitmap = cachedArtwork,
+                    )
+                }
+
+                if (snapshot.visualKey != lastVisualKey) {
+                    lastVisualKey = snapshot.visualKey
                     updateForegroundNotification()
+                    PlaybackWidgetBroadcast.send(this@MediaPlaybackService)
                 }
             }
         }
