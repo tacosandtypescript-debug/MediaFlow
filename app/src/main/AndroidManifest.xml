@@ -32,6 +32,11 @@
             android:exported="false"
             android:foregroundServiceType="mediaPlayback" />
 
+        <service
+            android:name="com.mediaflow.data.player.background.SpaceRecordingService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+
         <receiver
             android:name=".player.widget.PlayerWidgetProvider"
             android:exported="true"
