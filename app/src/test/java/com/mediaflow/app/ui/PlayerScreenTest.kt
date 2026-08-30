@@ -242,6 +242,78 @@ class PlayerScreenTest {
     }
 
     @Test
+    fun livePlayerViewBehindLiveShowsJumpToLiveAndNoDuration() {
+        val liveSpace = XSpace(
+            id = "1rGmqplYpggGy",
+            url = "https://x.com/i/spaces/1rGmqplYpggGy",
+            title = "Santo Rosario",
+            state = XSpaceState.LIVE,
+            host = XParticipant(
+                displayName = "Bárbara V.",
+                username = "barvabe",
+                userId = "1",
+                role = ParticipantRole.HOST,
+            ),
+            liveListenersCount = 22,
+            audioStreamUrl = "https://prod-fastly.video.pscp.tv/live.m3u8",
+        )
+        composeRule.setContent {
+            MediaFlowTheme {
+                LivePlayerView(
+                    space = liveSpace,
+                    playbackState = EnginePlaybackState.PAUSED,
+                    liveEndState = LiveSpaceEndState.ActiveLive,
+                    isAutoDownloadEnabled = false,
+                    onTogglePlayPause = {},
+                    onToggleAutoDownload = {},
+                    onDownloadReplay = {},
+                    onCheckReplayAgain = {},
+                    isBroadcastLive = true,
+                )
+            }
+        }
+        composeRule.onNodeWithTag("xspace_jump_live").assertIsDisplayed()
+        composeRule.onNodeWithText("LIVE").assertIsDisplayed()
+        composeRule.onAllNodesWithText("--").assertCountEquals(0)
+    }
+
+    @Test
+    fun endedReplayHidesLiveJumpControl() {
+        val ended = XSpace(
+            id = "1NGarowkqQlJj",
+            url = "https://x.com/i/spaces/1NGarowkqQlJj",
+            title = "Replay space",
+            state = XSpaceState.ENDED,
+            host = XParticipant(
+                displayName = "Host",
+                username = "host",
+                role = ParticipantRole.HOST,
+            ),
+            durationSeconds = 6828L,
+            recordingAvailable = true,
+            audioStreamUrl = "https://prod-fastly.video.pscp.tv/replay.m3u8",
+        )
+        composeRule.setContent {
+            MediaFlowTheme {
+                LivePlayerView(
+                    space = ended,
+                    playbackState = EnginePlaybackState.PLAYING,
+                    liveEndState = LiveSpaceEndState.EndedReplayAvailable(ended.audioStreamUrl!!),
+                    isAutoDownloadEnabled = false,
+                    onTogglePlayPause = {},
+                    onToggleAutoDownload = {},
+                    onDownloadReplay = {},
+                    onCheckReplayAgain = {},
+                    isBroadcastLive = false,
+                )
+            }
+        }
+        composeRule.onNodeWithTag("xspace_jump_live").assertDoesNotExist()
+        composeRule.onNodeWithTag("xspace_replay_mode").assertIsDisplayed()
+        composeRule.onNodeWithText("1 h 53 min").assertIsDisplayed()
+    }
+
+    @Test
     fun liveEndedContentShowsWaitingForReplay() {
         composeRule.setContent {
             MediaFlowTheme {

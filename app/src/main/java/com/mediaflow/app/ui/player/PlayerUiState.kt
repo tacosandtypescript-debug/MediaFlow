@@ -3,9 +3,11 @@ package com.mediaflow.app.ui.player
 import com.mediaflow.core.model.PlaybackQueueItem
 import com.mediaflow.core.model.Playlist
 import com.mediaflow.core.model.XSpace
+import com.mediaflow.data.provider.x.spaces.XSpaceCapabilities
 import com.mediaflow.domain.live.LiveSpaceEndState
 import com.mediaflow.domain.player.EnginePlaybackState
 import com.mediaflow.domain.player.PlayerServiceState
+import com.mediaflow.domain.player.xspace.XSpaceLivePlayerState
 
 /**
  * Ephemeral event for animated seek feedback (±10s).
@@ -37,6 +39,8 @@ data class PlayerUiState(
     val isAutoDownloadEnabled: Boolean = false,
     val isFavorite: Boolean = false,
     val playlists: List<Playlist> = emptyList(),
+    val spacePlayer: XSpaceLivePlayerState = XSpaceLivePlayerState(),
+    val spaceCapabilities: XSpaceCapabilities? = null,
 ) {
     val isPlaying: Boolean
         get() = serviceState.isPlaying

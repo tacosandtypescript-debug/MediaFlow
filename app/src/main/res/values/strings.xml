@@ -158,6 +158,12 @@
     <string name="space_upcoming">Este Space todavía no ha comenzado (Programado).</string>
     <string name="space_on_air">En el aire</string>
     <string name="space_default_title">X Space en vivo</string>
+    <string name="space_behind_live">Detrás del directo</string>
+    <string name="space_jump_live">LIVE</string>
+    <string name="space_replay_mode">Repetición</string>
+    <string name="space_playback_paused">Pausa</string>
+    <string name="space_connection_connecting">Conectando…</string>
+    <string name="space_connection_connected">Conectado</string>
 
     <!-- Gallery -->
     <string name="gallery_filter_videos">Vídeos</string>
