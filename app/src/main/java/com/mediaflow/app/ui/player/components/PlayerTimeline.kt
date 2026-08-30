@@ -30,8 +30,10 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import com.mediaflow.app.ui.player.PlayerTimelineMath
 import com.mediaflow.app.ui.theme.customColors
 import java.util.Locale
 
@@ -47,31 +49,39 @@ fun PlayerTimeline(
     modifier: Modifier = Modifier,
     bufferedMs: Long = 0L,
     onScrubbingChanged: (Boolean) -> Unit = {},
+    onScrubPositionChange: (Long) -> Unit = {},
+    nowPlaying: Boolean = false,
 ) {
     var isDragging by remember { mutableStateOf(false) }
     var dragProgressFraction by remember { mutableFloatStateOf(0f) }
 
     val effectiveDuration = durationMs.coerceAtLeast(0L)
-    val actualProgressFraction = if (effectiveDuration > 0L) {
-        (currentPositionMs.toFloat() / effectiveDuration.toFloat()).coerceIn(0f, 1f)
-    } else 0f
+    val actualProgressFraction = PlayerTimelineMath.fractionForPosition(currentPositionMs, effectiveDuration)
 
-    val bufferedFraction = if (effectiveDuration > 0L) {
-        (bufferedMs.toFloat() / effectiveDuration.toFloat()).coerceIn(0f, 1f)
-    } else 0f
+    val bufferedFraction = PlayerTimelineMath.fractionForPosition(bufferedMs, effectiveDuration)
 
     val displayFraction = if (isDragging) dragProgressFraction else actualProgressFraction
-    val displayPositionMs = (displayFraction * effectiveDuration).toLong()
+    val displayPositionMs = PlayerTimelineMath.positionForFraction(displayFraction, effectiveDuration)
 
     // Smooth animations for track height and thumb radius
     val trackHeight by animateDpAsState(
-        targetValue = if (isDragging) 6.dp else 3.5.dp,
+        targetValue = when {
+            nowPlaying && isDragging -> 6.dp
+            nowPlaying -> 4.dp
+            isDragging -> 6.dp
+            else -> 3.5.dp
+        },
         animationSpec = tween(durationMillis = 150),
         label = "trackHeight",
     )
 
     val thumbRadius by animateDpAsState(
-        targetValue = if (isDragging) 8.dp else 5.dp,
+        targetValue = when {
+            nowPlaying && isDragging -> 8.dp
+            nowPlaying -> 6.dp
+            isDragging -> 8.dp
+            else -> 5.dp
+        },
         animationSpec = tween(durationMillis = 150),
         label = "thumbRadius",
     )
@@ -82,7 +92,9 @@ fun PlayerTimeline(
     val bufferedTrackColor = MaterialTheme.customColors.progressTrack.copy(alpha = 0.7f)
 
     Column(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .testTag("player_timeline"),
     ) {
         // Floating Time Tooltip during Scrubbing
         if (isDragging) {
@@ -111,7 +123,8 @@ fun PlayerTimeline(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(28.dp)
+                .height(if (nowPlaying) 32.dp else 28.dp)
+                .testTag("player_seek")
                 .pointerInput(effectiveDuration) {
                     detectTapGestures(
                         onPress = { offset ->
@@ -120,10 +133,16 @@ fun PlayerTimeline(
                                 onScrubbingChanged(true)
                                 val fraction = (offset.x / size.width.toFloat()).coerceIn(0f, 1f)
                                 dragProgressFraction = fraction
+                                onScrubPositionChange(
+                                    PlayerTimelineMath.positionForFraction(fraction, effectiveDuration),
+                                )
                                 try {
                                     awaitRelease()
                                 } finally {
-                                    val targetMs = (dragProgressFraction * effectiveDuration).toLong()
+                                    val targetMs = PlayerTimelineMath.positionForFraction(
+                                        dragProgressFraction,
+                                        effectiveDuration,
+                                    )
                                     onSeekTo(targetMs)
                                     isDragging = false
                                     onScrubbingChanged(false)
@@ -140,11 +159,17 @@ fun PlayerTimeline(
                                 onScrubbingChanged(true)
                                 val fraction = (offset.x / size.width.toFloat()).coerceIn(0f, 1f)
                                 dragProgressFraction = fraction
+                                onScrubPositionChange(
+                                    PlayerTimelineMath.positionForFraction(fraction, effectiveDuration),
+                                )
                             }
                         },
                         onDragEnd = {
                             if (effectiveDuration > 0L) {
-                                val targetMs = (dragProgressFraction * effectiveDuration).toLong()
+                                val targetMs = PlayerTimelineMath.positionForFraction(
+                                    dragProgressFraction,
+                                    effectiveDuration,
+                                )
                                 onSeekTo(targetMs)
                             }
                             isDragging = false
@@ -159,6 +184,9 @@ fun PlayerTimeline(
                             if (effectiveDuration > 0L) {
                                 val fraction = (change.position.x / size.width.toFloat()).coerceIn(0f, 1f)
                                 dragProgressFraction = fraction
+                                onScrubPositionChange(
+                                    PlayerTimelineMath.positionForFraction(fraction, effectiveDuration),
+                                )
                             }
                         },
                     )
@@ -199,16 +227,25 @@ fun PlayerTimeline(
                 // 3. Played Progress Track (Gradient)
                 val playedWidth = canvasWidth * displayFraction
                 if (playedWidth > 0f) {
-                    drawRoundRect(
-                        brush = Brush.horizontalGradient(
-                            colors = listOf(primaryColor, tertiaryColor),
-                            startX = 0f,
-                            endX = canvasWidth.coerceAtLeast(1f),
-                        ),
-                        topLeft = Offset(0f, centerY - (trackHeightPx / 2f)),
-                        size = Size(playedWidth, trackHeightPx),
-                        cornerRadius = cornerRadius,
-                    )
+                    if (nowPlaying) {
+                        drawRoundRect(
+                            color = primaryColor,
+                            topLeft = Offset(0f, centerY - (trackHeightPx / 2f)),
+                            size = Size(playedWidth, trackHeightPx),
+                            cornerRadius = cornerRadius,
+                        )
+                    } else {
+                        drawRoundRect(
+                            brush = Brush.horizontalGradient(
+                                colors = listOf(primaryColor, tertiaryColor),
+                                startX = 0f,
+                                endX = canvasWidth.coerceAtLeast(1f),
+                            ),
+                            topLeft = Offset(0f, centerY - (trackHeightPx / 2f)),
+                            size = Size(playedWidth, trackHeightPx),
+                            cornerRadius = cornerRadius,
+                        )
+                    }
                 }
 
                 // 4. Thumb Indicator
@@ -236,14 +273,18 @@ fun PlayerTimeline(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 2.dp),
+                .padding(top = if (nowPlaying) 4.dp else 2.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
                 text = formatPlayerTime(displayPositionMs),
                 style = MaterialTheme.typography.labelMedium.copy(fontFamily = FontFamily.Monospace),
-                color = MaterialTheme.colorScheme.onSurface,
+                color = if (nowPlaying) {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                } else {
+                    MaterialTheme.colorScheme.onSurface
+                },
             )
             Text(
                 text = formatPlayerTime(effectiveDuration),

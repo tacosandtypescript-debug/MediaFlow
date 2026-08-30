@@ -11,6 +11,8 @@ import com.mediaflow.core.model.MediaType
 import com.mediaflow.core.model.Playlist
 import com.mediaflow.core.model.XSpace
 import com.mediaflow.core.model.XSpaceState
+import com.mediaflow.data.media.metadata.EmbeddedTrackMetadata
+import com.mediaflow.data.media.metadata.EmbeddedTrackTags
 import com.mediaflow.data.player.background.MediaPlaybackService
 import com.mediaflow.data.player.background.PlayerSessionHolder
 import com.mediaflow.data.provider.x.XUrlParser
@@ -51,6 +53,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
@@ -66,6 +69,9 @@ class PlayerViewModel(
     private val liveEndMonitor: LiveSpaceEndMonitor = LiveSpaceEndMonitor(),
     private val pendingDownloadRepo: PendingLiveDownloadRepository = PendingLiveDownloadRepositoryImpl(app),
     downloadRepository: DownloadRepository? = null,
+    private val readEmbeddedMetadata: (String) -> EmbeddedTrackTags = { uri ->
+        EmbeddedTrackMetadata.read(app, uri)
+    },
 ) : AndroidViewModel(app) {
 
     constructor(application: Application) : this(
@@ -83,6 +89,7 @@ class PlayerViewModel(
     private val seekFeedback = MutableStateFlow<SeekFeedbackEvent?>(null)
     private val isScrubbing = MutableStateFlow(false)
     private val scrubPositionMs = MutableStateFlow(0L)
+    private val embeddedTags = MutableStateFlow(EmbeddedTrackTags())
     private val liveEndState = MutableStateFlow<LiveSpaceEndState>(LiveSpaceEndState.ActiveLive)
     private val isAutoDownloadEnabled = MutableStateFlow(false)
 
@@ -105,6 +112,8 @@ class PlayerViewModel(
         isAutoDownloadEnabled,
         favoritesRepository.observeFavoriteMediaUris().flowOn(Dispatchers.IO),
         playlistRepository.observePlaylists().flowOn(Dispatchers.IO),
+        scrubPositionMs,
+        embeddedTags,
     ) { args: Array<Any?> ->
         val service = args[0] as PlayerServiceState
         val controls = args[1] as Boolean
@@ -118,20 +127,35 @@ class PlayerViewModel(
         val favoriteUris = args[8] as Set<String>
         @Suppress("UNCHECKED_CAST")
         val playlists = args[9] as List<Playlist>
+        val scrubPos = args[10] as Long
+        val tags = args[11] as EmbeddedTrackTags
 
         val uri = service.filePath.orEmpty()
         val isFav = favoriteUris.contains(uri) || (service.mediaId != null && favoriteUris.contains(service.mediaId))
+        val artist = space?.let { "Host: ${it.host.formattedHandle}" }
+            ?: PlayerDisplayMetadata.artist(tags.artist, service.artistOrHost)
+        val title = PlayerDisplayMetadata.title(
+            taggedTitle = tags.title ?: space?.title,
+            serviceTitle = service.title,
+            fileName = uri.substringAfterLast('/'),
+            uri = uri,
+        )
 
         PlayerUiState(
             mediaUri = uri,
-            title = space?.title ?: service.title ?: uri.substringAfterLast('/'),
+            title = title,
+            artist = artist,
+            album = PlayerDisplayMetadata.album(tags.album),
+            artworkUri = preferredArtworkUrl(tags.artworkUri, service.artworkUrl),
+            subtitle = artist,
             serviceState = service,
             isControlsVisible = controls,
             isFullscreen = fullscreen,
             spaceMetadata = space,
             seekFeedback = feedback,
             isScrubbing = scrubbing,
-            scrubPositionMs = scrubPositionMs.value,
+            scrubPositionMs = scrubPos,
+            fileDurationMs = tags.durationMs,
             liveEndState = endState,
             isAutoDownloadEnabled = autoDownload,
             isFavorite = isFav,
@@ -213,7 +237,31 @@ class PlayerViewModel(
                 isAutoDownloadEnabled.value = pendingDownloadRepo.isAutoDownloadEnabled(spaceId)
             }
 
-            // Check if this media is already open and playing/paused
+            val isRemote = mediaUri.startsWith("http://", ignoreCase = true) ||
+                mediaUri.startsWith("https://", ignoreCase = true)
+            val tags = if (!effectiveLive && !isRemote) {
+                runCatching {
+                    withContext(Dispatchers.IO) { readEmbeddedMetadata(mediaUri) }
+                }.getOrDefault(EmbeddedTrackTags())
+            } else {
+                EmbeddedTrackTags()
+            }
+            embeddedTags.value = tags
+
+            val download = withTimeoutOrNull(1_500) {
+                downloadRepo.observeDownloads().first().firstOrNull { item ->
+                    item.localUri == mediaUri || item.id == mediaUri || item.sourceUrl == mediaUri
+                }
+            }
+            val artwork = tags.artworkUri ?: download?.thumbnailUri
+            embeddedTags.value = tags.copy(artworkUri = artwork)
+            val resolvedTitle = PlayerDisplayMetadata.title(
+                taggedTitle = tags.title ?: space?.title ?: title,
+                serviceTitle = download?.title,
+                fileName = download?.fileName ?: mediaUri.substringAfterLast('/'),
+                uri = mediaUri,
+            )
+
             val activeState = playerService.uiState.value
             if (activeState.mediaId == mediaUri && activeState.playbackState != EnginePlaybackState.IDLE) {
                 return@launch
@@ -226,18 +274,14 @@ class PlayerViewModel(
             val preservedArtwork = activeState.artworkUrl.takeIf {
                 activeState.mediaId == mediaUri || activeState.filePath == mediaUri
             }
-            val download = withTimeoutOrNull(250) {
-                downloadRepo.observeDownloads().first().firstOrNull { item ->
-                    item.localUri == mediaUri || item.id == mediaUri || item.sourceUrl == mediaUri
-                }
-            }
             playerService.openMedia(
                 mediaId = mediaUri,
                 filePath = mediaUri,
-                title = space?.title ?: title ?: download?.title ?: download?.fileName,
-                artistOrHost = space?.let { "Host: ${it.host.formattedHandle}" },
+                title = resolvedTitle,
+                artistOrHost = space?.let { "Host: ${it.host.formattedHandle}" }
+                    ?: PlayerDisplayMetadata.artist(tags.artist, null),
                 artworkUrl = preferredArtworkUrl(
-                    preservedArtwork ?: download?.thumbnailUri,
+                    artwork ?: preservedArtwork,
                     space?.host?.avatarUrl,
                 ),
                 autoPlay = true,
@@ -248,7 +292,7 @@ class PlayerViewModel(
             MediaPlaybackService.start(
                 context = app,
                 mediaUri = mediaUri,
-                title = space?.title ?: title,
+                title = resolvedTitle,
                 isLive = effectiveLive,
                 spaceId = space?.id,
                 spaceUrl = space?.url,
@@ -259,10 +303,14 @@ class PlayerViewModel(
 
     fun togglePlayPause() {
         showControlsTemporarily()
-        if (uiState.value.serviceState.isPlaying) {
-            playerService.pause()
-        } else {
-            playerService.play()
+        val state = uiState.value.serviceState
+        when {
+            state.isPlaying -> playerService.pause()
+            state.isEnded -> {
+                playerService.seekTo(0L)
+                playerService.play()
+            }
+            else -> playerService.play()
         }
     }
 
@@ -272,8 +320,8 @@ class PlayerViewModel(
     }
 
     fun seekRelative(offsetMs: Long) {
-        val current = playerService.uiState.value.currentPositionMs
-        val duration = playerService.uiState.value.durationMs
+        val current = uiState.value.currentPositionMs
+        val duration = uiState.value.durationMs
         val target = if (duration > 0L) {
             (current + offsetMs).coerceIn(0L, duration)
         } else {
@@ -308,15 +356,21 @@ class PlayerViewModel(
         playerService.setMute(!muted)
     }
 
-    fun setScrubbing(scrubbing: Boolean, positionMs: Long = 0L) {
+    fun setScrubbing(scrubbing: Boolean, positionMs: Long? = null) {
         isScrubbing.value = scrubbing
-        if (scrubbing) {
+        if (positionMs != null) {
             scrubPositionMs.value = positionMs
-            cancelHideControls()
-        } else {
-            seekTo(positionMs)
-            if (uiState.value.isPlaying) scheduleHideControls()
         }
+        if (scrubbing) {
+            cancelHideControls()
+        } else if (uiState.value.isPlaying) {
+            scheduleHideControls()
+        }
+    }
+
+    fun updateScrubPosition(positionMs: Long) {
+        scrubPositionMs.value = positionMs.coerceAtLeast(0L)
+        if (!isScrubbing.value) isScrubbing.value = true
     }
 
     fun toggleFullscreen() {

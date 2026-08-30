@@ -21,7 +21,11 @@ sealed class SeekFeedbackEvent {
 data class PlayerUiState(
     val mediaUri: String = "",
     val title: String = "",
+    val artist: String? = null,
+    val album: String? = null,
+    val artworkUri: String? = null,
     val subtitle: String? = null,
+    val fileDurationMs: Long = 0L,
     val serviceState: PlayerServiceState = PlayerServiceState(),
     val isControlsVisible: Boolean = true,
     val isFullscreen: Boolean = false,
@@ -56,10 +60,14 @@ data class PlayerUiState(
         get() = serviceState.errorMessage
 
     val durationMs: Long
-        get() = serviceState.durationMs
+        get() = serviceState.durationMs.takeIf { it > 0L } ?: fileDurationMs
 
     val currentPositionMs: Long
-        get() = if (isScrubbing) scrubPositionMs else serviceState.currentPositionMs
+        get() = PlayerTimelineMath.displayedPositionMs(
+            isScrubbing = isScrubbing,
+            scrubPositionMs = scrubPositionMs,
+            enginePositionMs = serviceState.currentPositionMs,
+        )
 
     val speed: Float
         get() = serviceState.speed
