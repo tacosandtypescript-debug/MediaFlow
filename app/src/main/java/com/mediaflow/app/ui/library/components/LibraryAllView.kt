@@ -65,7 +65,7 @@ fun LibraryAllView(
             .fillMaxSize()
             .testTag("library_all_list"),
     ) {
-        items(playlists, key = { "pl_${it.id}" }) { playlist ->
+        items(playlists, key = { "pl_${it.id}" }, contentType = { "playlist" }) { playlist ->
             val artworks = playlist.mediaUris.take(4).map { uri ->
                 preferredArtworkUrl(mediaMap[uri]?.thumbnailUri)
             }
@@ -78,7 +78,11 @@ fun LibraryAllView(
                 onDelete = { onDeletePlaylist(playlist.id) },
             )
         }
-        itemsIndexed(items, key = { _, item -> item.id }) { index, item ->
+        itemsIndexed(
+            items,
+            key = { _, item -> item.id },
+            contentType = { _, item -> item.mediaType },
+        ) { index, item ->
             val uri = item.localUri ?: item.id
             val space = spacesMap[item.sourceUrl] ?: spacesMap[item.id]
             val title = space?.title ?: item.title ?: item.fileName ?: "Media"

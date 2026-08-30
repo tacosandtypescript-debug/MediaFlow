@@ -37,8 +37,10 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import com.mediaflow.core.model.PlaybackProgress
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
@@ -75,11 +77,16 @@ class LibraryViewModel(
             .map { Result.success(it) }
             .catch { emit(Result.failure(it)) }
             .flowOn(Dispatchers.IO),
-        progressRepository.observeAllProgress().flowOn(Dispatchers.IO),
+        progressRepository.observeAllProgress()
+            .map { libraryProgressForList(it) }
+            .distinctUntilChanged()
+            .flowOn(Dispatchers.Default),
         spaceRepository.observeAllSpaces().flowOn(Dispatchers.IO),
         playlistRepository.observePlaylists().flowOn(Dispatchers.IO),
         favoritesRepository.observeFavoriteMediaUris().flowOn(Dispatchers.IO),
-        playerService.uiState,
+        playerService.uiState
+            .map { LibraryPlayerBits(it.mediaId, it.isPlaying, it.isShuffle) }
+            .distinctUntilChanged(),
         selectedFilter,
         selectedSort,
         downloadsFlow.flowOn(Dispatchers.IO),
@@ -88,14 +95,14 @@ class LibraryViewModel(
         @Suppress("UNCHECKED_CAST")
         val galleryResult = args[0] as Result<List<DownloadItem>>
         @Suppress("UNCHECKED_CAST")
-        val progressMap = args[1] as Map<String, com.mediaflow.core.model.PlaybackProgress>
+        val progressMap = args[1] as Map<String, PlaybackProgress>
         @Suppress("UNCHECKED_CAST")
         val spacesMap = args[2] as Map<String, com.mediaflow.core.model.XSpace>
         @Suppress("UNCHECKED_CAST")
         val playlists = args[3] as List<com.mediaflow.core.model.Playlist>
         @Suppress("UNCHECKED_CAST")
         val favoriteUris = args[4] as Set<String>
-        val playerState = args[5] as com.mediaflow.domain.player.PlayerServiceState
+        val playerBits = args[5] as LibraryPlayerBits
         val filter = args[6] as LibraryFilter
         val sort = args[7] as LibrarySort
         @Suppress("UNCHECKED_CAST")
@@ -125,9 +132,9 @@ class LibraryViewModel(
             playlists = playlists,
             spacesMap = spacesMap,
             progressMap = progressMap,
-            playingMediaId = playerState.mediaId,
-            isPlayerPlaying = playerState.isPlaying,
-            isShuffle = playerState.isShuffle,
+            playingMediaId = playerBits.playingMediaId,
+            isPlayerPlaying = playerBits.isPlayerPlaying,
+            isShuffle = playerBits.isShuffle,
             isLoading = false,
             errorMessage = galleryResult.exceptionOrNull()?.message,
         )
@@ -411,6 +418,40 @@ class LibraryViewModel(
 
     companion object {
         const val LIBRARY_AUDIO_QUEUE_CONTEXT = "Biblioteca"
+    }
+}
+
+private data class LibraryPlayerBits(
+    val playingMediaId: String?,
+    val isPlayerPlaying: Boolean,
+    val isShuffle: Boolean,
+)
+
+/**
+ * Library rows only need a coarse resume bar. Dropping timestamp/ms ticks keeps
+ * [LibraryUiState] from rebuilding on every mpv time-pos event.
+ */
+internal fun libraryProgressForList(
+    progress: Map<String, PlaybackProgress>,
+    bucketCount: Int = 20,
+): Map<String, PlaybackProgress> {
+    if (progress.isEmpty()) return progress
+    val buckets = bucketCount.coerceAtLeast(1)
+    return progress.mapValues { (_, item) ->
+        val total = item.totalDurationMs
+        if (total <= 0L) {
+            item.copy(currentPositionMs = 0L, playbackPercentage = 0f, lastPlayedAt = 0L)
+        } else {
+            val bucket = ((item.currentPositionMs.toDouble() / total) * buckets)
+                .toInt()
+                .coerceIn(0, buckets)
+            val pos = if (bucket >= buckets) total else (total * bucket) / buckets
+            item.copy(
+                currentPositionMs = pos,
+                playbackPercentage = bucket.toFloat() / buckets,
+                lastPlayedAt = 0L,
+            )
+        }
     }
 }
 

@@ -71,7 +71,7 @@ fun VideoMosaic(
             .fillMaxSize()
             .testTag("video_library_grid"),
     ) {
-        items(items, key = { it.id }) { item ->
+        items(items, key = { it.id }, contentType = { it.mediaType }) { item ->
             val uri = item.localUri ?: item.id
             val isFavorite = favoriteUris.contains(uri)
             val isPlaying = playingMediaId == uri

@@ -147,7 +147,11 @@ fun FavoritesView(
                     .fillMaxSize()
                     .testTag("favorites_list"),
             ) {
-                itemsIndexed(items, key = { _, item -> item.id }) { index, item ->
+                itemsIndexed(
+                    items,
+                    key = { _, item -> item.id },
+                    contentType = { _, _ -> "favorite_row" },
+                ) { index, item ->
                     val uri = item.localUri ?: item.id
                     val space = spacesMap[item.sourceUrl] ?: spacesMap[item.id]
                     val isPlaying = playingMediaId == uri && isPlayerPlaying

@@ -158,7 +158,11 @@ fun AudioLibraryView(
                     .fillMaxSize()
                     .testTag("audio_library_list"),
             ) {
-                itemsIndexed(items, key = { _, item -> item.id }) { index, item ->
+                itemsIndexed(
+                    items,
+                    key = { _, item -> item.id },
+                    contentType = { _, _ -> "audio_row" },
+                ) { index, item ->
                     val uri = item.localUri ?: item.id
                     val space = spacesMap[item.sourceUrl] ?: spacesMap[item.id]
                     val progress = progressMap[uri] ?: progressMap[item.id]
@@ -220,7 +224,7 @@ fun AudioLibraryView(
                                             onDrag = { change, dragAmount ->
                                                 change.consume()
                                                 dragOffsetY += dragAmount.y
-                                                val from = items.indexOfFirst { it.id == item.id }.takeIf { it >= 0 } ?: index
+                                                val from = index
                                                 val to = LibraryAudioDragMath.targetIndex(
                                                     from,
                                                     dragOffsetY,
