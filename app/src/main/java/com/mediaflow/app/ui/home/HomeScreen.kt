@@ -154,6 +154,25 @@ fun HomeScreen(
                         val streamUrl = space.audioStreamUrl?.takeIf { it.isNotBlank() } ?: space.url
                         onPlayLive?.invoke(streamUrl)
                     },
+                    onDownloadSpace = if (!spaceMetadata.isLive) {
+                        {
+                            val result = onDownloadRequested?.invoke(state)
+                            when (result) {
+                                null -> scope.launch {
+                                    snackbarHostState.showSnackbar(pendingDownloadMessage)
+                                }
+                                is DownloadStartResult.Accepted -> scope.launch {
+                                    snackbarHostState.showSnackbar(downloadAcceptedMessage)
+                                }
+                                DownloadStartResult.AwaitingNotificationPermission -> Unit
+                                is DownloadStartResult.Rejected -> scope.launch {
+                                    snackbarHostState.showSnackbar(result.message)
+                                }
+                            }
+                        }
+                    } else {
+                        null
+                    },
                 )
             }
 

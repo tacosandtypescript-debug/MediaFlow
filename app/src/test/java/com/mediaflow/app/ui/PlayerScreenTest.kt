@@ -19,6 +19,7 @@ import com.mediaflow.app.ui.player.components.PlayPauseButton
 import com.mediaflow.app.ui.player.components.PlayerSecondaryActions
 import com.mediaflow.app.ui.player.components.PlayerTimeline
 import com.mediaflow.app.ui.player.components.SeekFeedback
+import com.mediaflow.app.ui.home.components.XSpaceCard
 import com.mediaflow.app.ui.player.live.LiveEndedContent
 import com.mediaflow.app.ui.theme.MediaFlowTheme
 import com.mediaflow.core.model.ParticipantRole
@@ -316,6 +317,38 @@ class PlayerScreenTest {
         composeRule.onNodeWithTag("xspace_replay_mode").assertIsDisplayed()
         composeRule.onNodeWithTag("xspace_record_toggle").assertDoesNotExist()
         composeRule.onNodeWithText("1 h 53 min").assertIsDisplayed()
+    }
+
+    @Test
+    fun endedSpaceCardShowsDownloadWhenOpeningLink() {
+        val ended = XSpace(
+            id = "1NGarowkqQlJj",
+            url = "https://x.com/i/spaces/1NGarowkqQlJj",
+            title = "RESACATULIA #343: MAÑANA TURBULENTA",
+            state = XSpaceState.ENDED,
+            host = XParticipant(
+                displayName = "Relatos de André",
+                username = "respaldodeandre",
+                role = ParticipantRole.HOST,
+            ),
+            durationSeconds = 6828L,
+            recordingAvailable = true,
+        )
+        var downloaded = false
+        composeRule.setContent {
+            MediaFlowTheme {
+                XSpaceCard(
+                    space = ended,
+                    onPlayLive = {},
+                    onDownloadSpace = { downloaded = true },
+                )
+            }
+        }
+        composeRule.onNodeWithTag("xspace_download_replay").assertIsDisplayed()
+        composeRule.onNodeWithText("Descargar Space").assertIsDisplayed()
+        composeRule.onNodeWithText("Reproducir repetición").assertIsDisplayed()
+        composeRule.onNodeWithTag("xspace_download_replay").performClick()
+        assertTrue(downloaded)
     }
 
     @Test

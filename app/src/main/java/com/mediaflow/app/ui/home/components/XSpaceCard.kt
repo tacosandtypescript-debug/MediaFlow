@@ -20,6 +20,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Group
+import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.Headphones
 import androidx.compose.material.icons.outlined.Mic
 import androidx.compose.material.icons.outlined.Person
@@ -56,6 +57,7 @@ import java.net.URL
 
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.OutlinedButton
 import com.mediaflow.app.ui.player.components.LiveStatusBadge
 
 /**
@@ -67,6 +69,7 @@ fun XSpaceCard(
     space: XSpace,
     modifier: Modifier = Modifier,
     onPlayLive: ((XSpace) -> Unit)? = null,
+    onDownloadSpace: (() -> Unit)? = null,
 ) {
     Card(
         modifier = modifier.fillMaxWidth(),
@@ -259,6 +262,34 @@ fun XSpaceCard(
                             ),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
+                        )
+                    }
+                }
+            }
+
+            if (!space.isLive && onDownloadSpace != null) {
+                OutlinedButton(
+                    onClick = onDownloadSpace,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp)
+                        .height(52.dp)
+                        .testTag("xspace_download_replay"),
+                    shape = RoundedCornerShape(14.dp),
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Download,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp),
+                        )
+                        Text(
+                            text = stringResource(R.string.space_download_replay),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
                         )
                     }
                 }
