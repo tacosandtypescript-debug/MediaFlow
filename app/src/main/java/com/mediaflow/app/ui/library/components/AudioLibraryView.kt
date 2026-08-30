@@ -20,21 +20,30 @@ import androidx.compose.material.icons.outlined.Audiotrack
 import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.Shuffle
 import androidx.compose.material3.Button
-import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import com.mediaflow.app.R
 import com.mediaflow.app.ui.common.media.AudioMediaRow
 import com.mediaflow.app.ui.common.media.preferredArtworkUrl
+import com.mediaflow.app.ui.library.LibraryAudioDragMath
 import com.mediaflow.core.model.DownloadItem
 import com.mediaflow.core.model.PlaybackProgress
 import com.mediaflow.core.model.XSpace
@@ -56,6 +65,8 @@ fun AudioLibraryView(
     onAddToQueue: (item: DownloadItem) -> Unit,
     onDeleteMedia: (item: DownloadItem) -> Unit,
     onPlayAll: () -> Unit = {},
+    shuffleEnabled: Boolean = false,
+    onShuffleChange: (Boolean) -> Unit = {},
     onShuffleAll: () -> Unit = {},
     onReorder: (fromIndex: Int, toIndex: Int) -> Unit = { _, _ -> },
     selectedIds: Set<String> = emptySet(),
@@ -96,6 +107,20 @@ fun AudioLibraryView(
                         fontWeight = FontWeight.Bold,
                     )
                 }
+                FilterChip(
+                    selected = shuffleEnabled,
+                    onClick = { onShuffleChange(!shuffleEnabled) },
+                    label = {
+                        Text(
+                            text = stringResource(R.string.library_shuffle),
+                            fontWeight = FontWeight.Bold,
+                        )
+                    },
+                    leadingIcon = {
+                        Icon(Icons.Outlined.Shuffle, contentDescription = null, modifier = Modifier.size(18.dp))
+                    },
+                    modifier = Modifier.testTag("library_shuffle_btn"),
+                )
                 OutlinedButton(
                     onClick = onShuffleAll,
                     shape = RoundedCornerShape(14.dp),
@@ -113,6 +138,8 @@ fun AudioLibraryView(
             }
             val density = LocalDensity.current
             val rowHeightPx = with(density) { 72.dp.toPx() }
+            var draggingId by remember { mutableStateOf<String?>(null) }
+            var dragOffsetY by remember { mutableFloatStateOf(0f) }
             LazyColumn(
                 contentPadding = PaddingValues(top = 4.dp, bottom = 120.dp),
                 modifier = Modifier
@@ -151,24 +178,51 @@ fun AudioLibraryView(
                         selected = item.id in selectedIds,
                         modifier = Modifier
                             .testTag("audio_library_row_$index")
+                            .zIndex(if (draggingId == item.id) 1f else 0f)
+                            .graphicsLayer {
+                                if (draggingId == item.id) {
+                                    translationY = dragOffsetY
+                                    shadowElevation = 18f
+                                    scaleX = 1.02f
+                                    scaleY = 1.02f
+                                }
+                            }
                             .then(
                                 if (inSelectionMode) {
                                     Modifier
                                 } else {
-                                    Modifier.pointerInput(index, items.size) {
-                                        var accumulated = 0f
+                                    Modifier.pointerInput(item.id, items.size) {
                                         detectDragGesturesAfterLongPress(
-                                            onDragStart = { accumulated = 0f },
+                                            onDragStart = {
+                                                draggingId = item.id
+                                                dragOffsetY = 0f
+                                            },
+                                            onDragEnd = {
+                                                draggingId = null
+                                                dragOffsetY = 0f
+                                            },
+                                            onDragCancel = {
+                                                draggingId = null
+                                                dragOffsetY = 0f
+                                            },
                                             onDrag = { change, dragAmount ->
                                                 change.consume()
-                                                accumulated += dragAmount.y
-                                                val steps = (accumulated / rowHeightPx).toInt()
-                                                if (steps != 0) {
-                                                    val to = (index + steps).coerceIn(0, items.lastIndex)
-                                                    if (to != index) {
-                                                        onReorder(index, to)
-                                                        accumulated = 0f
-                                                    }
+                                                dragOffsetY += dragAmount.y
+                                                val from = items.indexOfFirst { it.id == item.id }.takeIf { it >= 0 } ?: index
+                                                val to = LibraryAudioDragMath.targetIndex(
+                                                    from,
+                                                    dragOffsetY,
+                                                    rowHeightPx,
+                                                    items.lastIndex,
+                                                )
+                                                if (to != from) {
+                                                    onReorder(from, to)
+                                                    dragOffsetY = LibraryAudioDragMath.leftoverOffset(
+                                                        dragOffsetY,
+                                                        from,
+                                                        to,
+                                                        rowHeightPx,
+                                                    )
                                                 }
                                             },
                                         )

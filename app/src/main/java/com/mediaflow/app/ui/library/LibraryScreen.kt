@@ -237,6 +237,8 @@ fun LibraryScreen(
                 playingMediaId = uiState.playingMediaId,
                 isPlayerPlaying = uiState.isPlayerPlaying,
                 favoriteUris = uiState.favoriteUris,
+                shuffleEnabled = uiState.isShuffle,
+                onShuffleChange = { enabled -> viewModel.setLibraryShuffle(enabled, audioOrder) },
                 onPlayAll = {
                     if (audioOrder.isNotEmpty()) {
                         viewModel.playAllAudio(audioOrder)

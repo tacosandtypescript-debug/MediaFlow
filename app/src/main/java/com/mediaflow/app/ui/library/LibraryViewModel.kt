@@ -127,6 +127,7 @@ class LibraryViewModel(
             progressMap = progressMap,
             playingMediaId = playerState.mediaId,
             isPlayerPlaying = playerState.isPlaying,
+            isShuffle = playerState.isShuffle,
             isLoading = false,
             errorMessage = galleryResult.exceptionOrNull()?.message,
         )
@@ -274,6 +275,18 @@ class LibraryViewModel(
 
     fun shuffleAllAudio(visible: List<DownloadItem>, context: String = LIBRARY_AUDIO_QUEUE_CONTEXT) {
         playLibraryAudioQueue(LibraryAudioQueueBuilder.shuffleAll(visible), context)
+    }
+
+    fun setLibraryShuffle(enabled: Boolean, visible: List<DownloadItem>) {
+        val player = playerService.uiState.value
+        val active = player.playbackContext == LIBRARY_AUDIO_QUEUE_CONTEXT && player.queue.isNotEmpty()
+        if (active) {
+            playerService.setShuffle(enabled)
+        } else if (enabled && visible.isNotEmpty()) {
+            shuffleAllAudio(visible)
+        } else {
+            playerService.setShuffle(false)
+        }
     }
 
     fun reorderAudioQueueIfActive(

@@ -22,6 +22,7 @@ data class LibraryUiState(
     val progressMap: Map<String, PlaybackProgress> = emptyMap(),
     val playingMediaId: String? = null,
     val isPlayerPlaying: Boolean = false,
+    val isShuffle: Boolean = false,
     val isLoading: Boolean = false,
     val errorMessage: String? = null,
 )
