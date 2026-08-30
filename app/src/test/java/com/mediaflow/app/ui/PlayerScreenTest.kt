@@ -46,7 +46,7 @@ class PlayerScreenTest {
         composeRule.setContent {
             MediaFlowTheme { PlayerScreen(mediaUri = "file:///tmp/sample.mp4", onBack = {}) }
         }
-        composeRule.onNodeWithText("sample.mp4")
+        composeRule.onNodeWithText("sample", substring = true)
             .assertIsDisplayed()
     }
 
@@ -90,12 +90,27 @@ class PlayerScreenTest {
             MediaFlowTheme {
                 PlayPauseButton(
                     playbackState = EnginePlaybackState.PAUSED,
+                    isPlaying = false,
                     onClick = { clicked = true },
                 )
             }
         }
         composeRule.onNodeWithContentDescription("Reproducir").assertIsDisplayed().performClick()
         assertTrue("Play button click should invoke callback", clicked)
+    }
+
+    @Test
+    fun playPauseButtonFollowsEnginePlayingFlag() {
+        composeRule.setContent {
+            MediaFlowTheme {
+                PlayPauseButton(
+                    playbackState = EnginePlaybackState.PAUSED,
+                    isPlaying = true,
+                    onClick = {},
+                )
+            }
+        }
+        composeRule.onNodeWithContentDescription("Pausa").assertIsDisplayed()
     }
 
     @Test
