@@ -1,43 +1,31 @@
 package com.mediaflow.app.ui.home.components
 
-import android.graphics.BitmapFactory
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Image
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.mediaflow.app.R
+import com.mediaflow.app.ui.common.media.MediaArtwork
+import com.mediaflow.app.ui.common.media.preferredArtworkUrl
 import com.mediaflow.app.ui.home.AnalysisState
 import com.mediaflow.app.ui.home.ContentType
 import com.mediaflow.core.model.MediaFormat
 import com.mediaflow.core.model.MediaType
 import com.mediaflow.domain.repository.SourceInfo
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import java.net.URL
 
 @Composable
 fun SourceAnalysisCard(
@@ -49,87 +37,120 @@ fun SourceAnalysisCard(
     modifier: Modifier = Modifier,
 ) {
     if (state == AnalysisState.IDLE) return
-    Card(
-        modifier = modifier.fillMaxWidth().testTag("source_analysis_card"),
-        shape = MaterialTheme.shapes.large,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+    Surface(
+        modifier = modifier
+            .fillMaxWidth()
+            .testTag("source_analysis_card"),
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        shadowElevation = 0.dp,
+        tonalElevation = 0.dp,
     ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text(
-                text = when (state) {
-                    AnalysisState.ANALYZING -> stringResource(R.string.analysis_loading)
-                    AnalysisState.READY -> stringResource(R.string.analysis_ready)
-                    AnalysisState.FAILED -> stringResource(R.string.analysis_failed)
-                    AnalysisState.IDLE -> ""
-                },
-                style = MaterialTheme.typography.titleMedium,
-            )
-            if (state == AnalysisState.ANALYZING) {
-                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-            }
-            if (state == AnalysisState.FAILED) {
-                Text(
-                    text = errorMessage ?: sourceInfo?.errorMessage ?: stringResource(R.string.analysis_failed),
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-            }
-            if (state == AnalysisState.READY && sourceInfo != null) {
-                ThumbnailPreview(sourceInfo.thumbnailUrl)
-                Text(sourceInfo.title ?: stringResource(R.string.analysis_untitled), style = MaterialTheme.typography.titleLarge)
-                val playlistCount = sourceInfo.playlistEntries.size
-                if (playlistCount > 0) {
+        when (state) {
+            AnalysisState.ANALYZING -> {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
                     Text(
-                        text = stringResource(R.string.analysis_playlist_count, playlistCount),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        text = stringResource(R.string.analysis_loading),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
                     )
-                } else {
-                    sourceInfo.durationSeconds?.let { seconds ->
+                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                }
+            }
+            AnalysisState.FAILED -> {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        text = stringResource(R.string.analysis_failed),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Text(
+                        text = errorMessage ?: sourceInfo?.errorMessage
+                            ?: stringResource(R.string.analysis_failed),
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+            }
+            AnalysisState.READY -> {
+                if (sourceInfo == null) return@Surface
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    MediaArtwork(
+                        artworkUrl = preferredArtworkUrl(sourceInfo.thumbnailUrl),
+                        size = 64.dp,
+                        shape = RoundedCornerShape(8.dp),
+                        mediaType = if (selectedType == ContentType.VIDEO) {
+                            MediaType.VIDEO
+                        } else {
+                            MediaType.AUDIO
+                        },
+                        contentDescription = stringResource(
+                            if (sourceInfo.thumbnailUrl.isNullOrBlank()) {
+                                R.string.analysis_no_thumbnail
+                            } else {
+                                R.string.analysis_thumbnail
+                            },
+                        ),
+                    )
+                    Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = formatDuration(seconds),
+                            text = stringResource(R.string.analysis_ready),
+                            style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
+                        Text(
+                            text = sourceInfo.title ?: stringResource(R.string.analysis_untitled),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                        val playlistCount = sourceInfo.playlistEntries.size
+                        val meta = if (playlistCount > 0) {
+                            stringResource(R.string.analysis_playlist_count, playlistCount)
+                        } else {
+                            sourceInfo.durationSeconds?.let(::formatDuration)
+                        }
+                        if (!meta.isNullOrBlank()) {
+                            Text(
+                                text = meta,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                        Text(
+                            text = stringResource(
+                                R.string.analysis_download_type,
+                                stringResource(selectedType.descriptionRes),
+                            ),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        if (selectedFormat != null) {
+                            Text(
+                                text = formatLabel(selectedFormat),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
                     }
                 }
-                Text(
-                    text = stringResource(
-                        R.string.analysis_download_type,
-                        stringResource(selectedType.descriptionRes),
-                    ),
-                    style = MaterialTheme.typography.labelLarge,
-                )
-                if (selectedFormat != null) {
-                    Text(
-                        text = formatLabel(selectedFormat),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
             }
-        }
-    }
-}
-
-@Composable
-private fun ThumbnailPreview(url: String?) {
-    val bitmap by produceState<android.graphics.Bitmap?>(initialValue = null, key1 = url) {
-        value = withContext(Dispatchers.IO) {
-            runCatching { url?.takeIf { it.startsWith("https://") }?.let { BitmapFactory.decodeStream(URL(it).openStream()) } }.getOrNull()
-        }
-    }
-    if (bitmap != null) {
-        Image(
-            bitmap = bitmap!!.asImageBitmap(),
-            contentDescription = stringResource(R.string.analysis_thumbnail),
-            contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxWidth().height(150.dp).clip(RoundedCornerShape(20.dp)),
-        )
-    } else {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Outlined.Image, contentDescription = null, modifier = Modifier.size(28.dp))
-            Text(stringResource(R.string.analysis_no_thumbnail), modifier = Modifier.padding(start = 8.dp))
+            AnalysisState.IDLE -> Unit
         }
     }
 }

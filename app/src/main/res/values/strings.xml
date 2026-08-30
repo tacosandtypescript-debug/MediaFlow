@@ -13,6 +13,9 @@
     <string name="go_to_home">Volver a Inicio</string>
 
     <!-- Home -->
+    <string name="home_greeting_morning">Buenos días</string>
+    <string name="home_greeting_afternoon">Buenas tardes</string>
+    <string name="home_greeting_evening">Buenas noches</string>
     <string name="home_subtitle">Pega un enlace de YouTube o un X Space y archívalo.</string>
     <string name="home_url_label">Enlace</string>
     <string name="home_url_placeholder">Pega aquí el enlace del vídeo o audio</string>

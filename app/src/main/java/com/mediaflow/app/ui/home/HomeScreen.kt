@@ -1,7 +1,6 @@
 package com.mediaflow.app.ui.home
 
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -12,13 +11,13 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -30,7 +29,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -50,6 +49,7 @@ import com.mediaflow.core.model.DownloadStatus
 import com.mediaflow.domain.repository.SourceResolver
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.util.Calendar
 
 @Composable
 fun HomeScreen(
@@ -70,6 +70,13 @@ fun HomeScreen(
     val completedRecents = remember(recentDownloads) {
         recentDownloads.filter { it.status == DownloadStatus.COMPLETED }.take(8)
     }
+    val greetingRes = remember {
+        when (Calendar.getInstance().get(Calendar.HOUR_OF_DAY)) {
+            in 0..11 -> R.string.home_greeting_morning
+            in 12..19 -> R.string.home_greeting_afternoon
+            else -> R.string.home_greeting_evening
+        }
+    }
 
     LaunchedEffect(state.url, sourceResolver) {
         if (
@@ -80,16 +87,6 @@ fun HomeScreen(
             delay(500)
             viewModel.analyze(sourceResolver)
         }
-    }
-
-    val linkCardColor = when {
-        state.errorMessage != null -> MaterialTheme.colorScheme.errorContainer
-        else -> MaterialTheme.colorScheme.surfaceContainerHigh
-    }
-    val linkBorder = when {
-        state.errorMessage != null -> MaterialTheme.colorScheme.error
-        state.validationState == ValidationState.Valid -> MaterialTheme.colorScheme.primary
-        else -> MaterialTheme.colorScheme.outline
     }
 
     Scaffold(
@@ -113,49 +110,45 @@ fun HomeScreen(
                 .verticalScroll(rememberScrollState())
                 .imePadding()
                 .navigationBarsPadding()
-                .padding(horizontal = 16.dp, vertical = 16.dp),
+                .padding(horizontal = 16.dp, vertical = 12.dp),
         ) {
-            Column {
-                Text(
-                    text = stringResource(R.string.app_name),
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                Text(
-                    text = stringResource(R.string.home_subtitle),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 6.dp),
-                )
-            }
+            Text(
+                text = stringResource(greetingRes),
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = stringResource(R.string.app_name),
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.ExtraBold,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.padding(top = 2.dp),
+            )
+            Text(
+                text = stringResource(R.string.home_subtitle),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 4.dp),
+            )
 
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(16.dp))
 
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = MaterialTheme.shapes.medium,
-                colors = CardDefaults.cardColors(containerColor = linkCardColor),
-                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-                border = BorderStroke(1.dp, linkBorder),
-            ) {
-                Column(Modifier.padding(14.dp)) {
-                    UrlInputField(
-                        url = state.url,
-                        onUrlChange = viewModel::onUrlChanged,
-                        onClear = viewModel::onClearUrl,
-                        errorMessage = state.errorMessage,
-                        infoMessage = state.infoMessage,
-                    )
-                }
-            }
+            UrlInputField(
+                url = state.url,
+                onUrlChange = viewModel::onUrlChanged,
+                onClear = viewModel::onClearUrl,
+                errorMessage = state.errorMessage,
+                infoMessage = state.infoMessage,
+            )
 
-            Spacer(Modifier.height(18.dp))
+            Spacer(Modifier.height(16.dp))
 
             val spaceMetadata = state.sourceInfo?.spaceMetadata
             if (spaceMetadata != null) {
                 XSpaceCard(
                     space = spaceMetadata,
-                    modifier = Modifier.padding(bottom = 18.dp),
+                    modifier = Modifier.padding(bottom = 16.dp),
                     onPlayLive = { space ->
                         val streamUrl = space.audioStreamUrl
                         if (streamUrl != null) {
@@ -169,7 +162,7 @@ fun HomeScreen(
                 selected = state.mediaType,
                 onSelect = viewModel::onMediaTypeSelected,
                 videoEnabled = state.sourceInfo?.spaceMetadata == null,
-                modifier = Modifier.padding(bottom = 18.dp),
+                modifier = Modifier.padding(bottom = 12.dp),
             )
 
             SourceAnalysisCard(
@@ -178,7 +171,7 @@ fun HomeScreen(
                 selectedType = state.mediaType,
                 selectedFormat = state.availableFormats.firstOrNull { it.formatId == state.selectedFormatId },
                 errorMessage = state.analysisError,
-                modifier = Modifier.padding(bottom = 18.dp),
+                modifier = Modifier.padding(bottom = 12.dp),
             )
 
             if (sourceResolver == null || state.analysisState == AnalysisState.READY) {
@@ -189,8 +182,6 @@ fun HomeScreen(
                 )
             }
 
-            Spacer(Modifier.height(12.dp))
-
             if (state.sourceInfo?.playlistEntries.isNullOrEmpty()) {
                 FileNameField(
                     fileName = state.fileName,
@@ -199,7 +190,7 @@ fun HomeScreen(
                 )
             }
 
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(16.dp))
 
             DownloadButton(
                 enabled = state.isDownloadButtonEnabled &&
@@ -232,18 +223,31 @@ fun HomeScreen(
             )
 
             if (completedRecents.isNotEmpty()) {
-                Spacer(Modifier.height(32.dp))
-                Column {
-                    Text(
-                        text = stringResource(R.string.home_recent_downloads),
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                    completedRecents.forEach { item ->
-                        RecentDownloadRow(
-                            item = item,
-                            onClick = { onRecentClick(item) },
-                        )
+                Spacer(Modifier.height(28.dp))
+                Text(
+                    text = stringResource(R.string.home_recent_downloads),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.padding(bottom = 4.dp),
+                )
+                completedRecents.chunked(2).forEach { rowItems ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        rowItems.forEach { item ->
+                            RecentShortcutTile(
+                                item = item,
+                                onClick = { onRecentClick(item) },
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+                        if (rowItems.size == 1) {
+                            Spacer(Modifier.weight(1f))
+                        }
                     }
                 }
             }
@@ -254,42 +258,33 @@ fun HomeScreen(
 }
 
 @Composable
-private fun RecentDownloadRow(
+private fun RecentShortcutTile(
     item: DownloadItem,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 8.dp)
-            .clickable(onClick = onClick)
-            .padding(vertical = 8.dp),
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(10.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        modifier = modifier.height(64.dp),
     ) {
-        MediaArtwork(
-            artworkUrl = preferredArtworkUrl(item.thumbnailUri),
-            size = 72.dp,
-            mediaType = item.mediaType,
-        )
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .padding(horizontal = 12.dp),
-        ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            MediaArtwork(
+                artworkUrl = preferredArtworkUrl(item.thumbnailUri),
+                size = 64.dp,
+                shape = RoundedCornerShape(0.dp),
+                mediaType = item.mediaType,
+            )
             Text(
                 text = item.title ?: item.fileName ?: item.sourceUrl,
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-            )
-        }
-        item.durationSeconds?.let { seconds ->
-            val minutes = seconds / 60
-            val rest = seconds % 60
-            Text(
-                text = "%02d:%02d".format(minutes, rest),
-                style = MaterialTheme.typography.labelMedium.copy(fontFamily = FontFamily.Monospace),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(horizontal = 10.dp),
             )
         }
     }

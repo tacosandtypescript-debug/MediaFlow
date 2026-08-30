@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -14,6 +15,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.mediaflow.app.R
 import com.mediaflow.app.ui.home.QualityOption
@@ -34,22 +36,33 @@ fun QualitySelector(
         Text(
             text = stringResource(R.string.home_quality),
             style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurface,
         )
         FlowRow(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 8.dp, start = 2.dp, end = 2.dp, bottom = 2.dp),
+                .padding(top = 6.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             options.forEach { option ->
+                val selectedChip = selected == option
                 FilterChip(
-                    selected = selected == option,
+                    selected = selectedChip,
                     onClick = { onSelect(option) },
-                    label = { Text(stringResource(option.labelRes)) },
+                    label = {
+                        Text(
+                            text = stringResource(option.labelRes),
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = if (selectedChip) FontWeight.Bold else FontWeight.Medium,
+                        )
+                    },
+                    shape = CircleShape,
+                    border = null,
+                    colors = homeFilterChipColors(),
                     modifier = Modifier
-                        .height(48.dp)
+                        .height(40.dp)
                         .testTag("quality_${option.name.lowercase()}"),
                 )
             }
