@@ -117,11 +117,9 @@ class HomeScreenTest {
     }
 
     @Test
-    fun editFileName() {
+    fun fileNameFieldIsNotShown() {
         setHome()
-        composeRule.onNodeWithTag("file_name_input").performScrollTo()
-            .performTextInput("Mi video final")
-        composeRule.onNodeWithTag("file_name_input").assertTextContains("Mi video final")
+        composeRule.onNodeWithTag("file_name_input").assertDoesNotExist()
     }
 
     @Test

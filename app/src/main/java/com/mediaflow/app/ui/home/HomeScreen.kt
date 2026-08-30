@@ -38,7 +38,6 @@ import com.mediaflow.app.ui.common.media.MediaArtwork
 import com.mediaflow.app.ui.common.media.preferredArtworkUrl
 import com.mediaflow.app.ui.downloads.DownloadStartResult
 import com.mediaflow.app.ui.home.components.DownloadButton
-import com.mediaflow.app.ui.home.components.FileNameField
 import com.mediaflow.app.ui.home.components.MediaTypeSelector
 import com.mediaflow.app.ui.home.components.AnalyzedFormatSelector
 import com.mediaflow.app.ui.home.components.QualitySelector
@@ -205,14 +204,6 @@ fun HomeScreen(
                     options = state.qualityOptions,
                     selected = state.quality,
                     onSelect = viewModel::onQualitySelected,
-                )
-            }
-
-            if (state.sourceInfo?.playlistEntries.isNullOrEmpty()) {
-                FileNameField(
-                    fileName = state.fileName,
-                    suggestedFileName = state.suggestedFileName,
-                    onFileNameChange = viewModel::onFileNameChanged,
                 )
             }
 

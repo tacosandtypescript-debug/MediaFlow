@@ -55,10 +55,6 @@
     <string name="quality_high">Alta</string>
     <string name="quality_medium">Media</string>
     <string name="quality_low">Baja</string>
-    <string name="home_file_name_label">Nombre del archivo</string>
-    <string name="home_file_name_placeholder">Usar título de la fuente</string>
-    <string name="home_file_name_hint">Si lo dejas vacío, se usará el título de la fuente</string>
-    <string name="home_file_name_suggested">Se guardará como: %1$s</string>
     <string name="home_download_now">Descargar ahora</string>
     <string name="home_download_video">Descargar vídeo con audio</string>
     <string name="home_download_audio">Descargar solo audio</string>
