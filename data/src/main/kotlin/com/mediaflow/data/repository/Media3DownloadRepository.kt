@@ -20,9 +20,11 @@ import com.mediaflow.data.download.Media3DownloadInfrastructure
 import com.mediaflow.data.download.Media3DownloadStateMapper
 import com.mediaflow.data.download.ThumbnailPersister
 import com.mediaflow.data.download.YtDlpPlatformDownloader
+import com.mediaflow.data.media.DownloadedMediaPurger
 import com.mediaflow.data.media.MediaStorePublisher
 import com.mediaflow.data.media.MediaFileValidator
 import com.mediaflow.data.media.MediaFlowLibraryStore
+import com.mediaflow.data.media.VideoFrameThumbnail
 import com.mediaflow.data.media.metadata.DefaultMediaMetadataWriter
 import com.mediaflow.data.media.metadata.MediaMetadata
 import com.mediaflow.data.media.metadata.MediaMetadataWriter
@@ -141,11 +143,16 @@ class Media3DownloadRepository private constructor(
     }
 
     override suspend fun removeDownload(id: String) {
+        val item = getDownloadById(id)
+        if (item != null) {
+            DownloadedMediaPurger.purge(context, item)
+        }
         if (platformDownloader.contains(id)) {
             platformDownloader.remove(id)
             return
         }
         DirectDownloadService.removeDownload(context, id)
+        publishedUris.remove(id)
         refresh()
     }
 
@@ -247,6 +254,11 @@ class Media3DownloadRepository private constructor(
                 ownership.add(it)
             }
             ThumbnailPersister.persist(context, download.request.id, metadata.thumbnailUrl)
+            if (metadata.mediaType == MediaType.VIDEO &&
+                ThumbnailPersister.existingUri(context, download.request.id) == null
+            ) {
+                VideoFrameThumbnail.ensure(context, output)
+            }
             refresh()
         }.onFailure {
             output.delete()
@@ -265,7 +277,11 @@ class Media3DownloadRepository private constructor(
         } else {
             null
         }
-        val thumbnailUri = ThumbnailPersister.existingUri(context, request.id) ?: metadata.thumbnailUrl
+        val fileUri = completedFileUri(metadata.fileName, metadata.extension, request.id)
+        val thumbnailUri = ThumbnailPersister.existingUri(context, request.id)
+            ?: fileUri?.let { VideoFrameThumbnail.cachedUri(context, it) }
+            ?: localUri?.let { VideoFrameThumbnail.cachedUri(context, it) }
+            ?: metadata.thumbnailUrl
         return DownloadItem(
             id = request.id,
             sourceUrl = request.uri.toString(),
@@ -273,6 +289,8 @@ class Media3DownloadRepository private constructor(
             fileName = metadata.fileName,
             mediaType = metadata.mediaType,
             thumbnailUri = thumbnailUri,
+            width = metadata.width,
+            height = metadata.height,
             selectedFormat = metadata.extension?.let { extension ->
                 MediaFormat(
                     formatId = metadata.formatId ?: "direct",

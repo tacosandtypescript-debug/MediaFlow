@@ -18,9 +18,18 @@ import com.mediaflow.core.model.MediaFormat
 import com.mediaflow.core.model.MediaType
 import com.mediaflow.core.model.PlaybackProgress
 import com.mediaflow.core.model.XSpace
+import com.mediaflow.app.data.DownloadsPreferences
+import com.mediaflow.data.player.background.PlayerSessionHolder
+import com.mediaflow.data.repository.FavoritesRepositoryImpl
 import com.mediaflow.data.repository.Media3DownloadRepository
+import com.mediaflow.data.repository.MediaStoreGalleryRepository
+import com.mediaflow.data.repository.PlaylistRepositoryImpl
 import com.mediaflow.data.repository.ProgressRepositoryImpl
 import com.mediaflow.data.repository.XSpaceRepositoryImpl
+import com.mediaflow.domain.player.PlayerService
+import com.mediaflow.domain.repository.FavoritesRepository
+import com.mediaflow.domain.repository.GalleryRepository
+import com.mediaflow.domain.repository.PlaylistRepository
 import com.mediaflow.data.resolver.DirectUrlSourceResolver
 import com.mediaflow.data.resolver.YtDlpSourceResolver
 import com.mediaflow.domain.repository.DownloadRepository
@@ -40,6 +49,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.SharingStarted
@@ -64,6 +74,11 @@ class DownloadViewModel(
     application: Application,
     private val progressRepository: ProgressRepository = ProgressRepositoryImpl(application),
     private val spaceRepository: XSpaceRepository = XSpaceRepositoryImpl(application),
+    private val galleryRepository: GalleryRepository = MediaStoreGalleryRepository(application),
+    private val favoritesRepository: FavoritesRepository = FavoritesRepositoryImpl(application),
+    private val playlistRepository: PlaylistRepository = PlaylistRepositoryImpl(application),
+    private val playerService: PlayerService = PlayerSessionHolder.get(application),
+    private val downloadsPreferences: DownloadsPreferences = DownloadsPreferences(application),
 ) : AndroidViewModel(application) {
 
     private val repositoryDeferred = viewModelScope.async(Dispatchers.IO) {
@@ -84,6 +99,9 @@ class DownloadViewModel(
 
     private val _events = MutableSharedFlow<DownloadEvent>(extraBufferCapacity = 8)
     val events: SharedFlow<DownloadEvent> = _events.asSharedFlow()
+
+    val viewMode: StateFlow<DownloadsViewMode> = downloadsPreferences.viewMode
+        .stateIn(viewModelScope, SharingStarted.Eagerly, DownloadsViewMode.LIST)
 
     init {
         viewModelScope.launch {
@@ -219,7 +237,32 @@ class DownloadViewModel(
     fun resume(id: String) = viewModelScope.launch { ResumeDownloadUseCase(repositoryDeferred.await())(id) }
     fun cancel(id: String) = viewModelScope.launch { CancelDownloadUseCase(repositoryDeferred.await())(id) }
     fun retry(id: String) = viewModelScope.launch { RetryDownloadUseCase(repositoryDeferred.await())(id) }
-    fun remove(id: String) = viewModelScope.launch { RemoveDownloadUseCase(repositoryDeferred.await())(id) }
+    fun setViewMode(mode: DownloadsViewMode) {
+        viewModelScope.launch { downloadsPreferences.setViewMode(mode) }
+    }
+
+    fun remove(id: String) = viewModelScope.launch {
+        val item = _downloads.value.firstOrNull { it.id == id }
+        RemoveDownloadUseCase(repositoryDeferred.await())(id)
+        if (item != null) {
+            val keys = listOfNotNull(item.id, item.localUri).toSet()
+            item.localUri?.let { galleryRepository.deleteItem(it) }
+            keys.forEach { key -> favoritesRepository.setFavorite(key, false) }
+            val currentPlaylists = playlistRepository.observePlaylists().first()
+            currentPlaylists.forEach { playlist ->
+                keys.forEach { key ->
+                    if (key in playlist.mediaUris) {
+                        playlistRepository.removeMediaFromPlaylist(playlist.id, key)
+                    }
+                }
+            }
+            val player = playerService.uiState.value
+            val current = setOfNotNull(player.mediaId, player.filePath, player.currentQueueItem?.mediaUri)
+            if (current.any { it in keys }) {
+                playerService.stop()
+            }
+        }
+    }
 
     fun open(item: DownloadItem) {
         if (item.status != com.mediaflow.core.model.DownloadStatus.COMPLETED) return

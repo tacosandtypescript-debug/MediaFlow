@@ -30,6 +30,13 @@ class MediaFlowLibraryStoreTest {
 
             store.remove(owned)
             assertTrue(store.uris().isEmpty())
+
+            val video = Uri.parse("content://media/external/video/media/400")
+            val files = Uri.parse("content://media/external/file/400")
+            store.add(video)
+            store.add(files)
+            store.removeMatching(video)
+            assertTrue(store.uris().isEmpty())
         } finally {
             file.delete()
         }

@@ -40,15 +40,30 @@ class MediaFlowLibraryStore private constructor(private val file: File) {
 
     @Synchronized
     fun remove(uri: Uri) {
-        val values = uris() - uri.toString()
+        persist(uris() - uri.toString())
+    }
+
+    /** Drops the exact URI and any other ledger row that shares its MediaStore id. */
+    @Synchronized
+    fun removeMatching(uri: Uri) {
+        val target = uri.toString()
+        val targetId = mediaStoreId(target)
+        persist(
+            uris().filterNot { stored ->
+                stored == target || (targetId != null && mediaStoreId(stored) == targetId)
+            }.toSet(),
+        )
+    }
+
+    private fun persist(values: Set<String>) {
         if (values.isEmpty()) {
             file.delete()
-        } else {
-            val temp = File(file.parentFile, "${file.name}.tmp")
-            temp.writeText(JSONArray(values.sorted()).toString())
-            temp.copyTo(file, overwrite = true)
-            temp.delete()
+            return
         }
+        val temp = File(file.parentFile, "${file.name}.tmp")
+        temp.writeText(JSONArray(values.sorted()).toString())
+        temp.copyTo(file, overwrite = true)
+        temp.delete()
     }
 
     companion object {

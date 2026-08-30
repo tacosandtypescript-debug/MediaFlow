@@ -9,9 +9,11 @@ import com.mediaflow.domain.repository.DownloadRequest
 import com.mediaflow.data.resolver.PlatformUrlSupport
 import com.mediaflow.data.resolver.InstagramAnonymousResolver
 import com.mediaflow.data.resolver.TikTokAnonymousResolver
+import com.mediaflow.data.media.DownloadedMediaPurger
 import com.mediaflow.data.media.MediaStorePublisher
 import com.mediaflow.data.media.MediaFileValidator
 import com.mediaflow.data.media.MediaFlowLibraryStore
+import com.mediaflow.data.media.VideoFrameThumbnail
 import com.mediaflow.data.media.MediaTrackMuxer
 import com.mediaflow.data.media.metadata.DefaultMediaMetadataWriter
 import com.mediaflow.data.media.metadata.MediaMetadata
@@ -235,11 +237,12 @@ class YtDlpPlatformDownloader(
 
         val publishedUri = MediaStorePublisher.publishIfMissing(context, audioReady, mimeType, audioReady.name)
         publishedUri?.let(ownership::add)
+        val localUri = publishedUri?.toString() ?: android.net.Uri.fromFile(audioReady).toString()
         val thumbnailUri = harvestThumbnail(id, audioReady, request.thumbnailUrl) ?: current.thumbnailUri
         update(current.copy(
             fileName = audioReady.name,
             title = audioReady.nameWithoutExtension,
-            localUri = publishedUri?.toString() ?: android.net.Uri.fromFile(audioReady).toString(),
+            localUri = localUri,
             thumbnailUri = thumbnailUri,
             progress = 1f,
             isProgressKnown = true,
@@ -536,6 +539,10 @@ class YtDlpPlatformDownloader(
 
     fun remove(id: String) {
         sessions.remove(id)?.future?.cancel(true)
+        val existing = _items.value.firstOrNull { it.id == id }
+        if (existing != null) {
+            DownloadedMediaPurger.purge(context, existing)
+        }
         val updated = _items.value.filterNot { it.id == id }
         _items.value = updated
         store.save(updated)
@@ -616,17 +623,28 @@ class YtDlpPlatformDownloader(
             android.util.Log.w("YtDlpPlatformDownloader", "No se pudieron incrustar metadatos en ${output.name}: ${error.message}")
         }
 
-        val thumbnailUri = harvestThumbnail(id, output, request.thumbnailUrl) ?: current.thumbnailUri
+        val localUri = MediaStorePublisher.publishIfMissing(
+            context,
+            output,
+            mimeFor(extension),
+            output.name,
+        )?.also(ownership::add)?.toString() ?: android.net.Uri.fromFile(output).toString()
+        val harvested = harvestThumbnail(id, output, request.thumbnailUrl) ?: current.thumbnailUri
+        val frame = if (request.mediaType == MediaType.VIDEO && VideoFrameThumbnail.needsFrame(harvested)) {
+            VideoFrameThumbnail.ensure(context, output)
+        } else {
+            null
+        }
+        val thumbnailUri = harvested?.takeUnless { VideoFrameThumbnail.needsFrame(it) }
+            ?: frame?.thumbnailUri
+            ?: harvested
         update(current.copy(
             fileName = output.name,
             title = output.nameWithoutExtension,
-            localUri = MediaStorePublisher.publishIfMissing(
-                context,
-                output,
-                mimeFor(extension),
-                output.name,
-            )?.also(ownership::add)?.toString() ?: android.net.Uri.fromFile(output).toString(),
+            localUri = localUri,
             thumbnailUri = thumbnailUri,
+            width = current.width ?: frame?.width ?: request.width,
+            height = current.height ?: frame?.height ?: request.height,
             progress = 1f,
             isProgressKnown = true,
             totalBytes = output.length(),
