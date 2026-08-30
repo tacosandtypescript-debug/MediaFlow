@@ -2,6 +2,9 @@ package com.mediaflow.data
 
 import com.mediaflow.core.model.MediaType
 import com.mediaflow.data.resolver.YtDlpSourceResolver
+import com.mediaflow.data.resolver.tiktok.TikTokExtractPipeline
+import com.mediaflow.data.resolver.tiktok.TikTokResolveException
+import com.mediaflow.data.resolver.tiktok.TikTokResolveStage
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -122,6 +125,36 @@ class YtDlpSourceResolverTest {
         assertEquals(MediaType.VIDEO, format.mediaType)
         assertEquals(1080, format.height)
         assertTrue(format.isProgressive)
+    }
+
+    @Test
+    fun `TikTok stage codes appear verbatim in analysis errors`() {
+        val resolver = YtDlpSourceResolver(RuntimeEnvironment.getApplication())
+        val url = "https://vt.tiktok.com/ZSVWNejMx/"
+        val stages = listOf(
+            TikTokResolveStage.URL_RESOLUTION_FAILED,
+            TikTokResolveStage.REDIRECT_FAILED,
+            TikTokResolveStage.VIDEO_ID_NOT_FOUND,
+            TikTokResolveStage.TIKTOK_BLOCKED,
+            TikTokResolveStage.EXTRACTOR_FAILED,
+            TikTokResolveStage.MEDIA_URL_FAILED,
+            TikTokResolveStage.DOWNLOAD_FAILED,
+        )
+        for (stage in stages) {
+            val message = resolver.friendlyAnalysisError(
+                url,
+                TikTokResolveException(stage, stage.name),
+            )
+            assertTrue(message.startsWith("$stage:"))
+        }
+        assertEquals(
+            TikTokResolveStage.TIKTOK_BLOCKED,
+            TikTokExtractPipeline.mapBlocked(403, null)?.stage,
+        )
+        assertEquals(
+            TikTokResolveStage.TIKTOK_BLOCKED,
+            TikTokExtractPipeline.mapBlocked(429, "too many requests")?.stage,
+        )
     }
 
     @Test

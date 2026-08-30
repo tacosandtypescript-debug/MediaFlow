@@ -737,7 +737,7 @@ class YtDlpPlatformDownloader(
         val resolveStage = (error as? TikTokResolveException)?.stage
             ?: (error.cause as? TikTokResolveException)?.stage
         if (resolveStage != null) {
-            return when (resolveStage) {
+            val detail = when (resolveStage) {
                 TikTokResolveStage.URL_RESOLUTION_FAILED ->
                     "No se pudo resolver el enlace de TikTok."
                 TikTokResolveStage.REDIRECT_FAILED ->
@@ -753,6 +753,7 @@ class YtDlpPlatformDownloader(
                 TikTokResolveStage.DOWNLOAD_FAILED ->
                     "La descarga de TikTok falló después de resolver la URL canónica."
             }
+            return "${resolveStage}: $detail"
         }
         return when {
             platformType == PlatformUrlSupport.Platform.INSTAGRAM &&

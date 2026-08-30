@@ -82,48 +82,37 @@ class YtDlpSourceResolver(
             }
         }
 
-        val extractionUrl = if (PlatformUrlSupport.platformFor(trimmed) == PlatformUrlSupport.Platform.TIKTOK) {
-            val resolved = runCatching { TikTokExtractPipeline.resolveCanonical(trimmed) }
+        if (PlatformUrlSupport.platformFor(trimmed) == PlatformUrlSupport.Platform.TIKTOK) {
+            val canonical = runCatching { TikTokExtractPipeline.resolveCanonical(trimmed) }
                 .getOrElse { error ->
                     return@withContext SourceInfo(
                         sourceUrl = trimmed,
                         errorMessage = friendlyAnalysisError(trimmed, error),
                     )
                 }
-            resolved.canonicalUrl
-        } else {
-            PlatformUrlSupport.canonicalExtractionUrl(trimmed)
-        }
-        runCatching {
-            try {
-                val json = YtDlpRuntime.extractJson(
-                    appContext,
-                    extractionUrl,
-                    analysisDirectory,
-                    allowPlaylist = PlatformUrlSupport.isYoutubePlaylist(trimmed),
-                )
-                check(json.isNotBlank() && json != "None") {
-                    "El extractor no pudo analizar la fuente."
-                }
-                parseForTest(trimmed, json)
-            } finally {
-                analysisDirectory.listFiles().orEmpty().forEach { it.delete() }
-            }
-        }.getOrElse { error ->
-            analyzeAnonymousFallback(extractionUrl)?.let { return@withContext it }
-            if (PlatformUrlSupport.platformFor(trimmed) == PlatformUrlSupport.Platform.TIKTOK) {
-                return@withContext SourceInfo(
+                .canonicalUrl
+            return@withContext runCatching {
+                extractYtDlp(trimmed, canonical)
+            }.getOrElse { error ->
+                analyzeAnonymousFallback(canonical) ?: SourceInfo(
                     sourceUrl = trimmed,
                     errorMessage = friendlyAnalysisError(
                         trimmed,
                         TikTokResolveException(
                             TikTokResolveStage.EXTRACTOR_FAILED,
-                            "El extractor no pudo leer $extractionUrl.",
+                            "El extractor no pudo leer $canonical.",
                             error,
                         ),
                     ),
                 )
             }
+        }
+
+        val extractionUrl = PlatformUrlSupport.canonicalExtractionUrl(trimmed)
+        runCatching {
+            extractYtDlp(trimmed, extractionUrl)
+        }.getOrElse { error ->
+            analyzeAnonymousFallback(extractionUrl)?.let { return@withContext it }
 
             // Fallback for X Space if yt-dlp fails due to replay disabled or missing audio stream
             if (XUrlParser.isXUrl(trimmed)) {
@@ -157,6 +146,23 @@ class YtDlpSourceResolver(
                 sourceUrl = trimmed,
                 errorMessage = friendlyAnalysisError(trimmed, error),
             )
+        }
+    }
+
+    private suspend fun extractYtDlp(sourceUrl: String, extractionUrl: String): SourceInfo {
+        try {
+            val json = YtDlpRuntime.extractJson(
+                appContext,
+                extractionUrl,
+                analysisDirectory,
+                allowPlaylist = PlatformUrlSupport.isYoutubePlaylist(sourceUrl),
+            )
+            check(json.isNotBlank() && json != "None") {
+                "El extractor no pudo analizar la fuente."
+            }
+            return parseForTest(sourceUrl, json)
+        } finally {
+            analysisDirectory.listFiles().orEmpty().forEach { it.delete() }
         }
     }
 

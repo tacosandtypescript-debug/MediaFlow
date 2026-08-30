@@ -29,11 +29,11 @@ class TikTokExtractPipelineTest {
     }
 
     @Test
-    fun `short link follows redirect to canonical video id`() {
+    fun `short link follows 301 or 302 redirect to canonical video id`() {
         val hop = TikTokRedirectHop { url ->
             if (url.contains("vt.tiktok.com")) {
                 TikTokHopResult(
-                    302,
+                    301,
                     location = "https://www.tiktok.com/@user/video/7555123456789012345",
                 )
             } else {
@@ -157,5 +157,29 @@ class TikTokExtractPipelineTest {
             },
         )
         assertEquals("ok", result)
+    }
+
+    @Test
+    fun `lookalike video path never invokes extractors`() {
+        val extractCalled = AtomicBoolean(false)
+        val hop = TikTokRedirectHop { TikTokHopResult(200) }
+        try {
+            TikTokExtractPipeline.resolveThenExtract(
+                sourceUrl = "https://www.tiktok.com/@user/video/not-a-numeric-id",
+                hop = hop,
+                primary = TikTokPageExtractor {
+                    extractCalled.set(true)
+                    "primary"
+                },
+                fallback = TikTokPageExtractor {
+                    extractCalled.set(true)
+                    "fallback"
+                },
+            )
+            fail("expected VIDEO_ID_NOT_FOUND")
+        } catch (error: TikTokResolveException) {
+            assertEquals(TikTokResolveStage.VIDEO_ID_NOT_FOUND, error.stage)
+        }
+        assertFalse(extractCalled.get())
     }
 }
