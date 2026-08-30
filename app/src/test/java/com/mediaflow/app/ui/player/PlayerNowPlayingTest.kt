@@ -32,6 +32,24 @@ class PlayerNowPlayingTest {
     }
 
     @Test
+    fun `stale embedded tags do not belong to the next track`() {
+        assertTrue(
+            PlayerDisplayMetadata.tagsBelongToCurrent(
+                "content://media/a",
+                "content://media/a",
+                "a",
+            ),
+        )
+        assertFalse(
+            PlayerDisplayMetadata.tagsBelongToCurrent(
+                "content://media/first-song",
+                "content://media/second-song",
+                "second-song",
+            ),
+        )
+    }
+
+    @Test
     fun `filename is used when tags are missing and uri is a numeric id`() {
         val shown = PlayerDisplayMetadata.title(
             taggedTitle = null,

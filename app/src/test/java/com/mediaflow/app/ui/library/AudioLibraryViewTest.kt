@@ -53,6 +53,7 @@ class AudioLibraryViewTest {
                     onDeleteMedia = {},
                     shuffleEnabled = shuffle,
                     onShuffleChange = { shuffle = it },
+                    onShuffleAll = { shuffle = true },
                 )
             }
         }

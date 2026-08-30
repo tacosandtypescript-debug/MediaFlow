@@ -138,7 +138,12 @@ class YtDlpSourceResolver(
             PlatformUrlSupport.Platform.TIKTOK -> {
                 val video = runCatching { TikTokAnonymousResolver().resolve(sourceUrl).getOrThrow() }.getOrNull()
                     ?: return null
-                anonymousVideoInfo(sourceUrl, video.url, title = "Vídeo de TikTok")
+                anonymousVideoInfo(
+                    sourceUrl,
+                    video.url,
+                    title = video.title?.takeIf { it.isNotBlank() } ?: "Vídeo de TikTok",
+                    thumbnailUrl = video.thumbnailUrl,
+                )
             }
             PlatformUrlSupport.Platform.INSTAGRAM -> {
                 val cdn = runCatching {
@@ -150,9 +155,15 @@ class YtDlpSourceResolver(
         }
     }
 
-    private fun anonymousVideoInfo(sourceUrl: String, cdnUrl: String, title: String): SourceInfo = SourceInfo(
+    private fun anonymousVideoInfo(
+        sourceUrl: String,
+        cdnUrl: String,
+        title: String,
+        thumbnailUrl: String? = null,
+    ): SourceInfo = SourceInfo(
         sourceUrl = sourceUrl,
         title = title,
+        thumbnailUrl = thumbnailUrl,
         availableFormats = listOf(
             MediaFormat(
                 formatId = "anonymous",

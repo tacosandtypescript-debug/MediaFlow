@@ -13,6 +13,7 @@ import com.mediaflow.app.ui.player.miniplayer.MiniPlayer
 import com.mediaflow.app.ui.theme.MediaFlowTheme
 import com.mediaflow.domain.player.EnginePlaybackState
 import com.mediaflow.domain.player.PlayerServiceState
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -59,7 +60,7 @@ class LibraryScreenTest {
         assertTrue(source.contains("onShuffleChange"))
         assertTrue(source.contains("graphicsLayer"))
         assertTrue(source.contains("translationY"))
-        assertTrue(source.contains("library_shuffle_all"))
+        assertFalse(source.contains("library_shuffle_all_btn"))
         val shuffle = Regex("<string name=\"library_shuffle_all\">([^<]+)</string>").find(strings)?.groupValues?.get(1).orEmpty()
         assertTrue(shuffle.isNotBlank())
         assertTrue("Shuffle label must not include emojis", shuffle.none { it.category == CharCategory.SURROGATE || it.code > 0x2600 })

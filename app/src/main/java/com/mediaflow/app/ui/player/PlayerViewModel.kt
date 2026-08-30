@@ -91,6 +91,7 @@ class PlayerViewModel(
     private val isScrubbing = MutableStateFlow(false)
     private val scrubPositionMs = MutableStateFlow(0L)
     private val embeddedTags = MutableStateFlow(EmbeddedTrackTags())
+    private val taggedMediaUri = MutableStateFlow<String?>(null)
     private val liveEndState = MutableStateFlow<LiveSpaceEndState>(LiveSpaceEndState.ActiveLive)
     private val isAutoDownloadEnabled = MutableStateFlow(false)
 
@@ -115,6 +116,7 @@ class PlayerViewModel(
         playlistRepository.observePlaylists().flowOn(Dispatchers.IO),
         scrubPositionMs,
         embeddedTags,
+        taggedMediaUri,
     ) { args: Array<Any?> ->
         val service = args[0] as PlayerServiceState
         val controls = args[1] as Boolean
@@ -129,9 +131,14 @@ class PlayerViewModel(
         @Suppress("UNCHECKED_CAST")
         val playlists = args[9] as List<Playlist>
         val scrubPos = args[10] as Long
-        val tags = args[11] as EmbeddedTrackTags
-
+        val rawTags = args[11] as EmbeddedTrackTags
+        val tagsUri = args[12] as? String
         val uri = service.filePath.orEmpty()
+        val tags = if (PlayerDisplayMetadata.tagsBelongToCurrent(tagsUri, service.filePath, service.mediaId)) {
+            rawTags
+        } else {
+            EmbeddedTrackTags()
+        }
         val isFav = favoriteUris.contains(uri) || (service.mediaId != null && favoriteUris.contains(service.mediaId))
         val artist = space?.let { "Host: ${it.host.formattedHandle}" }
             ?: PlayerDisplayMetadata.artist(tags.artist, service.artistOrHost)
@@ -167,6 +174,10 @@ class PlayerViewModel(
     init {
         viewModelScope.launch {
             playerService.uiState.collect { state ->
+                val trackUri = state.filePath ?: state.mediaId
+                if (!trackUri.isNullOrBlank() && trackUri != taggedMediaUri.value) {
+                    refreshEmbeddedTags(trackUri, state.isLive)
+                }
                 if (state.isPlaying && isControlsVisible.value && !isScrubbing.value) {
                     scheduleHideControls()
                 } else if (!state.isPlaying) {
@@ -248,6 +259,7 @@ class PlayerViewModel(
                 EmbeddedTrackTags()
             }
             embeddedTags.value = tags
+            taggedMediaUri.value = mediaUri
 
             val download = withTimeoutOrNull(1_500) {
                 val items = downloadRepo.observeDownloads().first()
@@ -255,6 +267,7 @@ class PlayerViewModel(
             }
             val artwork = tags.artworkUri ?: download?.thumbnailUri
             embeddedTags.value = tags.copy(artworkUri = artwork)
+            taggedMediaUri.value = mediaUri
             val resolvedTitle = PlayerDisplayMetadata.title(
                 taggedTitle = tags.title ?: space?.title ?: title,
                 serviceTitle = download?.title,
@@ -469,6 +482,30 @@ class PlayerViewModel(
 
     fun playPrevious() {
         playerService.previousTrack()
+    }
+
+    private fun refreshEmbeddedTags(trackUri: String, isLive: Boolean) {
+        viewModelScope.launch {
+            taggedMediaUri.value = trackUri
+            val isRemote = trackUri.startsWith("http://", ignoreCase = true) ||
+                trackUri.startsWith("https://", ignoreCase = true)
+            val tags = if (!isLive && !isRemote) {
+                runCatching {
+                    withContext(Dispatchers.IO) { readEmbeddedMetadata(trackUri) }
+                }.getOrDefault(EmbeddedTrackTags())
+            } else {
+                EmbeddedTrackTags()
+            }
+            if (taggedMediaUri.value == trackUri) {
+                val download = withTimeoutOrNull(800) {
+                    downloadRepo.observeDownloads().first()
+                        .firstOrNull { item -> matchesDownload(item, trackUri) }
+                }
+                embeddedTags.value = tags.copy(
+                    artworkUri = tags.artworkUri ?: download?.thumbnailUri,
+                )
+            }
+        }
     }
 
     fun skipToIndex(index: Int) {

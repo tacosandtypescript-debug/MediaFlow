@@ -20,10 +20,13 @@ import androidx.compose.material.icons.outlined.Audiotrack
 import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.Shuffle
 import androidx.compose.material3.Button
-import androidx.compose.material3.FilterChip
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -88,52 +91,61 @@ fun AudioLibraryView(
         Column(modifier = modifier.fillMaxSize()) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 8.dp),
             ) {
+                val pill = RoundedCornerShape(24.dp)
+                val btnMod = Modifier
+                    .weight(1f)
+                    .height(48.dp)
                 Button(
                     onClick = onPlayAll,
-                    shape = RoundedCornerShape(14.dp),
-                    modifier = Modifier
-                        .height(44.dp)
-                        .testTag("library_play_all_btn"),
+                    shape = pill,
+                    modifier = btnMod.testTag("library_play_all_btn"),
                 ) {
-                    Icon(Icons.Outlined.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(4.dp))
+                    Icon(Icons.Outlined.PlayArrow, contentDescription = null, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(6.dp))
                     Text(
                         text = stringResource(R.string.library_play_all),
                         fontWeight = FontWeight.Bold,
                     )
                 }
-                FilterChip(
-                    selected = shuffleEnabled,
-                    onClick = { onShuffleChange(!shuffleEnabled) },
-                    label = {
+                if (shuffleEnabled) {
+                    Button(
+                        onClick = { onShuffleChange(false) },
+                        shape = pill,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                        ),
+                        modifier = btnMod
+                            .testTag("library_shuffle_btn")
+                            .semantics { selected = true },
+                    ) {
+                        Icon(Icons.Outlined.Shuffle, contentDescription = null, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(6.dp))
                         Text(
                             text = stringResource(R.string.library_shuffle),
                             fontWeight = FontWeight.Bold,
                         )
-                    },
-                    leadingIcon = {
-                        Icon(Icons.Outlined.Shuffle, contentDescription = null, modifier = Modifier.size(18.dp))
-                    },
-                    modifier = Modifier.testTag("library_shuffle_btn"),
-                )
-                OutlinedButton(
-                    onClick = onShuffleAll,
-                    shape = RoundedCornerShape(14.dp),
-                    modifier = Modifier
-                        .height(44.dp)
-                        .testTag("library_shuffle_all_btn"),
-                ) {
-                    Icon(Icons.Outlined.Shuffle, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(4.dp))
-                    Text(
-                        text = stringResource(R.string.library_shuffle_all),
-                        fontWeight = FontWeight.Bold,
-                    )
+                    }
+                } else {
+                    OutlinedButton(
+                        onClick = onShuffleAll,
+                        shape = pill,
+                        modifier = btnMod
+                            .testTag("library_shuffle_btn")
+                            .semantics { selected = false },
+                    ) {
+                        Icon(Icons.Outlined.Shuffle, contentDescription = null, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            text = stringResource(R.string.library_shuffle),
+                            fontWeight = FontWeight.Bold,
+                        )
+                    }
                 }
             }
             val density = LocalDensity.current

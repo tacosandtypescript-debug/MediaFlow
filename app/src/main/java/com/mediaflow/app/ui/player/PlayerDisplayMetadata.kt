@@ -28,6 +28,16 @@ object PlayerDisplayMetadata {
 
     fun album(taggedAlbum: String?): String? = taggedAlbum.humanOrNull()
 
+    /**
+     * Embedded tags belong to one URI. After skip/swipe they must not paint
+     * the previous track's title/cover onto the new one.
+     */
+    fun tagsBelongToCurrent(tagsUri: String?, currentFilePath: String?, currentMediaId: String?): Boolean {
+        val tagged = tagsUri?.trim().orEmpty()
+        if (tagged.isBlank()) return false
+        return tagged == currentFilePath?.trim() || tagged == currentMediaId?.trim()
+    }
+
     private fun String?.humanOrNull(): String? {
         val value = this?.trim().orEmpty()
         if (value.isEmpty()) return null

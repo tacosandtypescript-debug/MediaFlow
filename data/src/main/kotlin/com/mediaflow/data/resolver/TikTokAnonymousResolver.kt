@@ -8,7 +8,12 @@ import java.net.URL
 
 /** Resolves the public TikTok HTML page without cookies or a login session. */
 class TikTokAnonymousResolver {
-    data class ResolvedVideo(val url: String, val cookieHeader: String? = null)
+    data class ResolvedVideo(
+        val url: String,
+        val cookieHeader: String? = null,
+        val title: String? = null,
+        val thumbnailUrl: String? = null,
+    )
 
     fun resolve(sourceUrl: String): Result<ResolvedVideo> = runCatching {
         require(PlatformUrlSupport.platformFor(sourceUrl) == PlatformUrlSupport.Platform.TIKTOK)
@@ -18,7 +23,8 @@ class TikTokAnonymousResolver {
             ?: error("TikTok no publicó un enlace de vídeo anónimo")
         val cookieHeader = cookies.entries.joinToString("; ") { "${it.key}=${it.value}" }
             .takeIf { it.isNotBlank() }
-        ResolvedVideo(videoUrl, cookieHeader)
+        val meta = extractPageMeta(html)
+        ResolvedVideo(videoUrl, cookieHeader, meta.first, meta.second)
     }
 
     fun sessionCookieHeader(sourceUrl: String): String? {
@@ -126,11 +132,41 @@ class TikTokAnonymousResolver {
         private val PLAY_URL = Regex(""""playUrl"\s*:\s*"([^"]+)"""")
         private val PLAY_ADDR_LIST = Regex(""""play_addr"\s*:\s*\{[^{}]*?"url_list"\s*:\s*\[\s*"([^"]+)"""")
         private val DOWNLOAD_ADDR_LIST = Regex(""""download_addr"\s*:\s*\{[^{}]*?"url_list"\s*:\s*\[\s*"([^"]+)"""")
+        private val OG_TITLE = Regex(
+            """<meta\s+[^>]*(?:property|name)=["']og:title["'][^>]*content=["']([^"']+)["']""" +
+                """|<meta\s+[^>]*content=["']([^"']+)["'][^>]*(?:property|name)=["']og:title["']""",
+            RegexOption.IGNORE_CASE,
+        )
+        private val OG_IMAGE = Regex(
+            """<meta\s+[^>]*(?:property|name)=["']og:image["'][^>]*content=["']([^"']+)["']""" +
+                """|<meta\s+[^>]*content=["']([^"']+)["'][^>]*(?:property|name)=["']og:image["']""",
+            RegexOption.IGNORE_CASE,
+        )
+        private val JSON_DESC = Regex(""""desc"\s*:\s*"((?:\\.|[^"\\])*)"""")
+        private val JSON_COVER = Regex(""""(?:originCover|dynamicCover|cover)"\s*:\s*"([^"]+)"""")
         private val OG_VIDEO = Regex(
             """<meta\s+[^>]*(?:property|name)=["']og:video(?::(?:url|secure_url))?["'][^>]*content=["']([^"']+)["']""" +
                 """|<meta\s+[^>]*content=["']([^"']+)["'][^>]*(?:property|name)=["']og:video(?::(?:url|secure_url))?["']""",
             RegexOption.IGNORE_CASE,
         )
+
+        internal fun extractPageMeta(html: String): Pair<String?, String?> {
+            val ogTitle = OG_TITLE.find(html)?.let { match ->
+                unescapeJsonString(match.groupValues[1].ifBlank { match.groupValues[2] })
+                    .replace("&amp;", "&")
+                    .replace("&#39;", "'")
+                    .trim()
+                    .takeIf { it.isNotBlank() && !it.equals("tiktok", ignoreCase = true) }
+            }
+            val jsonTitle = JSON_DESC.find(html)?.groupValues?.get(1)?.let { raw ->
+                unescapeJsonString(raw).trim().takeIf { it.isNotBlank() }
+            }
+            val ogImage = OG_IMAGE.find(html)?.let { match ->
+                decodeHttpsUrl(match.groupValues[1].ifBlank { match.groupValues[2] })
+            }
+            val jsonCover = JSON_COVER.find(html)?.groupValues?.get(1)?.let { decodeHttpsUrl(it) }
+            return (ogTitle ?: jsonTitle) to (ogImage ?: jsonCover)
+        }
 
         internal fun extractPlayAddress(html: String): String? {
             val patterns = listOf(

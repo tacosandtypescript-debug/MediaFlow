@@ -48,6 +48,18 @@ class AnonymousHtmlExtractorTest {
     }
 
     @Test
+    fun `TikTok og title and image are extracted from html`() {
+        val html = """
+            <meta property="og:title" content="Baile en la cocina" />
+            <meta property="og:image" content="https://p16-sign.tiktokcdn.com/cover.jpeg" />
+            {"playAddr":"https://v16.tiktokcdn.com/file.mp4"}
+        """.trimIndent()
+        val meta = TikTokAnonymousResolver.extractPageMeta(html)
+        assertEquals("Baile en la cocina", meta.first)
+        assertEquals("https://p16-sign.tiktokcdn.com/cover.jpeg", meta.second)
+    }
+
+    @Test
     fun `TikTok login pages are not treated as video URLs`() {
         val html = """{"playAddr":"https://www.tiktok.com/login?redirect=video"}"""
         assertNull(TikTokAnonymousResolver.extractPlayAddress(html))
