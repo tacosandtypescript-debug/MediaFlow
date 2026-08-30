@@ -50,4 +50,31 @@ object LibraryAudioQueueBuilder {
         }
         return LibraryAudioQueue(shuffled, currentIndex = 0, shuffle = true)
     }
+
+    fun <T> reorder(
+        items: List<T>,
+        fromIndex: Int,
+        toIndex: Int,
+        currentIndex: Int,
+        shuffle: Boolean,
+    ): LibraryAudioQueue<T> {
+        if (items.isEmpty()) {
+            return LibraryAudioQueue(emptyList(), currentIndex = 0, shuffle = shuffle)
+        }
+        val from = fromIndex.coerceIn(0, items.lastIndex)
+        val to = toIndex.coerceIn(0, items.lastIndex)
+        if (from == to) {
+            return LibraryAudioQueue(items, currentIndex.coerceIn(0, items.lastIndex), shuffle)
+        }
+        val mutable = items.toMutableList()
+        val moved = mutable.removeAt(from)
+        mutable.add(to, moved)
+        val newCurrent = when {
+            currentIndex == from -> to
+            from < currentIndex && to >= currentIndex -> currentIndex - 1
+            from > currentIndex && to <= currentIndex -> currentIndex + 1
+            else -> currentIndex
+        }.coerceIn(0, mutable.lastIndex)
+        return LibraryAudioQueue(mutable, newCurrent, shuffle)
+    }
 }

@@ -1,5 +1,6 @@
 package com.mediaflow.app.ui.library.components
 
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -25,6 +26,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -54,6 +57,7 @@ fun AudioLibraryView(
     onDeleteMedia: (item: DownloadItem) -> Unit,
     onPlayAll: () -> Unit = {},
     onShuffleAll: () -> Unit = {},
+    onReorder: (fromIndex: Int, toIndex: Int) -> Unit = { _, _ -> },
     selectedIds: Set<String> = emptySet(),
     inSelectionMode: Boolean = false,
     onLongPressItem: (DownloadItem) -> Unit = {},
@@ -107,6 +111,8 @@ fun AudioLibraryView(
                     )
                 }
             }
+            val density = LocalDensity.current
+            val rowHeightPx = with(density) { 72.dp.toPx() }
             LazyColumn(
                 contentPadding = PaddingValues(top = 4.dp, bottom = 120.dp),
                 modifier = Modifier
@@ -143,10 +149,36 @@ fun AudioLibraryView(
                         isFavorite = favoriteUris.contains(uri),
                         progressFraction = progressFraction,
                         selected = item.id in selectedIds,
+                        modifier = Modifier
+                            .testTag("audio_library_row_$index")
+                            .then(
+                                if (inSelectionMode) {
+                                    Modifier
+                                } else {
+                                    Modifier.pointerInput(index, items.size) {
+                                        var accumulated = 0f
+                                        detectDragGesturesAfterLongPress(
+                                            onDragStart = { accumulated = 0f },
+                                            onDrag = { change, dragAmount ->
+                                                change.consume()
+                                                accumulated += dragAmount.y
+                                                val steps = (accumulated / rowHeightPx).toInt()
+                                                if (steps != 0) {
+                                                    val to = (index + steps).coerceIn(0, items.lastIndex)
+                                                    if (to != index) {
+                                                        onReorder(index, to)
+                                                        accumulated = 0f
+                                                    }
+                                                }
+                                            },
+                                        )
+                                    }
+                                },
+                            ),
                         onClick = {
                             if (inSelectionMode) onToggleSelect(item) else onPlayItem(item, index)
                         },
-                        onLongClick = { onLongPressItem(item) },
+                        onLongClick = { if (inSelectionMode) onLongPressItem(item) },
                         onToggleFavorite = { onToggleFavorite(uri) },
                         onAddToPlaylist = { onAddToPlaylist(item) },
                         onAddToQueue = { onAddToQueue(item) },

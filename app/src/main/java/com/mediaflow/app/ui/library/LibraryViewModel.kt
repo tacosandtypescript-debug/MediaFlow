@@ -268,6 +268,27 @@ class LibraryViewModel(
         playLibraryAudioQueue(LibraryAudioQueueBuilder.shuffleAll(visible), context)
     }
 
+    fun reorderAudioQueueIfActive(
+        visible: List<DownloadItem>,
+        fromIndex: Int,
+        toIndex: Int,
+        context: String = LIBRARY_AUDIO_QUEUE_CONTEXT,
+    ): List<DownloadItem> {
+        val player = playerService.uiState.value
+        val isActiveContext = player.playbackContext == context
+        val result = LibraryAudioQueueBuilder.reorder(
+            items = visible,
+            fromIndex = fromIndex,
+            toIndex = toIndex,
+            currentIndex = if (isActiveContext) player.queueIndex else 0,
+            shuffle = player.isShuffle,
+        )
+        if (isActiveContext) {
+            playerService.reorderQueue(fromIndex, toIndex)
+        }
+        return result.items
+    }
+
     fun playLibraryAudioQueue(
         queue: LibraryAudioQueue<DownloadItem>,
         context: String? = LIBRARY_AUDIO_QUEUE_CONTEXT,

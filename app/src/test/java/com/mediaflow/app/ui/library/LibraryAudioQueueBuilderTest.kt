@@ -27,4 +27,18 @@ class LibraryAudioQueueBuilderTest {
         assertTrue(queue.shuffle)
         assertNotEquals(tracks, queue.items)
     }
+
+    @Test
+    fun reorder_movesBPastC() {
+        val original = listOf("A", "B", "C", "D")
+        val queue = LibraryAudioQueueBuilder.reorder(
+            items = original,
+            fromIndex = 1,
+            toIndex = 2,
+            currentIndex = 0,
+            shuffle = false,
+        )
+        assertEquals(listOf("A", "C", "B", "D"), queue.items)
+        assertEquals(0, queue.currentIndex)
+    }
 }

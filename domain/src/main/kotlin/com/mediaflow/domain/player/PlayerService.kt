@@ -436,6 +436,24 @@ class PlayerService(
         _uiState.value = _uiState.value.copy(isShuffle = enabled)
     }
 
+    fun reorderQueue(fromIndex: Int, toIndex: Int) {
+        val current = _uiState.value
+        if (current.queue.isEmpty()) return
+        val from = fromIndex.coerceIn(0, current.queue.lastIndex)
+        val to = toIndex.coerceIn(0, current.queue.lastIndex)
+        if (from == to) return
+        val mutable = current.queue.toMutableList()
+        val moved = mutable.removeAt(from)
+        mutable.add(to, moved)
+        val newIndex = when {
+            current.queueIndex == from -> to
+            from < current.queueIndex && to >= current.queueIndex -> current.queueIndex - 1
+            from > current.queueIndex && to <= current.queueIndex -> current.queueIndex + 1
+            else -> current.queueIndex
+        }.coerceIn(0, mutable.lastIndex)
+        _uiState.value = current.copy(queue = mutable, queueIndex = newIndex)
+    }
+
     fun seekTo(positionMs: Long) {
         if (isReleased) return
         engine.seekTo(positionMs)

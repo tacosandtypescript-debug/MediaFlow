@@ -20,6 +20,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -226,29 +227,35 @@ fun LibraryScreen(
                     onToggleSelect = { viewModel.toggleSelection(it.id) },
                 )
             }
-            LibraryFilter.AUDIO -> AudioLibraryView(
-                items = visibleAudio,
+            LibraryFilter.AUDIO -> {
+                var audioOrder by remember { mutableStateOf(visibleAudio) }
+                LaunchedEffect(visibleAudio) { audioOrder = visibleAudio }
+                AudioLibraryView(
+                    items = audioOrder,
                 spacesMap = uiState.spacesMap,
                 progressMap = uiState.progressMap,
                 playingMediaId = uiState.playingMediaId,
                 isPlayerPlaying = uiState.isPlayerPlaying,
                 favoriteUris = uiState.favoriteUris,
                 onPlayAll = {
-                    if (visibleAudio.isNotEmpty()) {
-                        viewModel.playAllAudio(visibleAudio)
-                        onOpenItem(visibleAudio.first())
+                    if (audioOrder.isNotEmpty()) {
+                        viewModel.playAllAudio(audioOrder)
+                        onOpenItem(audioOrder.first())
                     }
                 },
                 onShuffleAll = {
-                    if (visibleAudio.isNotEmpty()) {
-                        val shuffled = LibraryAudioQueueBuilder.shuffleAll(visibleAudio)
+                    if (audioOrder.isNotEmpty()) {
+                        val shuffled = LibraryAudioQueueBuilder.shuffleAll(audioOrder)
                         viewModel.playLibraryAudioQueue(shuffled)
                         shuffled.items.firstOrNull()?.let(onOpenItem)
                     }
                 },
                 onPlayItem = { item, index ->
-                    viewModel.playQueue(visibleAudio, index, LibraryViewModel.LIBRARY_AUDIO_QUEUE_CONTEXT)
+                    viewModel.playQueue(audioOrder, index, LibraryViewModel.LIBRARY_AUDIO_QUEUE_CONTEXT)
                     onOpenItem(item)
+                },
+                onReorder = { from, to ->
+                    audioOrder = viewModel.reorderAudioQueueIfActive(audioOrder, from, to)
                 },
                 onToggleFavorite = { uri -> viewModel.toggleFavorite(uri) },
                 onAddToPlaylist = { item -> itemForAddToPlaylist = item },
@@ -258,7 +265,8 @@ fun LibraryScreen(
                 inSelectionMode = selection.inSelectionMode,
                 onLongPressItem = { viewModel.enterSelection(it.id) },
                 onToggleSelect = { viewModel.toggleSelection(it.id) },
-            )
+                )
+            }
             LibraryFilter.VIDEO -> VideoLibraryView(
                 items = visibleVideo,
                 playingMediaId = uiState.playingMediaId,
