@@ -1,6 +1,7 @@
 package com.mediaflow.app.ui.library
 
 import com.mediaflow.app.ui.library.components.AudioLibraryTab
+import com.mediaflow.app.ui.library.components.LibraryFilter
 import com.mediaflow.core.model.DownloadItem
 import com.mediaflow.core.model.MediaType
 import com.mediaflow.core.model.PlaybackProgress
@@ -11,6 +12,7 @@ import com.mediaflow.core.model.XSpace
  * Consolidates full UI state for the Library tab (Audio, Video, Playlists, Favorites).
  */
 data class LibraryUiState(
+    val selectedFilter: LibraryFilter = LibraryFilter.ALL,
     val selectedMediaType: MediaType = MediaType.AUDIO,
     val selectedAudioTab: AudioLibraryTab = AudioLibraryTab.ALL,
     val allItems: List<DownloadItem> = emptyList(),

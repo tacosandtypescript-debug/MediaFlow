@@ -1,13 +1,7 @@
 package com.mediaflow.app.ui.library
 
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -16,29 +10,26 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import com.mediaflow.app.R
-import com.mediaflow.app.ui.common.media.preferredArtworkUrl
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.mediaflow.app.ui.common.media.DeleteMediaDialog
+import com.mediaflow.app.ui.common.media.preferredArtworkUrl
 import com.mediaflow.app.ui.favorites.FavoritesView
-import com.mediaflow.app.ui.library.components.AudioLibraryTab
 import com.mediaflow.app.ui.library.components.AudioLibraryView
-import com.mediaflow.app.ui.library.components.LibraryMediaSelector
-import com.mediaflow.app.ui.library.components.LibraryTabs
+import com.mediaflow.app.ui.library.components.LibraryAllView
+import com.mediaflow.app.ui.library.components.LibraryFilter
+import com.mediaflow.app.ui.library.components.LibraryFilterChips
+import com.mediaflow.app.ui.library.components.LibraryHeader
+import com.mediaflow.app.ui.library.components.LibraryRecentsBar
 import com.mediaflow.app.ui.library.components.VideoLibraryView
 import com.mediaflow.app.ui.playlists.PlaylistDetailScreen
 import com.mediaflow.app.ui.playlists.PlaylistsView
 import com.mediaflow.app.ui.playlists.components.AddToPlaylistSheet
+import com.mediaflow.app.ui.playlists.components.CreatePlaylistDialog
 import com.mediaflow.core.model.DownloadItem
-import com.mediaflow.core.model.MediaType
 import com.mediaflow.core.model.Playlist
 
 /**
- * Main Library screen ("Tu biblioteca") with segmented Audio | Video collections,
- * tabs for Todos | Favoritos | Playlists, and seamless playback integration.
+ * Library screen modelled after Spotify's Your Library: chips, recents, list/grid.
  */
 @Composable
 fun LibraryScreen(
@@ -53,6 +44,33 @@ fun LibraryScreen(
     var activePlaylistForDetail by remember { mutableStateOf<Playlist?>(null) }
     var itemForAddToPlaylist by remember { mutableStateOf<DownloadItem?>(null) }
     var itemToDelete by remember { mutableStateOf<DownloadItem?>(null) }
+    var searchOpen by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
+    var isGrid by remember { mutableStateOf(false) }
+    var showCreatePlaylist by remember { mutableStateOf(false) }
+    var playlistToRename by remember { mutableStateOf<Playlist?>(null) }
+
+    val query = searchQuery.trim()
+    fun matchesQuery(text: String?): Boolean =
+        query.isEmpty() || (text?.contains(query, ignoreCase = true) == true)
+
+    val visibleAudio = remember(uiState.audioItems, query) {
+        uiState.audioItems.filter { matchesQuery(it.title) || matchesQuery(it.fileName) }
+    }
+    val visibleVideo = remember(uiState.videoItems, query) {
+        uiState.videoItems.filter { matchesQuery(it.title) || matchesQuery(it.fileName) }
+    }
+    val visibleFavorites = remember(uiState.favoriteItems, query) {
+        uiState.favoriteItems.filter { matchesQuery(it.title) || matchesQuery(it.fileName) }
+    }
+    val visiblePlaylists = remember(uiState.playlists, query) {
+        uiState.playlists.filter { matchesQuery(it.name) }
+    }
+    val visibleAll = remember(uiState.allItems, query) {
+        uiState.allItems
+            .sortedByDescending { it.createdAt }
+            .filter { matchesQuery(it.title) || matchesQuery(it.fileName) }
+    }
 
     if (activePlaylistForDetail != null) {
         val currentPlaylist = uiState.playlists.firstOrNull { it.id == activePlaylistForDetail?.id }
@@ -94,104 +112,147 @@ fun LibraryScreen(
             .fillMaxSize()
             .testTag("library_screen"),
     ) {
-        // Header
-        Text(
-            text = stringResource(R.string.library_title),
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+        LibraryHeader(
+            searchOpen = searchOpen,
+            searchQuery = searchQuery,
+            onSearchOpenChange = { open ->
+                searchOpen = open
+                if (!open) searchQuery = ""
+            },
+            onSearchQueryChange = { searchQuery = it },
+            onCreatePlaylist = { showCreatePlaylist = true },
         )
-
-        // Media Selector: Audio | Video
-        LibraryMediaSelector(
-            selectedType = uiState.selectedMediaType,
-            onSelectType = viewModel::setMediaType,
+        LibraryFilterChips(
+            selected = uiState.selectedFilter,
+            onSelect = viewModel::setFilter,
         )
-
-        Spacer(Modifier.height(4.dp))
-
-        if (uiState.selectedMediaType == MediaType.AUDIO) {
-            // Audio Sub-Tabs: Todos | Favoritos | Playlists
-            LibraryTabs(
-                selectedTab = uiState.selectedAudioTab,
-                onSelectTab = viewModel::setAudioTab,
+        if (uiState.selectedFilter == LibraryFilter.ALL ||
+            uiState.selectedFilter == LibraryFilter.AUDIO ||
+            uiState.selectedFilter == LibraryFilter.VIDEO
+        ) {
+            LibraryRecentsBar(
+                isGrid = isGrid,
+                onToggleGrid = { isGrid = !isGrid },
+                showGridToggle = false,
             )
+        }
 
-            Spacer(Modifier.height(4.dp))
-
-            when (uiState.selectedAudioTab) {
-                AudioLibraryTab.ALL -> {
-                    AudioLibraryView(
-                        items = uiState.audioItems,
-                        spacesMap = uiState.spacesMap,
-                        progressMap = uiState.progressMap,
-                        playingMediaId = uiState.playingMediaId,
-                        isPlayerPlaying = uiState.isPlayerPlaying,
-                        favoriteUris = uiState.favoriteUris,
-                        onPlayItem = { item, index ->
-                            viewModel.playQueue(uiState.audioItems, index, "Biblioteca")
-                            onOpenItem(item)
-                        },
-                        onToggleFavorite = { uri -> viewModel.toggleFavorite(uri) },
-                        onAddToPlaylist = { item -> itemForAddToPlaylist = item },
-                        onAddToQueue = { item -> viewModel.addToQueue(item) },
-                        onDeleteMedia = { item -> itemToDelete = item },
-                    )
-                }
-                AudioLibraryTab.FAVORITES -> {
-                    FavoritesView(
-                        items = uiState.favoriteItems,
-                        spacesMap = uiState.spacesMap,
-                        playingMediaId = uiState.playingMediaId,
-                        isPlayerPlaying = uiState.isPlayerPlaying,
-                        favoriteUris = uiState.favoriteUris,
-                        onPlayAllFavorites = {
-                            if (uiState.favoriteItems.isNotEmpty()) {
-                                viewModel.playQueue(uiState.favoriteItems, 0, "Favoritos")
-                                onOpenItem(uiState.favoriteItems.first())
-                            }
-                        },
-                        onPlayItem = { item, index ->
-                            viewModel.playQueue(uiState.favoriteItems, index, "Favoritos")
-                            onOpenItem(item)
-                        },
-                        onToggleFavorite = { uri -> viewModel.toggleFavorite(uri) },
-                        onAddToPlaylist = { item -> itemForAddToPlaylist = item },
-                        onAddToQueue = { item -> viewModel.addToQueue(item) },
-                        onDeleteMedia = { item -> itemToDelete = item },
-                    )
-                }
-                AudioLibraryTab.PLAYLISTS -> {
-                    PlaylistsView(
-                        playlists = uiState.playlists,
-                        allMediaItems = uiState.allItems,
-                        onOpenPlaylist = { playlist -> activePlaylistForDetail = playlist },
-                        onPlayPlaylist = { playlist ->
-                            val mediaMap = uiState.allItems.associateBy { it.localUri ?: it.id }
-                            val playlistItems = playlist.mediaUris.mapNotNull { mediaMap[it] }
-                            if (playlistItems.isNotEmpty()) {
-                                viewModel.playQueue(playlistItems, 0, "Playlist: ${playlist.name}")
-                                onOpenItem(playlistItems.first())
-                            }
-                        },
-                        onCreatePlaylist = viewModel::createPlaylist,
-                        onRenamePlaylist = viewModel::renamePlaylist,
-                        onDeletePlaylist = viewModel::deletePlaylist,
-                    )
-                }
-            }
-        } else {
-            // Video Library
-            VideoLibraryView(
-                items = uiState.videoItems,
+        when (uiState.selectedFilter) {
+            LibraryFilter.ALL -> LibraryAllView(
+                items = visibleAll,
+                playlists = visiblePlaylists,
+                spacesMap = uiState.spacesMap,
+                progressMap = uiState.progressMap,
+                playingMediaId = uiState.playingMediaId,
+                isPlayerPlaying = uiState.isPlayerPlaying,
+                favoriteUris = uiState.favoriteUris,
+                onPlayItem = { item, index ->
+                    viewModel.playQueue(visibleAll, index, "Biblioteca")
+                    onOpenItem(item)
+                },
+                onToggleFavorite = { uri -> viewModel.toggleFavorite(uri) },
+                onAddToPlaylist = { item -> itemForAddToPlaylist = item },
+                onAddToQueue = { item -> viewModel.addToQueue(item) },
+                onDeleteMedia = { item -> itemToDelete = item },
+                onOpenPlaylist = { playlist -> activePlaylistForDetail = playlist },
+                onPlayPlaylist = { playlist ->
+                    val mediaMap = uiState.allItems.associateBy { it.localUri ?: it.id }
+                    val playlistItems = playlist.mediaUris.mapNotNull { mediaMap[it] }
+                    if (playlistItems.isNotEmpty()) {
+                        viewModel.playQueue(playlistItems, 0, "Playlist: ${playlist.name}")
+                        onOpenItem(playlistItems.first())
+                    }
+                },
+                onRenamePlaylist = { playlistToRename = it },
+                onDeletePlaylist = viewModel::deletePlaylist,
+            )
+            LibraryFilter.AUDIO -> AudioLibraryView(
+                items = visibleAudio,
+                spacesMap = uiState.spacesMap,
+                progressMap = uiState.progressMap,
+                playingMediaId = uiState.playingMediaId,
+                isPlayerPlaying = uiState.isPlayerPlaying,
+                favoriteUris = uiState.favoriteUris,
+                onPlayItem = { item, index ->
+                    viewModel.playQueue(visibleAudio, index, "Biblioteca")
+                    onOpenItem(item)
+                },
+                onToggleFavorite = { uri -> viewModel.toggleFavorite(uri) },
+                onAddToPlaylist = { item -> itemForAddToPlaylist = item },
+                onAddToQueue = { item -> viewModel.addToQueue(item) },
+                onDeleteMedia = { item -> itemToDelete = item },
+            )
+            LibraryFilter.VIDEO -> VideoLibraryView(
+                items = visibleVideo,
                 playingMediaId = uiState.playingMediaId,
                 favoriteUris = uiState.favoriteUris,
                 onPlayItem = { item -> onOpenItem(item) },
                 onToggleFavorite = { uri -> viewModel.toggleFavorite(uri) },
                 onDeleteMedia = { item -> itemToDelete = item },
             )
+            LibraryFilter.FAVORITES -> FavoritesView(
+                items = visibleFavorites,
+                spacesMap = uiState.spacesMap,
+                playingMediaId = uiState.playingMediaId,
+                isPlayerPlaying = uiState.isPlayerPlaying,
+                favoriteUris = uiState.favoriteUris,
+                onPlayAllFavorites = {
+                    if (visibleFavorites.isNotEmpty()) {
+                        viewModel.playQueue(visibleFavorites, 0, "Favoritos")
+                        onOpenItem(visibleFavorites.first())
+                    }
+                },
+                onPlayItem = { item, index ->
+                    viewModel.playQueue(visibleFavorites, index, "Favoritos")
+                    onOpenItem(item)
+                },
+                onToggleFavorite = { uri -> viewModel.toggleFavorite(uri) },
+                onAddToPlaylist = { item -> itemForAddToPlaylist = item },
+                onAddToQueue = { item -> viewModel.addToQueue(item) },
+                onDeleteMedia = { item -> itemToDelete = item },
+            )
+            LibraryFilter.PLAYLISTS -> PlaylistsView(
+                playlists = visiblePlaylists,
+                allMediaItems = uiState.allItems,
+                onOpenPlaylist = { playlist -> activePlaylistForDetail = playlist },
+                onPlayPlaylist = { playlist ->
+                    val mediaMap = uiState.allItems.associateBy { it.localUri ?: it.id }
+                    val playlistItems = playlist.mediaUris.mapNotNull { mediaMap[it] }
+                    if (playlistItems.isNotEmpty()) {
+                        viewModel.playQueue(playlistItems, 0, "Playlist: ${playlist.name}")
+                        onOpenItem(playlistItems.first())
+                    }
+                },
+                onCreatePlaylist = viewModel::createPlaylist,
+                onRenamePlaylist = viewModel::renamePlaylist,
+                onDeletePlaylist = viewModel::deletePlaylist,
+            )
         }
+    }
+
+    if (showCreatePlaylist) {
+        CreatePlaylistDialog(
+            title = "Nueva playlist",
+            confirmLabel = "Crear",
+            onConfirm = { name ->
+                viewModel.createPlaylist(name)
+                showCreatePlaylist = false
+            },
+            onDismiss = { showCreatePlaylist = false },
+        )
+    }
+
+    playlistToRename?.let { playlist ->
+        CreatePlaylistDialog(
+            initialName = playlist.name,
+            title = "Renombrar playlist",
+            confirmLabel = "Guardar",
+            onConfirm = { newName ->
+                viewModel.renamePlaylist(playlist.id, newName)
+                playlistToRename = null
+            },
+            onDismiss = { playlistToRename = null },
+        )
     }
 
     // Add to Playlist Sheet

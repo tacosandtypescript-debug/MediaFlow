@@ -17,8 +17,6 @@ import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.PlayArrow
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -53,27 +51,21 @@ fun PlaylistCard(
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
 
-    Card(
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
         modifier = modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 8.dp)
             .testTag("playlist_card_${playlist.id}"),
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(12.dp),
-        ) {
             PlaylistCover(
                 artworks = artworks,
-                size = 64.dp,
-                shape = RoundedCornerShape(12.dp),
+                size = 56.dp,
+                shape = RoundedCornerShape(4.dp),
             )
 
-            Spacer(Modifier.width(14.dp))
+            Spacer(Modifier.width(12.dp))
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(
@@ -87,7 +79,11 @@ fun PlaylistCard(
 
                 Spacer(Modifier.height(4.dp))
 
-                val itemLabel = if (playlist.itemCount == 1) "1 audio" else "${playlist.itemCount} audios"
+                val itemLabel = if (playlist.itemCount == 1) {
+                    "Playlist · 1 elemento"
+                } else {
+                    "Playlist · ${playlist.itemCount} elementos"
+                }
                 Text(
                     text = itemLabel,
                     style = MaterialTheme.typography.bodySmall,
@@ -147,6 +143,5 @@ fun PlaylistCard(
                     )
                 }
             }
-        }
     }
 }

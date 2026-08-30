@@ -39,6 +39,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.mediaflow.app.ui.theme.customColors
+import com.mediaflow.core.model.MediaType
 
 /**
  * Modern, clean media row representing an audio track or X Space in the library,
@@ -51,6 +52,7 @@ fun AudioMediaRow(
     artworkUrl: String?,
     durationText: String?,
     isSpace: Boolean = false,
+    mediaType: MediaType = MediaType.AUDIO,
     isPlaying: Boolean = false,
     isFavorite: Boolean = false,
     progressFraction: Float = 0f,
@@ -65,45 +67,32 @@ fun AudioMediaRow(
     onDelete: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val rowBackground = if (isPlaying) {
-        MaterialTheme.customColors.libraryRowPlaying
-    } else {
-        Color.Transparent
-    }
-    val rowBorder = if (isPlaying) {
-        androidx.compose.foundation.BorderStroke(1.5.dp, MaterialTheme.customColors.libraryRowPlayingBorder)
-    } else {
-        null
-    }
-
     Surface(
-        color = rowBackground,
-        border = rowBorder,
-        shape = RoundedCornerShape(14.dp),
+        color = Color.Transparent,
+        shape = RoundedCornerShape(0.dp),
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 8.dp, vertical = 3.dp)
             .clickable(onClick = onClick)
             .testTag("audio_media_row"),
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
         ) {
-            // Artwork with playing badge overlay
             Box(contentAlignment = Alignment.Center) {
                 MediaArtwork(
                     artworkUrl = artworkUrl,
-                    size = 48.dp,
+                    size = 56.dp,
                     isSpace = isSpace,
-                    shape = RoundedCornerShape(12.dp),
+                    mediaType = mediaType,
+                    shape = RoundedCornerShape(4.dp),
                 )
 
                 if (isPlaying) {
                     Box(
                         modifier = Modifier
-                            .size(48.dp)
-                            .clip(RoundedCornerShape(12.dp))
+                            .size(56.dp)
+                            .clip(RoundedCornerShape(4.dp))
                             .background(Color.Black.copy(alpha = 0.45f)),
                         contentAlignment = Alignment.Center,
                     ) {
@@ -115,7 +104,7 @@ fun AudioMediaRow(
                 }
             }
 
-            Spacer(Modifier.width(14.dp))
+            Spacer(Modifier.width(12.dp))
 
             // Metadata Column
             Column(

@@ -7,6 +7,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.mediaflow.app.ui.common.media.preferredArtworkUrl
 import com.mediaflow.app.ui.library.components.AudioLibraryTab
+import com.mediaflow.app.ui.library.components.LibraryFilter
 import com.mediaflow.core.model.DownloadItem
 import com.mediaflow.core.model.DownloadStatus
 import com.mediaflow.core.model.MediaType
@@ -53,8 +54,7 @@ class LibraryViewModel(
     downloadRepository: DownloadRepository? = null,
 ) : AndroidViewModel(application) {
 
-    private val selectedMediaType = MutableStateFlow(MediaType.AUDIO)
-    private val selectedAudioTab = MutableStateFlow(AudioLibraryTab.ALL)
+    private val selectedFilter = MutableStateFlow(LibraryFilter.ALL)
     private val downloadsFlow: Flow<List<DownloadItem>> = downloadRepository?.observeDownloads()
         ?: runCatching { Media3DownloadRepository.get(application).observeDownloads() }
             .getOrElse { flowOf(emptyList()) }
@@ -69,8 +69,7 @@ class LibraryViewModel(
         playlistRepository.observePlaylists().flowOn(Dispatchers.IO),
         favoritesRepository.observeFavoriteMediaUris().flowOn(Dispatchers.IO),
         playerService.uiState,
-        selectedMediaType,
-        selectedAudioTab,
+        selectedFilter,
         downloadsFlow.flowOn(Dispatchers.IO),
     ) { args: Array<Any?> ->
         @Suppress("UNCHECKED_CAST")
@@ -84,10 +83,15 @@ class LibraryViewModel(
         @Suppress("UNCHECKED_CAST")
         val favoriteUris = args[4] as Set<String>
         val playerState = args[5] as com.mediaflow.domain.player.PlayerServiceState
-        val mediaType = args[6] as MediaType
-        val audioTab = args[7] as AudioLibraryTab
+        val filter = args[6] as LibraryFilter
         @Suppress("UNCHECKED_CAST")
-        val downloads = args[8] as List<DownloadItem>
+        val downloads = args[7] as List<DownloadItem>
+        val mediaType = if (filter == LibraryFilter.VIDEO) MediaType.VIDEO else MediaType.AUDIO
+        val audioTab = when (filter) {
+            LibraryFilter.FAVORITES -> AudioLibraryTab.FAVORITES
+            LibraryFilter.PLAYLISTS -> AudioLibraryTab.PLAYLISTS
+            else -> AudioLibraryTab.ALL
+        }
 
         val allItems = overlayThumbnails(galleryResult.getOrDefault(emptyList()), downloads)
         val audioItems = allItems.filter { it.mediaType == MediaType.AUDIO }
@@ -98,6 +102,7 @@ class LibraryViewModel(
         }
 
         LibraryUiState(
+            selectedFilter = filter,
             selectedMediaType = mediaType,
             selectedAudioTab = audioTab,
             allItems = allItems,
@@ -115,12 +120,20 @@ class LibraryViewModel(
         )
     }.stateIn(viewModelScope, SharingStarted.Eagerly, LibraryUiState())
 
+    fun setFilter(filter: LibraryFilter) {
+        selectedFilter.value = filter
+    }
+
     fun setMediaType(mediaType: MediaType) {
-        selectedMediaType.value = mediaType
+        selectedFilter.value = if (mediaType == MediaType.VIDEO) LibraryFilter.VIDEO else LibraryFilter.AUDIO
     }
 
     fun setAudioTab(tab: AudioLibraryTab) {
-        selectedAudioTab.value = tab
+        selectedFilter.value = when (tab) {
+            AudioLibraryTab.FAVORITES -> LibraryFilter.FAVORITES
+            AudioLibraryTab.PLAYLISTS -> LibraryFilter.PLAYLISTS
+            AudioLibraryTab.ALL -> LibraryFilter.ALL
+        }
     }
 
     fun toggleFavorite(mediaUri: String) {

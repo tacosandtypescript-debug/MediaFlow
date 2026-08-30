@@ -1,34 +1,27 @@
 package com.mediaflow.app.ui.library.components
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.VideoLibrary
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import com.mediaflow.app.R
@@ -66,9 +59,9 @@ fun VideoLibraryView(
         )
     } else {
         LazyVerticalGrid(
-            columns = GridCells.Adaptive(160.dp),
+            columns = GridCells.Fixed(2),
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 120.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             modifier = modifier
                 .fillMaxSize()
@@ -79,35 +72,21 @@ fun VideoLibraryView(
                 val isFavorite = favoriteUris.contains(uri)
 
                 val isPlaying = playingMediaId == uri
-                Card(
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = if (isPlaying) {
-                            MaterialTheme.customColors.libraryRowPlaying
-                        } else {
-                            MaterialTheme.colorScheme.surface
-                        },
-                    ),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-                    border = BorderStroke(
-                        if (isPlaying) 1.5.dp else 1.dp,
-                        if (isPlaying) MaterialTheme.customColors.libraryRowPlayingBorder else MaterialTheme.colorScheme.outline,
-                    ),
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clickable { onPlayItem(item) },
                 ) {
-                    Column {
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(100.dp),
+                                .aspectRatio(1f),
                         ) {
                             MediaArtwork(
                                 artworkUrl = preferredArtworkUrl(item.thumbnailUri),
-                                size = 160.dp,
+                                size = 180.dp,
                                 mediaType = MediaType.VIDEO,
-                                shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
+                                shape = RoundedCornerShape(4.dp),
                             )
 
                             item.durationSeconds?.let { s ->
@@ -140,8 +119,15 @@ fun VideoLibraryView(
                                     text = item.title ?: item.fileName ?: "Video",
                                     style = MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.SemiBold,
-                                    maxLines = 1,
+                                    color = if (isPlaying) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                                    maxLines = 2,
                                     overflow = TextOverflow.Ellipsis,
+                                )
+                                Text(
+                                    text = stringResource(R.string.player_media_video),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
                                 )
                             }
 
@@ -158,7 +144,6 @@ fun VideoLibraryView(
                                 onDelete = { onDeleteMedia(item) },
                             )
                         }
-                    }
                 }
             }
         }

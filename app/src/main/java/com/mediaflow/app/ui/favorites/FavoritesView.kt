@@ -96,8 +96,8 @@ fun FavoritesView(
 
                 Box(
                     modifier = Modifier
-                        .size(72.dp)
-                        .clip(RoundedCornerShape(18.dp))
+                        .size(56.dp)
+                        .clip(RoundedCornerShape(4.dp))
                         .background(heartGradient),
                     contentAlignment = Alignment.Center,
                 ) {
@@ -105,11 +105,11 @@ fun FavoritesView(
                         imageVector = Icons.Filled.Favorite,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.onPrimary,
-                        modifier = Modifier.size(40.dp),
+                        modifier = Modifier.size(28.dp),
                     )
                 }
 
-                Spacer(Modifier.width(16.dp))
+                Spacer(Modifier.width(12.dp))
 
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
