@@ -183,7 +183,7 @@ enum class AnalysisState { IDLE, ANALYZING, READY, FAILED }
 data class HomeUiState(
     val url: String = "",
     val mediaType: ContentType = ContentType.VIDEO,
-    val qualityOptions: List<QualityOption> = QualityOption.videoOptions,
+    val qualityOptions: List<QualityOption> = listOf(QualityOption.AUTO),
     val quality: QualityOption = QualityOption.AUTO,
     val fileName: String = "",
     val suggestedFileName: String? = null,

@@ -39,7 +39,7 @@ class HomeViewModelTest {
         val s = vm.uiState.value
         assertEquals("", s.url)
         assertEquals(ContentType.VIDEO, s.mediaType)
-        assertEquals(QualityOption.videoOptions, s.qualityOptions)
+        assertEquals(listOf(QualityOption.AUTO), s.qualityOptions)
         assertEquals(QualityOption.AUTO, s.quality)
         assertEquals("", s.fileName)
         assertEquals(ValidationState.Empty, s.validationState)
@@ -152,16 +152,26 @@ class HomeViewModelTest {
         vm.onMediaTypeSelected(ContentType.AUDIO)
         vm.onMediaTypeSelected(ContentType.VIDEO)
         val s = vm.uiState.value
-        assertEquals(QualityOption.videoOptions, s.qualityOptions)
+        assertEquals(listOf(QualityOption.AUTO), s.qualityOptions)
         assertEquals(QualityOption.AUTO, s.quality)
     }
 
     @Test
-    fun `quality selection updates state`() {
+    fun `quality selection updates state after real 720p analysis`() {
         val vm = newViewModel()
-        vm.onMediaTypeSelected(ContentType.VIDEO)
+        vm.onUrlChanged("https://example.com/video")
+        vm.analyze(object : SourceResolver {
+            override suspend fun analyze(sourceUrl: String) = SourceInfo(
+                sourceUrl = sourceUrl,
+                availableFormats = listOf(
+                    MediaFormat("22", "mp4", "video/mp4", MediaType.VIDEO, "720p", height = 720),
+                ),
+            )
+        })
         vm.onQualitySelected(QualityOption.P720)
         assertEquals(QualityOption.P720, vm.uiState.value.quality)
+        assertFalse(QualityOption.P480 in vm.uiState.value.qualityOptions)
+        assertFalse(QualityOption.P1080 in vm.uiState.value.qualityOptions)
     }
 
     @Test

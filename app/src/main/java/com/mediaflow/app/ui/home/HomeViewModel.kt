@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.mediaflow.app.R
 import com.mediaflow.core.model.MediaFormat
 import com.mediaflow.core.model.MediaType
+import com.mediaflow.data.download.formats.RealFormatCatalog
 import com.mediaflow.data.resolver.PlatformUrlSupport
 import com.mediaflow.domain.repository.SourceInfo
 import com.mediaflow.domain.repository.SourceResolver
@@ -132,30 +133,42 @@ class HomeViewModel : ViewModel() {
         val info = state.sourceInfo
         val isSpace = info?.spaceMetadata != null
         val effective = if (isSpace) ContentType.AUDIO else contentType
-        val qualityOptions = QualityOption.optionsFor(effective)
-        val quality = if (state.quality in qualityOptions) state.quality else QualityOption.AUTO
         if (info == null ||
             state.analysisState == AnalysisState.IDLE ||
             state.analysisState == AnalysisState.ANALYZING
         ) {
+            val idleOptions = if (effective == ContentType.AUDIO) {
+                QualityOption.audioOptions
+            } else {
+                listOf(QualityOption.AUTO)
+            }
+            val quality = if (state.quality in idleOptions) state.quality else QualityOption.AUTO
             return state.copy(
                 mediaType = effective,
-                qualityOptions = qualityOptions,
+                qualityOptions = idleOptions,
                 quality = quality,
             )
         }
         val formats = formatsFor(info, effective)
+        val qualityOptions = qualityOptionsFromFormats(formats, effective)
+        val quality = if (state.quality in qualityOptions) state.quality else QualityOption.AUTO
         val error = info.errorMessage ?: if (formats.isEmpty() && !isSpace) {
             "La fuente no ofrece formatos para el tipo seleccionado."
         } else {
             null
+        }
+        val selectedId = if (quality == QualityOption.AUTO) {
+            RealFormatCatalog.bestCompatible(formats)?.formatId
+                ?: PreferredDownloadFormat.select(formats, quality)?.formatId
+        } else {
+            PreferredDownloadFormat.select(formats, quality)?.formatId
         }
         return state.copy(
             mediaType = effective,
             qualityOptions = qualityOptions,
             quality = quality,
             availableFormats = formats,
-            selectedFormatId = PreferredDownloadFormat.select(formats, quality)?.formatId,
+            selectedFormatId = selectedId,
             analysisState = if (error == null) AnalysisState.READY else AnalysisState.FAILED,
             analysisError = error,
             infoMessage = if (error == null) R.string.analysis_ready else null,
@@ -204,6 +217,22 @@ class HomeViewModel : ViewModel() {
     companion object {
         internal const val SYNTHETIC_AUDIO_FORMAT_ID = "bestaudio"
         private val ILLEGAL_CHARACTERS_REGEX = Regex("""[\\/:*?"<>|]""")
+
+        internal fun qualityOptionsFromFormats(
+            formats: List<MediaFormat>,
+            contentType: ContentType,
+        ): List<QualityOption> {
+            if (contentType == ContentType.AUDIO) return QualityOption.audioOptions
+            val heights = RealFormatCatalog.listedHeights(formats)
+            val rungs = buildList {
+                add(QualityOption.AUTO)
+                if (360 in heights) add(QualityOption.P360)
+                if (480 in heights) add(QualityOption.P480)
+                if (720 in heights) add(QualityOption.P720)
+                if (1080 in heights) add(QualityOption.P1080)
+            }
+            return rungs
+        }
 
         internal fun formatsFor(info: SourceInfo, contentType: ContentType): List<MediaFormat> {
             if (contentType == ContentType.AUDIO || info.spaceMetadata != null) {

@@ -101,10 +101,11 @@ class HomeScreenTest {
     }
 
     @Test
-    fun changeQualityUpdatesSelection() {
+    fun preAnalysisOnlyShowsAutoQualityNotInventedRungs() {
         setHome()
-        composeRule.onNodeWithTag("quality_p1080").performScrollTo().performClick()
-        composeRule.onNodeWithTag("quality_p1080").assertIsSelected()
+        composeRule.onNodeWithTag("quality_auto").assertIsDisplayed()
+        composeRule.onNodeWithTag("quality_p480").assertDoesNotExist()
+        composeRule.onNodeWithTag("quality_p1080").assertDoesNotExist()
     }
 
     @Test
