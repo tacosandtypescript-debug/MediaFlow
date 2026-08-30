@@ -21,6 +21,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlin.random.Random
 
 /** State exposed by [PlayerService] to the UI. */
 data class PlayerServiceState(
@@ -43,6 +44,8 @@ data class PlayerServiceState(
     val queue: List<PlaybackQueueItem> = emptyList(),
     val queueIndex: Int = -1,
     val playbackContext: String? = null,
+    val sourceContext: String? = null,
+    val isShuffle: Boolean = false,
     /** True when pause came from the user, not audio-focus interruption. */
     val pausedByUser: Boolean = false,
     /** True when pause came from audio-focus loss (engine remains playable). */
@@ -97,6 +100,8 @@ class PlayerService(
 
     private var periodicSaveJob: Job? = null
     private var isReleased = false
+    private var originalOrder: List<PlaybackQueueItem> = emptyList()
+    private var shuffleRandom: Random = Random.Default
 
     init {
         // Collect engine state
@@ -159,7 +164,7 @@ class PlayerService(
                             afterSave.mediaId == event.mediaId &&
                             playedLongEnough
                         ) {
-                            playNext()
+                            nextTrack()
                         }
                     }
                     is PlaybackEvent.PlaybackPaused -> {
@@ -179,15 +184,33 @@ class PlayerService(
         items: List<PlaybackQueueItem>,
         startIndex: Int = 0,
         context: String? = null,
+        shuffle: Boolean = false,
+        sourceContext: String? = null,
+        random: Random = Random.Default,
     ) {
         if (items.isEmpty() || isReleased) return
         val validIndex = startIndex.coerceIn(0, items.lastIndex)
-        val target = items[validIndex]
+        originalOrder = items
+        shuffleRandom = random
+        val current = items[validIndex]
+        val active = if (shuffle) {
+            val rest = items.filterIndexed { i, _ -> i != validIndex }.shuffled(random)
+            listOf(current) + rest
+        } else {
+            items
+        }
+        val playIndex = if (shuffle) 0 else validIndex
+        val target = active[playIndex]
 
         _uiState.value = _uiState.value.copy(
-            queue = items,
-            queueIndex = validIndex,
+            mediaId = target.mediaUri,
+            filePath = target.mediaUri,
+            title = target.title,
+            queue = active,
+            queueIndex = playIndex,
             playbackContext = context,
+            sourceContext = sourceContext ?: context,
+            isShuffle = shuffle,
             artistOrHost = target.artistOrHost,
             artworkUrl = target.artworkUrl,
         )
@@ -201,6 +224,62 @@ class PlayerService(
             autoPlay = true,
             isLive = target.isLive,
             replaceQueue = false,
+        )
+    }
+
+    fun playAll(
+        items: List<PlaybackQueueItem>,
+        context: String? = null,
+        sourceContext: String? = null,
+    ) {
+        playQueue(items, startIndex = 0, context = context, shuffle = false, sourceContext = sourceContext)
+    }
+
+    fun shuffleAll(
+        items: List<PlaybackQueueItem>,
+        context: String? = null,
+        sourceContext: String? = null,
+        random: Random = Random.Default,
+    ) {
+        playQueue(
+            items,
+            startIndex = 0,
+            context = context,
+            shuffle = true,
+            sourceContext = sourceContext,
+            random = random,
+        )
+    }
+
+    fun setShuffle(enabled: Boolean, random: Random = Random.Default) {
+        if (isReleased) return
+        val current = _uiState.value
+        if (current.isShuffle == enabled) return
+        shuffleRandom = random
+        val playing = current.currentQueueItem
+        val nextQueue: List<PlaybackQueueItem>
+        val nextIndex: Int
+        if (enabled) {
+            if (originalOrder.isEmpty()) originalOrder = current.queue
+            val base = originalOrder.ifEmpty { current.queue }
+            if (playing == null || base.isEmpty()) {
+                nextQueue = base.shuffled(random)
+                nextIndex = current.queueIndex.coerceIn(-1, nextQueue.lastIndex)
+            } else {
+                val rest = base.filter { it.mediaUri != playing.mediaUri }.shuffled(random)
+                nextQueue = listOf(playing) + rest
+                nextIndex = 0
+            }
+        } else {
+            nextQueue = originalOrder.ifEmpty { current.queue }
+            nextIndex = playing?.let { item ->
+                nextQueue.indexOfFirst { it.mediaUri == item.mediaUri }
+            }?.takeIf { it >= 0 } ?: current.queueIndex.coerceIn(-1, nextQueue.lastIndex)
+        }
+        _uiState.value = current.copy(
+            queue = nextQueue,
+            queueIndex = nextIndex,
+            isShuffle = enabled,
         )
     }
 
@@ -372,26 +451,27 @@ class PlayerService(
         }
     }
 
-    fun playNext() {
+    fun nextTrack() {
         val current = _uiState.value
         if (current.hasNext) {
-            val nextIndex = current.queueIndex + 1
-            skipToIndex(nextIndex)
+            skipToIndex(current.queueIndex + 1)
         }
     }
 
-    fun playPrevious() {
+    fun previousTrack() {
         val current = _uiState.value
         if (current.currentPositionMs > 3_000L) {
-            // Seek to start of current song if already played > 3 seconds
             seekTo(0L)
         } else if (current.hasPrevious) {
-            val prevIndex = current.queueIndex - 1
-            skipToIndex(prevIndex)
+            skipToIndex(current.queueIndex - 1)
         } else {
             seekTo(0L)
         }
     }
+
+    fun playNext() = nextTrack()
+
+    fun playPrevious() = previousTrack()
 
     fun skipToIndex(index: Int) {
         val current = _uiState.value

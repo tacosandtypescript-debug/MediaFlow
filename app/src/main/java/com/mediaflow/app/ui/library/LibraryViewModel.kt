@@ -251,6 +251,28 @@ class LibraryViewModel(
     }
 
     fun playQueue(items: List<DownloadItem>, startIndex: Int, context: String? = null) {
+        playQueueItems(
+            items = items,
+            startIndex = startIndex,
+            context = context,
+            shuffle = playerService.uiState.value.isShuffle,
+        )
+    }
+
+    fun playAll(items: List<DownloadItem>, context: String? = null) {
+        playQueueItems(items, startIndex = 0, context = context, shuffle = false)
+    }
+
+    fun shuffleAll(items: List<DownloadItem>, context: String? = null) {
+        playQueueItems(items, startIndex = 0, context = context, shuffle = true)
+    }
+
+    private fun playQueueItems(
+        items: List<DownloadItem>,
+        startIndex: Int,
+        context: String?,
+        shuffle: Boolean,
+    ) {
         val queueItems = items.map { item ->
             val uri = item.localUri ?: item.id
             val space = uiState.value.spacesMap[item.sourceUrl] ?: uiState.value.spacesMap[item.id]
@@ -263,7 +285,18 @@ class LibraryViewModel(
                 isLive = false,
             )
         }
-        playerService.playQueue(queueItems, startIndex, context)
+        val source = when {
+            context?.startsWith("Playlist:") == true -> "playlist"
+            context == "Favoritos" -> "library_favorites"
+            else -> "library_audio"
+        }
+        playerService.playQueue(
+            items = queueItems,
+            startIndex = startIndex,
+            context = context,
+            shuffle = shuffle,
+            sourceContext = source,
+        )
     }
 
     private fun attachCachedVideoThumbs(

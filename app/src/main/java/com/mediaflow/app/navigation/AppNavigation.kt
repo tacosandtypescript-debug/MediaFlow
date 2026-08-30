@@ -154,7 +154,7 @@ fun AppNavigation(
                                     }
                                 },
                                 onSkipNext = {
-                                    playerService.playNext()
+                                    playerService.nextTrack()
                                 },
                             )
 
