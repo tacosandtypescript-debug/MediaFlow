@@ -3,6 +3,7 @@ package com.mediaflow.data.ytdlp
 import android.content.Context
 import com.chaquo.python.PyObject
 import com.chaquo.python.Python
+import com.mediaflow.data.resolver.PlatformUrlSupport
 import dev.ffmpegkit_maintained.ytdlp.YtDlp
 import org.json.JSONArray
 import org.json.JSONObject
@@ -61,9 +62,12 @@ internal object YtDlpRuntime {
         val paths = JSONObject()
             .put("home", outputDirectory.absolutePath)
             .put("temp", outputDirectory.absolutePath)
+        // Chaquopy has no JS runtime. android_vr needs neither JS nor a PO token
+        // and still exposes AAC/m4a (140). tv is the existing no-cookie fallback;
+        // web is SABR-only without a PO token so it is omitted.
         val youtubeArgs = JSONObject().put(
             "player_client",
-            JSONArray().put("tv").put("web"),
+            JSONArray().put("android_vr").put("tv"),
         )
         return JSONObject()
             .put("outtmpl", absoluteTemplate)
@@ -120,7 +124,7 @@ internal object YtDlpRuntime {
                 result = json.dumps(ydl.sanitize_info(info))
             """.trimIndent(),
             mapOf(
-                "url" to url,
+                "url" to PlatformUrlSupport.canonicalExtractionUrl(url),
                 "out_dir" to outputDirectory.absolutePath,
                 "opts_json" to analysisOptions(outputDirectory, allowPlaylist).toString(),
             ),
@@ -160,7 +164,7 @@ internal object YtDlpRuntime {
                 ydl.download([url])
             """.trimIndent(),
             mapOf(
-                "url" to url,
+                "url" to PlatformUrlSupport.canonicalExtractionUrl(url),
                 "out_dir" to outputDirectory.absolutePath,
                 "opts_json" to options.toString(),
                 "listener" to onProgress?.let(::ProgressBridge),

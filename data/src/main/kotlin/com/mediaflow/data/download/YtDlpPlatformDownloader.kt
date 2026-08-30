@@ -258,12 +258,13 @@ class YtDlpPlatformDownloader(
     }
 
     private fun executeDownload(id: String, request: DownloadRequest, sourceUrl: String) {
+        val extractionUrl = PlatformUrlSupport.canonicalExtractionUrl(sourceUrl)
         val baseName = YtDlpRuntime.restrictStem(request.fileName, "mediaflow_$id")
         deleteStaleOutputs(baseName)
         val platform = PlatformUrlSupport.platformFor(sourceUrl)
 
         if (request.mediaType != MediaType.AUDIO &&
-            tryDirectStreamUrl(id, request, sourceUrl, platform)
+            tryDirectStreamUrl(id, request, extractionUrl, platform)
         ) {
             return
         }
@@ -272,7 +273,7 @@ class YtDlpPlatformDownloader(
         // cookies. Try that first, but never mark the download failed if the
         // anonymous URL is missing or the CDN transfer fails — yt-dlp runs next.
         // Anonymous CDN paths are progressive MP4. Audio-only downloads go through yt-dlp.
-        if (tryAnonymousDirectDownload(id, request, sourceUrl, platform)) {
+        if (tryAnonymousDirectDownload(id, request, extractionUrl, platform)) {
             return
         }
 
@@ -281,7 +282,6 @@ class YtDlpPlatformDownloader(
             PlatformUrlSupport.Platform.TIKTOK -> "https://www.tiktok.com/"
             else -> null
         }
-        val extractionUrl = sourceUrl
         val space = if (platform == PlatformUrlSupport.Platform.X) {
             runCatching {
                 val store = com.mediaflow.data.provider.x.spaces.XSpaceStore(context)

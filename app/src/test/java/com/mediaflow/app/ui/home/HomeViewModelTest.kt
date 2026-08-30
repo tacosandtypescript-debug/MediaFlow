@@ -114,6 +114,16 @@ class HomeViewModelTest {
     }
 
     @Test
+    fun `YouTube Music share url is accepted as https`() {
+        val vm = newViewModel()
+        vm.onUrlChanged("https://music.youtube.com/watch?v=jf6tbohQG_E&si=P9Ig0EuVhBe2tRO7")
+        val s = vm.uiState.value
+        assertEquals(ValidationState.Valid, s.validationState)
+        assertTrue(s.isDownloadButtonEnabled)
+        assertNull(s.errorMessage)
+    }
+
+    @Test
     fun `https without host is rejected as invalid`() {
         val vm = newViewModel()
         vm.onUrlChanged("https://")
@@ -474,5 +484,30 @@ class HomeViewModelTest {
         assertEquals(HomeViewModel.SYNTHETIC_AUDIO_FORMAT_ID, vm.uiState.value.selectedFormatId)
         assertEquals(MediaType.AUDIO, vm.uiState.value.availableFormats.single().mediaType)
         assertTrue(vm.uiState.value.isDownloadButtonEnabled)
+    }
+
+    @Test
+    fun `YouTube Music links default to audio after analysis`() {
+        val vm = newViewModel()
+        vm.onUrlChanged("https://music.youtube.com/watch?v=jf6tbohQG_E&si=P9Ig0EuVhBe2tRO7")
+        vm.analyze(object : SourceResolver {
+            override suspend fun analyze(sourceUrl: String) = SourceInfo(
+                sourceUrl = sourceUrl,
+                title = "Cancion de prueba",
+                availableFormats = listOf(
+                    MediaFormat("18", "mp4", "video/mp4", MediaType.VIDEO, "360p", height = 360, videoCodec = "avc1", audioCodec = "mp4a"),
+                    MediaFormat("140", "m4a", "audio/mp4", MediaType.AUDIO, "128k", audioCodec = "mp4a"),
+                ),
+            )
+        })
+
+        assertEquals(ContentType.AUDIO, vm.uiState.value.mediaType)
+        assertEquals("140", vm.uiState.value.selectedFormatId)
+        assertTrue(vm.uiState.value.isDownloadButtonEnabled)
+        assertEquals(AnalysisState.READY, vm.uiState.value.analysisState)
+
+        vm.onMediaTypeSelected(ContentType.VIDEO)
+        assertEquals(ContentType.VIDEO, vm.uiState.value.mediaType)
+        assertEquals("18", vm.uiState.value.selectedFormatId)
     }
 }

@@ -163,4 +163,54 @@ class YtDlpSourceResolverTest {
         assertTrue(info.availableFormats.any { it.mediaType == MediaType.VIDEO })
         assertTrue(info.availableFormats.any { it.mediaType == MediaType.AUDIO })
     }
+
+    @Test
+    fun `YouTube Music watch json keeps audio m4a and drops storyboards`() = runTest {
+        val resolver = YtDlpSourceResolver(RuntimeEnvironment.getApplication())
+        val info = resolver.parseForTest(
+            "https://music.youtube.com/watch?v=jf6tbohQG_E&si=P9Ig0EuVhBe2tRO7",
+            """
+            {
+              "id": "jf6tbohQG_E",
+              "title": "IYKYK",
+              "duration": 156,
+              "thumbnail": "https://i.ytimg.com/vi/jf6tbohQG_E/maxresdefault.jpg",
+              "formats": [
+                {"format_id":"sb0","ext":"mhtml","format_note":"storyboard","vcodec":"none","acodec":"none","height":180},
+                {"format_id":"140","ext":"m4a","vcodec":"none","acodec":"mp4a.40.2","abr":128},
+                {"format_id":"251","ext":"webm","vcodec":"none","acodec":"opus","abr":160},
+                {"format_id":"18","ext":"mp4","format_note":"360p","width":640,"height":360,"vcodec":"avc1.42001E","acodec":"mp4a.40.2"},
+                {"format_id":"137","ext":"mp4","format_note":"1080p","width":1920,"height":1080,"vcodec":"avc1.640020","acodec":"none"}
+              ]
+            }
+            """.trimIndent(),
+        )
+
+        assertEquals("IYKYK", info.title)
+        assertEquals(156L, info.durationSeconds)
+        assertTrue(info.playlistEntries.isEmpty())
+        assertEquals(emptyList<String>(), info.availableFormats.map { it.formatId }.filter { it.startsWith("sb") })
+        val audioIds = info.availableFormats.filter { it.mediaType == MediaType.AUDIO }.map { it.formatId }
+        assertEquals(listOf("140", "251"), audioIds.sorted())
+        assertTrue(info.availableFormats.any { it.formatId == "18" && it.mediaType == MediaType.VIDEO })
+        assertTrue(info.availableFormats.any { it.formatId == "137" && it.requiresMuxing })
+    }
+
+    @Test
+    fun `YouTube reload and sign-in errors are mapped to Spanish`() {
+        val resolver = YtDlpSourceResolver(RuntimeEnvironment.getApplication())
+        val music = "https://music.youtube.com/watch?v=jf6tbohQG_E&si=P9Ig0EuVhBe2tRO7"
+        val reload = resolver.friendlyAnalysisError(
+            music,
+            IllegalStateException("ERROR: [youtube] jf6tbohQG_E: The page needs to be reloaded."),
+        )
+        assertTrue(reload.contains("YouTube"))
+        assertFalse(reload.contains("reloaded"))
+        val signIn = resolver.friendlyAnalysisError(
+            music,
+            IllegalStateException("ERROR: [youtube] jf6tbohQG_E: Please sign in"),
+        )
+        assertTrue(signIn.contains("YouTube"))
+        assertTrue(signIn.contains("cookies"))
+    }
 }

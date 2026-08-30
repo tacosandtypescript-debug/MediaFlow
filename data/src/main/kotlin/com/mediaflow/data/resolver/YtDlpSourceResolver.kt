@@ -78,11 +78,12 @@ class YtDlpSourceResolver(
             }
         }
 
+        val extractionUrl = PlatformUrlSupport.canonicalExtractionUrl(trimmed)
         runCatching {
             try {
                 val json = YtDlpRuntime.extractJson(
                     appContext,
-                    trimmed,
+                    extractionUrl,
                     analysisDirectory,
                     allowPlaylist = PlatformUrlSupport.isYoutubePlaylist(trimmed),
                 )
@@ -196,8 +197,12 @@ class YtDlpSourceResolver(
             text.contains("DECRYPTION_FAILED_OR_BAD_RECORD_MAC", ignoreCase = true) ||
                 text.contains("SSL", ignoreCase = true) ->
                 "$platform no respondió de forma estable por HTTPS. Comprueba la conexión y vuelve a intentarlo; no se creó ningún archivo."
+            text.contains("page needs to be reloaded", ignoreCase = true) ||
+                text.contains("Requested format is not available", ignoreCase = true) ->
+                "$platform no entregó formatos descargables. Vuelve a intentarlo; MediaFlow no usa cookies de sesión."
             text.contains("private", ignoreCase = true) ||
                 text.contains("login", ignoreCase = true) ||
+                text.contains("sign in", ignoreCase = true) ||
                 text.contains("cookies", ignoreCase = true) ->
                 "$platform requiere acceso o el contenido no es público. MediaFlow no usa cookies de sesión."
             else -> text.ifBlank { "No se pudo analizar la fuente." }
@@ -341,6 +346,10 @@ class YtDlpSourceResolver(
         val videoCodec = json.optString("vcodec").takeIf { it.isNotBlank() && it != "none" && it != "null" }
         val audioCodec = json.optString("acodec").takeIf { it.isNotBlank() && it != "none" && it != "null" }
         val extension = json.optString("ext").takeIf { it.isNotBlank() } ?: "mp4"
+        val formatNote = json.optString("format_note")
+        if (extension.equals("mhtml", ignoreCase = true) || formatNote.contains("storyboard", ignoreCase = true)) {
+            return null
+        }
         val height = json.optInt("height", 0).takeIf { it > 0 }
         val width = json.optInt("width", 0).takeIf { it > 0 }
 

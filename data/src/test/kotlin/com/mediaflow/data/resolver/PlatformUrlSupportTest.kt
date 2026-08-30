@@ -57,6 +57,40 @@ class PlatformUrlSupportTest {
         )
         assertFalse(PlatformUrlSupport.isYoutubePlaylist("https://www.youtube.com/watch?v=dQw4w9WgXcQ"))
         assertFalse(PlatformUrlSupport.isYoutubePlaylist("https://youtu.be/dQw4w9WgXcQ"))
+        assertFalse(
+            PlatformUrlSupport.isYoutubePlaylist(
+                "https://music.youtube.com/watch?v=jf6tbohQG_E&si=P9Ig0EuVhBe2tRO7",
+            ),
+        )
+    }
+
+    @Test
+    fun `YouTube Music share links canonicalize to a watch video id`() {
+        val music =
+            "https://music.youtube.com/watch?v=jf6tbohQG_E&si=P9Ig0EuVhBe2tRO7"
+        assertTrue(PlatformUrlSupport.isYoutubeMusic(music))
+        assertEquals("jf6tbohQG_E", PlatformUrlSupport.youtubeVideoId(music))
+        assertEquals(
+            "https://www.youtube.com/watch?v=jf6tbohQG_E",
+            PlatformUrlSupport.canonicalExtractionUrl(music),
+        )
+        assertEquals(
+            "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+            PlatformUrlSupport.canonicalExtractionUrl("https://youtu.be/dQw4w9WgXcQ?si=abc"),
+        )
+        assertEquals(
+            "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+            PlatformUrlSupport.canonicalExtractionUrl(
+                "https://m.youtube.com/watch?v=dQw4w9WgXcQ&feature=share",
+            ),
+        )
+        assertFalse(PlatformUrlSupport.isYoutubeMusic("https://www.youtube.com/watch?v=jf6tbohQG_E"))
+        assertEquals(
+            "https://www.youtube.com/playlist?list=PLrAXtmErZgOeiKm4sgNOknGvNjby9efdf",
+            PlatformUrlSupport.canonicalExtractionUrl(
+                "https://www.youtube.com/playlist?list=PLrAXtmErZgOeiKm4sgNOknGvNjby9efdf",
+            ),
+        )
     }
 
     @Test

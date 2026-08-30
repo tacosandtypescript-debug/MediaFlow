@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.mediaflow.app.R
 import com.mediaflow.core.model.MediaFormat
 import com.mediaflow.core.model.MediaType
+import com.mediaflow.data.resolver.PlatformUrlSupport
 import com.mediaflow.domain.repository.SourceInfo
 import com.mediaflow.domain.repository.SourceResolver
 import kotlinx.coroutines.Job
@@ -77,10 +78,10 @@ class HomeViewModel : ViewModel() {
             runCatching { sourceResolver.analyze(current.url) }
                 .onSuccess { info ->
                     _uiState.update { latest ->
-                        val requested = if (info.spaceMetadata != null) {
-                            ContentType.AUDIO
-                        } else {
-                            latest.mediaType
+                        val requested = when {
+                            info.spaceMetadata != null -> ContentType.AUDIO
+                            PlatformUrlSupport.isYoutubeMusic(latest.url) -> ContentType.AUDIO
+                            else -> latest.mediaType
                         }
                         applyContentType(
                             latest.copy(
