@@ -11,6 +11,7 @@ import com.mediaflow.core.model.XSpace
  */
 data class LibraryUiState(
     val selectedFilter: LibraryFilter = LibraryFilter.ALL,
+    val selectedSort: LibrarySort = LibrarySort.NEWEST,
     val allItems: List<DownloadItem> = emptyList(),
     val audioItems: List<DownloadItem> = emptyList(),
     val videoItems: List<DownloadItem> = emptyList(),

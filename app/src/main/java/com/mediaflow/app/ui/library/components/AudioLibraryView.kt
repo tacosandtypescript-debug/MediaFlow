@@ -34,6 +34,10 @@ fun AudioLibraryView(
     onAddToPlaylist: (item: DownloadItem) -> Unit,
     onAddToQueue: (item: DownloadItem) -> Unit,
     onDeleteMedia: (item: DownloadItem) -> Unit,
+    selectedIds: Set<String> = emptySet(),
+    inSelectionMode: Boolean = false,
+    onLongPressItem: (DownloadItem) -> Unit = {},
+    onToggleSelect: (DownloadItem) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     if (items.isEmpty()) {
@@ -81,7 +85,11 @@ fun AudioLibraryView(
                     isPlaying = isPlaying,
                     isFavorite = favoriteUris.contains(uri),
                     progressFraction = progressFraction,
-                    onClick = { onPlayItem(item, index) },
+                    selected = item.id in selectedIds,
+                    onClick = {
+                        if (inSelectionMode) onToggleSelect(item) else onPlayItem(item, index)
+                    },
+                    onLongClick = { onLongPressItem(item) },
                     onToggleFavorite = { onToggleFavorite(uri) },
                     onAddToPlaylist = { onAddToPlaylist(item) },
                     onAddToQueue = { onAddToQueue(item) },

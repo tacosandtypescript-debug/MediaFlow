@@ -40,6 +40,10 @@ fun LibraryAllView(
     onPlayPlaylist: (Playlist) -> Unit,
     onRenamePlaylist: (Playlist) -> Unit,
     onDeletePlaylist: (String) -> Unit,
+    selectedIds: Set<String> = emptySet(),
+    inSelectionMode: Boolean = false,
+    onLongPressItem: (DownloadItem) -> Unit = {},
+    onToggleSelect: (DownloadItem) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     if (items.isEmpty() && playlists.isEmpty()) {
@@ -96,7 +100,12 @@ fun LibraryAllView(
                 isPlaying = playingMediaId == uri && isPlayerPlaying,
                 isFavorite = favoriteUris.contains(uri),
                 progressFraction = progressFraction,
-                onClick = { onPlayItem(item, index.coerceAtLeast(0)) },
+                selected = item.id in selectedIds,
+                onClick = {
+                    if (inSelectionMode) onToggleSelect(item)
+                    else onPlayItem(item, index.coerceAtLeast(0))
+                },
+                onLongClick = { onLongPressItem(item) },
                 onToggleFavorite = { onToggleFavorite(uri) },
                 onAddToPlaylist = { onAddToPlaylist(item) },
                 onAddToQueue = { onAddToQueue(item) },

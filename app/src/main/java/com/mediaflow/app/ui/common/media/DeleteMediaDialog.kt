@@ -32,6 +32,7 @@ import com.mediaflow.app.ui.theme.customColors
 fun DeleteMediaDialog(
     title: String,
     artworkUrl: String? = null,
+    itemCount: Int = 1,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -48,7 +49,7 @@ fun DeleteMediaDialog(
         },
         title = {
             Text(
-                text = "¿Eliminar este audio?",
+                text = if (itemCount > 1) "¿Eliminar $itemCount archivos?" else "¿Eliminar este audio?",
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
             )

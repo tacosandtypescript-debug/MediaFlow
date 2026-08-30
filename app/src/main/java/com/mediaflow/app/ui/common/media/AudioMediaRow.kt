@@ -6,8 +6,9 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -45,6 +46,7 @@ import com.mediaflow.core.model.MediaType
  * Modern, clean media row representing an audio track or X Space in the library,
  * playlists, favorites, and search results.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun AudioMediaRow(
     title: String,
@@ -57,6 +59,8 @@ fun AudioMediaRow(
     isFavorite: Boolean = false,
     progressFraction: Float = 0f,
     onClick: () -> Unit,
+    onLongClick: () -> Unit = {},
+    selected: Boolean = false,
     onToggleFavorite: () -> Unit,
     onAddToPlaylist: () -> Unit,
     onAddToQueue: (() -> Unit)? = null,
@@ -72,7 +76,11 @@ fun AudioMediaRow(
         shape = RoundedCornerShape(0.dp),
         modifier = modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
+            .then(
+                if (selected) Modifier.background(MaterialTheme.colorScheme.primary.copy(alpha = 0.16f))
+                else Modifier,
+            )
             .testTag("audio_media_row"),
     ) {
         Row(

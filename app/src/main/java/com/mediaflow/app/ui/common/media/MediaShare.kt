@@ -67,6 +67,42 @@ object MediaShare {
         }.getOrElse { fail(context) }
     }
 
+    fun shareMultiple(context: Context, uris: List<String>, isAudio: Boolean): Boolean {
+        val unique = uris.map { it.trim() }.filter { it.isNotBlank() && !isRemoteStream(it) }.distinct()
+        if (unique.isEmpty()) return fail(context)
+        if (unique.size == 1) {
+            return share(context, unique.first(), isAudio = isAudio)
+        }
+        val shareUris = unique.mapNotNull { resolveShareableUri(context, it) }
+        if (shareUris.isEmpty()) return fail(context)
+        val mime = if (isAudio) "audio/*" else "*/*"
+        val streamList = ArrayList(shareUris)
+        val send = Intent(Intent.ACTION_SEND_MULTIPLE).apply {
+            type = mime
+            putParcelableArrayListExtra(Intent.EXTRA_STREAM, streamList)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            clipData = ClipData.newUri(
+                context.contentResolver,
+                "MediaFlow",
+                shareUris.first(),
+            ).also { clip ->
+                shareUris.drop(1).forEach { uri ->
+                    clip.addItem(ClipData.Item(uri))
+                }
+            }
+        }
+        val chooser = Intent.createChooser(
+            send,
+            context.getString(if (isAudio) R.string.share_audio else R.string.share_video),
+        ).apply {
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        return runCatching {
+            context.startActivity(chooser)
+            true
+        }.getOrElse { fail(context) }
+    }
+
     internal fun isRemoteStream(uriString: String): Boolean {
         val value = uriString.trim()
         return value.startsWith("http://", ignoreCase = true) ||
