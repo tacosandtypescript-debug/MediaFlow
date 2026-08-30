@@ -213,7 +213,6 @@ class PlayerService(
             isShuffle = shuffle,
             artistOrHost = target.artistOrHost,
             artworkUrl = target.artworkUrl,
-            isShuffle = shuffle,
         )
 
         openMedia(
