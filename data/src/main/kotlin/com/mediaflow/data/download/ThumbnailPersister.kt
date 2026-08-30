@@ -72,12 +72,13 @@ internal object ThumbnailPersister {
      * and deletes the extra file so finish() cannot treat it as media.
      */
     fun harvestNearby(context: Context, downloadId: String, mediaFile: File): String? {
-        existingUri(context, downloadId)?.let { existing ->
-            deleteSidecars(mediaFile.parentFile, mediaFile.nameWithoutExtension)
-            return existing
+        val sidecar = findSidecar(mediaFile.parentFile, mediaFile.nameWithoutExtension)
+        val existing = existingFile(context, downloadId)
+        if (sidecar != null && (existing == null || sidecar.length() > existing.length())) {
+            return copySidecar(context, downloadId, sidecar)
         }
-        val sidecar = findSidecar(mediaFile.parentFile, mediaFile.nameWithoutExtension) ?: return null
-        return copySidecar(context, downloadId, sidecar)
+        deleteSidecars(mediaFile.parentFile, mediaFile.nameWithoutExtension)
+        return existing?.let(::fileUri)
     }
 
     fun harvestFromDirectory(
@@ -86,15 +87,21 @@ internal object ThumbnailPersister {
         directory: File,
         expectedBaseName: String? = null,
     ): String? {
-        existingUri(context, downloadId)?.let { existing ->
-            deleteImageFiles(directory, expectedBaseName)
-            return existing
-        }
         val images = directory.listFiles().orEmpty().filter { isImageFile(it) }
-        val sidecar = expectedBaseName?.let { base ->
-            images.firstOrNull { it.nameWithoutExtension == base || it.nameWithoutExtension.startsWith(base) }
-        } ?: images.maxByOrNull { it.lastModified() }
-        return sidecar?.let { copySidecar(context, downloadId, it) }
+        val sidecar = images
+            .filter { file ->
+                expectedBaseName == null ||
+                    file.nameWithoutExtension == expectedBaseName ||
+                    file.nameWithoutExtension.startsWith(expectedBaseName)
+            }
+            .maxByOrNull { it.length() }
+            ?: images.maxByOrNull { it.length() }
+        val existing = existingFile(context, downloadId)
+        if (sidecar != null && (existing == null || sidecar.length() > existing.length())) {
+            return copySidecar(context, downloadId, sidecar)
+        }
+        deleteImageFiles(directory, expectedBaseName)
+        return existing?.let(::fileUri)
     }
 
     private fun copySidecar(context: Context, downloadId: String, sidecar: File): String? {
