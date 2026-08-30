@@ -1,5 +1,6 @@
 package com.mediaflow.app.navigation
 
+import android.content.Intent
 import android.net.Uri
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
@@ -52,7 +53,9 @@ import com.mediaflow.app.ui.settings.SettingsScreen
 import com.mediaflow.app.ui.theme.MediaFlowTheme
 import com.mediaflow.app.ui.theme.ThemeViewModel
 import com.mediaflow.app.ui.theme.customColors
+import com.mediaflow.data.player.background.MediaPlaybackService
 import com.mediaflow.data.player.background.PlayerSessionHolder
+import com.mediaflow.data.player.notification.PlaybackTransportActions
 import com.mediaflow.data.resolver.YtDlpSourceResolver
 import kotlinx.coroutines.launch
 
@@ -60,6 +63,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun AppNavigation(
     requestNotificationPermission: (((Boolean) -> Unit) -> Unit)? = null,
+    launchIntent: Intent? = null,
 ) {
     val context = LocalContext.current
     val application = context.applicationContext as android.app.Application
@@ -93,6 +97,19 @@ fun AppNavigation(
 
     MediaFlowTheme(themeMode = themeMode) {
         val navController = rememberNavController()
+        LaunchedEffect(launchIntent, playerServiceState.mediaId) {
+            val intent = launchIntent ?: return@LaunchedEffect
+            if (!intent.getBooleanExtra(PlaybackTransportActions.EXTRA_OPEN_PLAYER, false)) {
+                return@LaunchedEffect
+            }
+            val mediaId = intent.getStringExtra(MediaPlaybackService.EXTRA_MEDIA_URI)
+                ?: playerServiceState.mediaId
+                ?: playerServiceState.filePath
+                ?: return@LaunchedEffect
+            navController.navigate(MediaFlowDestination.Player.routeFor(Uri.encode(mediaId))) {
+                launchSingleTop = true
+            }
+        }
         val backStackEntry by navController.currentBackStackEntryAsState()
         val currentRoute = backStackEntry?.destination?.route
         val showBottomBar = MediaFlowDestination.bottomBarItems.any { it.route == currentRoute }

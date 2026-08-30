@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="brand_primary">#1B5E20</color>
+    <color name="brand_primary">#7C3AED</color>
+    <color name="widget_player_background">#121212</color>
+    <color name="widget_title">#FFFFFF</color>
+    <color name="widget_artist">#B3B3B3</color>
 </resources>

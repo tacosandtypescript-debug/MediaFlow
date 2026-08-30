@@ -99,6 +99,15 @@
     <string name="library_search_placeholder">¿Qué quieres escuchar?</string>
     <string name="library_search_close">Cerrar búsqueda</string>
     <string name="library_recents">Recién añadido</string>
+    <string name="library_sort">Ordenar</string>
+    <string name="library_sort_newest">Más recientes</string>
+    <string name="library_sort_oldest">Más antiguos</string>
+    <string name="library_sort_heaviest">Más pesados</string>
+    <string name="library_sort_lightest">Más ligeros</string>
+    <string name="library_sort_longest">Mayor duración</string>
+    <string name="library_sort_shortest">Menor duración</string>
+    <string name="library_sort_name_az">Nombre A–Z</string>
+    <string name="library_sort_name_za">Z–A</string>
     <string name="library_view_grid">Vista de cuadrícula</string>
     <string name="library_view_list">Vista de lista</string>
     <string name="library_all_empty_title">Tu biblioteca está vacía</string>
@@ -182,5 +191,14 @@
     <string name="settings_default_quality">Calidad predeterminada</string>
     <string name="settings_section_about">Acerca de</string>
     <string name="settings_version">Versión %1$s</string>
+
+    <string name="widget_player_description">Mini reproductor de MediaFlow</string>
+    <string name="widget_cover_cd">Portada</string>
+    <string name="widget_idle_title">Nada en reproducción</string>
+    <string name="widget_idle_artist">Abre MediaFlow y elige una pista</string>
+    <string name="widget_prev">Anterior</string>
+    <string name="widget_play">Reproducir</string>
+    <string name="widget_pause">Pausar</string>
+    <string name="widget_next">Siguiente</string>
 
 </resources>
