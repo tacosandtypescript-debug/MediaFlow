@@ -545,6 +545,21 @@ class PlayerService(
         }
     }
 
+    /**
+     * Seek the engine to the HLS live edge (duration of the growing playlist) and resume.
+     */
+    fun jumpToLiveEdge() {
+        if (isReleased) return
+        val edgeMs = _uiState.value.durationMs.coerceAtLeast(_uiState.value.currentPositionMs)
+        engine.seekTo(edgeMs)
+        _uiState.value = _uiState.value.copy(
+            currentPositionMs = edgeMs,
+            pausedByUser = false,
+            pausedByAudioFocus = false,
+        )
+        engine.play()
+    }
+
     fun setSpeed(speed: Float) {
         if (isReleased) return
         engine.setSpeed(speed)

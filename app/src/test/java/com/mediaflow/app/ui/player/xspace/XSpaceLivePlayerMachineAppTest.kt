@@ -14,9 +14,14 @@ class XSpaceLivePlayerMachineAppTest {
     @Test
     fun livePlusPauseIsBehindLiveWithNegativeLag() {
         val live = connectedLive()
-        val behind = XSpaceLivePlayerMachine.reduce(live, XSpaceLivePlayerEvent.Pause)
-        assertEquals(XSpacePlaybackMode.BEHIND_LIVE, behind.playback)
+        val paused = XSpaceLivePlayerMachine.reduce(live, XSpaceLivePlayerEvent.Pause)
+        assertEquals(XSpacePlaybackMode.BEHIND_LIVE, paused.playback)
+        val behind = XSpaceLivePlayerMachine.reduce(
+            paused,
+            XSpaceLivePlayerEvent.LagSample(-24_000L),
+        )
         assertTrue("lag must be negative while behind live", behind.liveLagMs < 0L)
+        assertEquals(-24_000L, behind.liveLagMs)
     }
 
     @Test

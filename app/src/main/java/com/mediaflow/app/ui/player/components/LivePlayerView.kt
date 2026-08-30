@@ -102,7 +102,7 @@ private fun inferredState(
         playbackState == EnginePlaybackState.PAUSED && isBroadcastLive -> XSpaceLivePlayerState(
             connection = XSpaceConnectionState.CONNECTED,
             playback = XSpacePlaybackMode.BEHIND_LIVE,
-            liveLagMs = -1L,
+            liveLagMs = 0L,
             liveControlActive = true,
             liveSeekAllowed = capabilities?.liveSeekAllowed == true,
         )

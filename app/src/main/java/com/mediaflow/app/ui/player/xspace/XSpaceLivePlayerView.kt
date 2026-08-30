@@ -51,6 +51,7 @@ import com.mediaflow.domain.live.LiveSpaceEndState
 import com.mediaflow.domain.player.EnginePlaybackState
 import com.mediaflow.domain.player.xspace.XSpaceConnectionState
 import com.mediaflow.domain.player.xspace.XSpaceLivePlayerState
+import com.mediaflow.domain.player.xspace.LiveLagMath
 import com.mediaflow.domain.player.xspace.XSpacePlaybackMode
 import kotlinx.coroutines.delay
 import java.util.Locale
@@ -192,14 +193,26 @@ fun XSpaceLivePlayerView(
             }
 
             if (playerState.playback == XSpacePlaybackMode.BEHIND_LIVE) {
-                Text(
-                    text = stringResource(R.string.space_behind_live),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier
                         .padding(top = 8.dp)
                         .testTag("xspace_behind_live"),
-                )
+                ) {
+                    Text(
+                        text = stringResource(R.string.space_live_badge),
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.customColors.live,
+                    )
+                    Text(
+                        text = LiveLagMath.format(playerState.liveLagMs),
+                        style = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.testTag("xspace_live_lag"),
+                    )
+                }
             }
 
             XSpaceConnectionStatusLabel(

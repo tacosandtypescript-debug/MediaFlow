@@ -466,4 +466,29 @@ class PlayerServiceTest {
         assertEquals(EnginePlaybackState.PAUSED, engine.state.value.playbackState)
         assertFalse(engine.isReleased)
     }
+
+    @Test
+    fun jumpToLiveEdgeSeeksEngineToPlaylistDuration() = runTest {
+        val (service, engine, _) = createService()
+        engine.simulateDuration(90_000L)
+        service.openMedia(
+            mediaId = "https://cdn.example/live.m3u8",
+            filePath = "https://cdn.example/live.m3u8",
+            isLive = true,
+            autoPlay = true,
+        )
+        runCurrent()
+        engine.simulatePosition(10_000L)
+        service.pause()
+        runCurrent()
+        assertEquals(EnginePlaybackState.PAUSED, engine.state.value.playbackState)
+
+        service.jumpToLiveEdge()
+        runCurrent()
+
+        assertEquals(90_000L, engine.state.value.currentPositionMs)
+        assertEquals(90_000L, service.uiState.value.currentPositionMs)
+        assertEquals(EnginePlaybackState.PLAYING, engine.state.value.playbackState)
+        assertFalse(service.uiState.value.pausedByUser)
+    }
 }

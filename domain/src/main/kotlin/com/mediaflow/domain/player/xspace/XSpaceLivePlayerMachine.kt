@@ -43,6 +43,7 @@ sealed class XSpaceLivePlayerEvent {
     data object Pause : XSpaceLivePlayerEvent()
     data object Resume : XSpaceLivePlayerEvent()
     data object JumpToLiveEdge : XSpaceLivePlayerEvent()
+    data class LagSample(val lagMs: Long) : XSpaceLivePlayerEvent()
     data object Buffering : XSpaceLivePlayerEvent()
     data object IngestEnded : XSpaceLivePlayerEvent()
     data class StartReplay(val seekAllowed: Boolean) : XSpaceLivePlayerEvent()
@@ -113,12 +114,11 @@ object XSpaceLivePlayerMachine {
                     state.playback == XSpacePlaybackMode.BUFFERING &&
                     state.liveControlActive -> state.copy(
                     playback = XSpacePlaybackMode.BEHIND_LIVE,
-                    liveLagMs = if (state.liveLagMs < 0L) state.liveLagMs else -1L,
+                    liveLagMs = state.liveLagMs.coerceAtMost(0L),
                     liveControlActive = true,
                 )
                 state.playback == XSpacePlaybackMode.BEHIND_LIVE -> state.copy(
                     playback = XSpacePlaybackMode.BEHIND_LIVE,
-                    liveLagMs = minOf(state.liveLagMs, -1L),
                     liveControlActive = true,
                 )
                 else -> state.copy(playback = XSpacePlaybackMode.PAUSED)
@@ -131,7 +131,6 @@ object XSpaceLivePlayerMachine {
                 state.playback == XSpacePlaybackMode.BEHIND_LIVE -> state.copy(
                     connection = XSpaceConnectionState.CONNECTED,
                     playback = XSpacePlaybackMode.BEHIND_LIVE,
-                    liveLagMs = minOf(state.liveLagMs, -1L),
                     liveControlActive = true,
                 )
                 else -> state.copy(
@@ -140,6 +139,29 @@ object XSpaceLivePlayerMachine {
                     liveLagMs = 0L,
                     liveControlActive = true,
                 )
+            }
+            is XSpaceLivePlayerEvent.LagSample -> {
+                if (state.connection == XSpaceConnectionState.ENDED ||
+                    state.playback == XSpacePlaybackMode.REPLAY
+                ) {
+                    state
+                } else if (LiveLagMath.behindLive(event.lagMs)) {
+                    state.copy(
+                        playback = XSpacePlaybackMode.BEHIND_LIVE,
+                        liveLagMs = event.lagMs,
+                        liveControlActive = true,
+                    )
+                } else if (state.playback == XSpacePlaybackMode.BEHIND_LIVE &&
+                    !LiveLagMath.behindLive(event.lagMs)
+                ) {
+                    state.copy(
+                        playback = XSpacePlaybackMode.LIVE,
+                        liveLagMs = 0L,
+                        liveControlActive = true,
+                    )
+                } else {
+                    state.copy(liveLagMs = event.lagMs.coerceAtMost(0L))
+                }
             }
             XSpaceLivePlayerEvent.JumpToLiveEdge -> {
                 if (state.connection == XSpaceConnectionState.ENDED ||

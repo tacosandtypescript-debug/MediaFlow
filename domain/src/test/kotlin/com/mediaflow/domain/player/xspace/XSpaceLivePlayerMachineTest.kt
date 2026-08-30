@@ -19,9 +19,27 @@ class XSpaceLivePlayerMachineTest {
 
         val behind = XSpaceLivePlayerMachine.reduce(live, XSpaceLivePlayerEvent.Pause)
         assertEquals(XSpacePlaybackMode.BEHIND_LIVE, behind.playback)
-        assertTrue(behind.liveLagMs < 0L)
         assertTrue(behind.liveControlActive)
         assertEquals(live.sessionGeneration, behind.sessionGeneration)
+
+        val lagged = XSpaceLivePlayerMachine.reduce(
+            behind,
+            XSpaceLivePlayerEvent.LagSample(-24_000L),
+        )
+        assertEquals(XSpacePlaybackMode.BEHIND_LIVE, lagged.playback)
+        assertEquals(-24_000L, lagged.liveLagMs)
+        assertEquals("-00:24", LiveLagMath.format(lagged.liveLagMs))
+    }
+
+    @Test
+    fun lagSampleDoesNotHardcodeMinusOne() {
+        val live = XSpaceLivePlayerMachine.reduce(
+            XSpaceLivePlayerMachine.initial(),
+            XSpaceLivePlayerEvent.OpenLive(liveSeekAllowed = false),
+        ).let { XSpaceLivePlayerMachine.reduce(it, XSpaceLivePlayerEvent.ConnectedAtLiveEdge) }
+        val sample = XSpaceLivePlayerMachine.reduce(live, XSpaceLivePlayerEvent.LagSample(-136_000L))
+        assertEquals(-136_000L, sample.liveLagMs)
+        assertEquals(XSpacePlaybackMode.BEHIND_LIVE, sample.playback)
     }
 
     @Test

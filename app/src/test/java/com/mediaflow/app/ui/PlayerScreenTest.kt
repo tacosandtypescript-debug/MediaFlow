@@ -277,6 +277,8 @@ class PlayerScreenTest {
         }
         composeRule.onNodeWithTag("xspace_jump_live").assertIsDisplayed()
         composeRule.onNodeWithText("LIVE").assertIsDisplayed()
+        composeRule.onNodeWithTag("xspace_behind_live").assertIsDisplayed()
+        composeRule.onNodeWithTag("xspace_live_lag").assertIsDisplayed()
         composeRule.onNodeWithTag("xspace_record_toggle").assertIsDisplayed()
         composeRule.onNodeWithText("Grabar").assertIsDisplayed()
         composeRule.onAllNodesWithText("--").assertCountEquals(0)

@@ -17,6 +17,7 @@ import com.mediaflow.data.media.metadata.EmbeddedTrackTags
 import com.mediaflow.data.player.background.MediaPlaybackService
 import com.mediaflow.data.player.background.PlayerSessionHolder
 import com.mediaflow.data.player.background.SpaceRecordingService
+import com.mediaflow.data.provider.x.dvr.HlsLiveIngest
 import com.mediaflow.data.provider.x.recording.RecordedSpaceLibrary
 import com.mediaflow.data.provider.x.recording.RecordingPhase
 import com.mediaflow.data.provider.x.recording.SpaceRecorder
@@ -106,6 +107,9 @@ class PlayerViewModel(
     private val spaceRecording = MutableStateFlow(SpaceRecordingUi())
     private var spaceRecorder: SpaceRecorder? = null
     private var recorderTickJob: Job? = null
+    private var liveLagJob: Job? = null
+    private var livePausedAtWallMs: Long? = null
+    private var hlsIngest = HlsLiveIngest(::fetchHlsBytes)
 
     private val downloadRepo: DownloadRepository = downloadRepository ?: Media3DownloadRepository.get(app)
 
@@ -419,9 +423,12 @@ class PlayerViewModel(
         val state = uiState.value.serviceState
         when {
             state.isPlaying -> {
+                val liveSession = currentSpace.value?.isLive == true ||
+                    spacePlayer.value.liveControlActive
                 playerService.pause()
                 reduceSpacePlayer(XSpaceLivePlayerEvent.Pause)
                 spaceRecorder?.playbackPaused = true
+                if (liveSession) startLiveLagTicker()
             }
             state.isEnded -> {
                 playerService.seekTo(0L)
@@ -433,14 +440,16 @@ class PlayerViewModel(
                 playerService.play()
                 reduceSpacePlayer(XSpaceLivePlayerEvent.Resume)
                 spaceRecorder?.playbackPaused = false
+                stopLiveLagTicker()
             }
         }
     }
 
     fun jumpToLiveEdge() {
         showControlsTemporarily()
+        stopLiveLagTicker()
+        playerService.jumpToLiveEdge()
         reduceSpacePlayer(XSpaceLivePlayerEvent.JumpToLiveEdge)
-        playerService.play()
         spaceRecorder?.playbackPaused = false
     }
 
@@ -811,6 +820,7 @@ class PlayerViewModel(
             originalUrl = space.url,
         )
         spaceRecording.value = SpaceRecordingUi()
+        hlsIngest = HlsLiveIngest(::fetchHlsBytes)
         ensureRecorderTicks()
     }
 
@@ -819,7 +829,10 @@ class PlayerViewModel(
         recorderTickJob = viewModelScope.launch(Dispatchers.IO) {
             while (true) {
                 val rec = spaceRecorder ?: break
-                rec.acceptRecorderTick(ByteArray(TICK_BYTES))
+                val playlist = currentSpace.value?.audioStreamUrl
+                if (!playlist.isNullOrBlank() && playlist.contains(".m3u8", ignoreCase = true)) {
+                    hlsIngest.pull(playlist).forEach { rec.acceptRecorderTick(it) }
+                }
                 publishRecordingUi()
                 if (rec.recordEnabled && rec.phase == RecordingPhase.RECORDING) {
                     SpaceRecordingService.start(app, rec.elapsedMs)
@@ -827,6 +840,32 @@ class PlayerViewModel(
                 delay(TICK_INTERVAL_MS)
             }
         }
+    }
+
+    private fun fetchHlsBytes(url: String): ByteArray {
+        val connection = java.net.URL(url).openConnection()
+        connection.connectTimeout = 4_000
+        connection.readTimeout = 4_000
+        return connection.getInputStream().use { it.readBytes() }
+    }
+
+    private fun startLiveLagTicker() {
+        livePausedAtWallMs = System.currentTimeMillis()
+        liveLagJob?.cancel()
+        liveLagJob = viewModelScope.launch {
+            val pausedAt = livePausedAtWallMs ?: return@launch
+            while (true) {
+                val lagMs = pausedAt - System.currentTimeMillis()
+                reduceSpacePlayer(XSpaceLivePlayerEvent.LagSample(lagMs))
+                delay(250)
+            }
+        }
+    }
+
+    private fun stopLiveLagTicker() {
+        liveLagJob?.cancel()
+        liveLagJob = null
+        livePausedAtWallMs = null
     }
 
     private fun finalizeSpaceRecording(state: XSpaceState) {
@@ -916,13 +955,13 @@ class PlayerViewModel(
         openJob?.cancel()
         liveEndJob?.cancel()
         recorderTickJob?.cancel()
+        liveLagJob?.cancel()
         SpaceRecordingService.stop(app)
         super.onCleared()
     }
 
     private companion object {
-        const val TICK_BYTES = 500
-        const val TICK_INTERVAL_MS = 500L
+        const val TICK_INTERVAL_MS = 1_000L
     }
 
     class Factory(
