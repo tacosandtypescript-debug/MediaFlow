@@ -1,10 +1,12 @@
 package com.mediaflow.app.ui.library
 
 import android.app.Application
+import android.content.Context
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.mediaflow.app.ui.common.media.MediaShare
 import com.mediaflow.app.ui.common.media.preferredArtworkUrl
 import com.mediaflow.app.ui.library.components.LibraryFilter
 import com.mediaflow.core.model.DownloadItem
@@ -18,6 +20,10 @@ import com.mediaflow.data.repository.Media3DownloadRepository
 import com.mediaflow.data.repository.MediaStoreGalleryRepository
 import com.mediaflow.data.repository.PlaylistRepositoryImpl
 import com.mediaflow.data.repository.ProgressRepositoryImpl
+import com.mediaflow.data.media.LibraryMediaMerge
+import com.mediaflow.data.media.VideoFrameThumbnail
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import com.mediaflow.data.repository.XSpaceRepositoryImpl
 import com.mediaflow.domain.player.PlayerService
 import com.mediaflow.domain.repository.DownloadRepository
@@ -54,6 +60,12 @@ class LibraryViewModel(
 ) : AndroidViewModel(application) {
 
     private val selectedFilter = MutableStateFlow(LibraryFilter.ALL)
+    private val selectionState = MutableStateFlow(LibrarySelection())
+    val selection: StateFlow<LibrarySelection> = selectionState
+    private val selectedSort = MutableStateFlow(LibrarySort.NEWEST)
+    private val videoThumbs = MutableStateFlow<Map<String, String>>(emptyMap())
+    private val thumbHarvestMutex = Mutex()
+    private val harvestedSources = mutableSetOf<String>()
     private val downloadsFlow: Flow<List<DownloadItem>> = downloadRepository?.observeDownloads()
         ?: runCatching { Media3DownloadRepository.get(application).observeDownloads() }
             .getOrElse { flowOf(emptyList()) }
@@ -69,7 +81,9 @@ class LibraryViewModel(
         favoritesRepository.observeFavoriteMediaUris().flowOn(Dispatchers.IO),
         playerService.uiState,
         selectedFilter,
+        selectedSort,
         downloadsFlow.flowOn(Dispatchers.IO),
+        videoThumbs,
     ) { args: Array<Any?> ->
         @Suppress("UNCHECKED_CAST")
         val galleryResult = args[0] as Result<List<DownloadItem>>
@@ -83,10 +97,16 @@ class LibraryViewModel(
         val favoriteUris = args[4] as Set<String>
         val playerState = args[5] as com.mediaflow.domain.player.PlayerServiceState
         val filter = args[6] as LibraryFilter
+        val sort = args[7] as LibrarySort
         @Suppress("UNCHECKED_CAST")
-        val downloads = args[7] as List<DownloadItem>
+        val downloads = args[8] as List<DownloadItem>
+        @Suppress("UNCHECKED_CAST")
+        val thumbs = args[9] as Map<String, String>
 
-        val allItems = overlayThumbnails(galleryResult.getOrDefault(emptyList()), downloads)
+        val merged = LibraryMediaMerge.merge(galleryResult.getOrDefault(emptyList()), downloads)
+        val withFrames = attachCachedVideoThumbs(merged, thumbs)
+        scheduleVideoThumbHarvest(withFrames)
+        val allItems = LibrarySorter.apply(withFrames, sort)
         val audioItems = allItems.filter { it.mediaType == MediaType.AUDIO }
         val videoItems = allItems.filter { it.mediaType == MediaType.VIDEO }
         val favoriteItems = allItems.filter { item ->
@@ -96,6 +116,7 @@ class LibraryViewModel(
 
         LibraryUiState(
             selectedFilter = filter,
+            selectedSort = sort,
             allItems = allItems,
             audioItems = audioItems,
             videoItems = videoItems,
@@ -113,6 +134,10 @@ class LibraryViewModel(
 
     fun setFilter(filter: LibraryFilter) {
         selectedFilter.value = filter
+    }
+
+    fun setSort(sort: LibrarySort) {
+        selectedSort.value = sort
     }
 
     fun toggleFavorite(mediaUri: String) {
@@ -157,7 +182,71 @@ class LibraryViewModel(
 
     fun deleteMediaItem(id: String) {
         viewModelScope.launch {
+            val item = uiState.value.allItems.firstOrNull { it.id == id }
             galleryRepository.deleteItem(id)
+            cleanupAfterDelete(listOfNotNull(item))
+        }
+    }
+
+    fun enterSelection(id: String) {
+        selectionState.value = selectionState.value.enter(id)
+    }
+
+    fun toggleSelection(id: String) {
+        selectionState.value = selectionState.value.toggle(id)
+    }
+
+    fun selectAll(ids: Collection<String>) {
+        selectionState.value = selectionState.value.selectAll(ids)
+    }
+
+    fun clearSelection() {
+        selectionState.value = selectionState.value.clear()
+    }
+
+    fun shareSelected(context: Context) {
+        val selected = selectedItems()
+        if (selected.isEmpty()) return
+        val uris = selected.mapNotNull { it.localUri ?: it.id.takeIf { id -> id.contains("://") || id.startsWith("/") } }
+        val allAudio = selected.all { it.mediaType == MediaType.AUDIO }
+        MediaShare.shareMultiple(context, uris, isAudio = allAudio)
+    }
+
+    fun deleteSelected() {
+        viewModelScope.launch {
+            val items = selectedItems()
+            if (items.isEmpty()) return@launch
+            items.forEach { galleryRepository.deleteItem(it.id) }
+            cleanupAfterDelete(items)
+            selectionState.value = LibrarySelection()
+        }
+    }
+
+    private fun selectedItems(): List<DownloadItem> {
+        val ids = selectionState.value.selectedIds
+        return uiState.value.allItems.filter { it.id in ids }
+    }
+
+    private suspend fun cleanupAfterDelete(items: List<DownloadItem>) {
+        if (items.isEmpty()) return
+        val keys = items.flatMap { item ->
+            listOfNotNull(item.id, item.localUri)
+        }.toSet()
+        keys.forEach { key ->
+            favoritesRepository.setFavorite(key, false)
+        }
+        val playlists = uiState.value.playlists
+        playlists.forEach { playlist ->
+            keys.forEach { key ->
+                if (key in playlist.mediaUris) {
+                    playlistRepository.removeMediaFromPlaylist(playlist.id, key)
+                }
+            }
+        }
+        val player = playerService.uiState.value
+        val current = setOfNotNull(player.mediaId, player.filePath, player.currentQueueItem?.mediaUri)
+        if (current.any { it in keys }) {
+            playerService.stop()
         }
     }
 
@@ -175,6 +264,52 @@ class LibraryViewModel(
             )
         }
         playerService.playQueue(queueItems, startIndex, context)
+    }
+
+    private fun attachCachedVideoThumbs(
+        items: List<DownloadItem>,
+        thumbs: Map<String, String>,
+    ): List<DownloadItem> {
+        val app = getApplication<Application>()
+        return items.map { item ->
+            if (item.mediaType != MediaType.VIDEO) return@map item
+            if (!VideoFrameThumbnail.needsFrame(item.thumbnailUri)) return@map item
+            val source = item.localUri ?: item.id
+            val found = thumbs[source]
+                ?: thumbs[item.id]
+                ?: VideoFrameThumbnail.cachedUri(app, source)
+                ?: item.localUri?.let { VideoFrameThumbnail.cachedUri(app, it) }
+            if (found != null) {
+                item.copy(thumbnailUri = found)
+            } else {
+                item
+            }
+        }
+    }
+
+    private fun scheduleVideoThumbHarvest(items: List<DownloadItem>) {
+        val pending = items.filter { item ->
+            item.mediaType == MediaType.VIDEO &&
+                VideoFrameThumbnail.needsFrame(item.thumbnailUri)
+        }
+        if (pending.isEmpty()) return
+        viewModelScope.launch(Dispatchers.IO) {
+            thumbHarvestMutex.withLock {
+                val app = getApplication<Application>()
+                val extras = LinkedHashMap<String, String>()
+                pending.forEach { item ->
+                    val source = item.localUri ?: item.id
+                    if (!harvestedSources.add(source)) return@forEach
+                    val info = VideoFrameThumbnail.extract(app, source)
+                    val uri = info.thumbnailUri ?: return@forEach
+                    extras[source] = uri
+                    extras[item.id] = uri
+                }
+                if (extras.isNotEmpty()) {
+                    videoThumbs.value = videoThumbs.value + extras
+                }
+            }
+        }
     }
 
     fun addToQueue(item: DownloadItem) {
@@ -205,9 +340,7 @@ internal fun overlayThumbnails(
     items: List<DownloadItem>,
     downloads: List<DownloadItem>,
 ): List<DownloadItem> {
-    val completed = downloads.filter { it.status == DownloadStatus.COMPLETED && !it.localUri.isNullOrBlank() }
-    if (items.isEmpty()) return completed
-    if (downloads.isEmpty()) return items
+    val merged = LibraryMediaMerge.merge(items, downloads)
     val thumbs = HashMap<String, String>()
     downloads.forEach { item ->
         val uri = item.thumbnailUri?.takeIf(::isLoadableArtworkUrl) ?: return@forEach
@@ -215,8 +348,8 @@ internal fun overlayThumbnails(
         item.localUri?.let { thumbs[it] = uri }
         thumbs[item.sourceUrl] = uri
     }
-    if (thumbs.isEmpty()) return items
-    return items.map { item ->
+    if (thumbs.isEmpty()) return merged
+    return merged.map { item ->
         if (isLoadableArtworkUrl(item.thumbnailUri)) item
         else {
             val overlay = sequenceOf(item.localUri, item.id, item.sourceUrl)
