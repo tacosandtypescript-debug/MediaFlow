@@ -250,30 +250,58 @@ class LibraryViewModel(
         }
     }
 
-    fun playQueue(items: List<DownloadItem>, startIndex: Int, context: String? = null) {
-        playQueueItems(
-            items = items,
-            startIndex = startIndex,
-            context = context,
-            shuffle = playerService.uiState.value.isShuffle,
-        )
+    fun playQueue(
+        items: List<DownloadItem>,
+        startIndex: Int,
+        context: String? = null,
+        shuffle: Boolean = false,
+    ) {
+        val queue = LibraryAudioQueueBuilder.tapIndex(items, startIndex, shuffle)
+        playLibraryAudioQueue(queue, context)
     }
 
     fun playAll(items: List<DownloadItem>, context: String? = null) {
-        playQueueItems(items, startIndex = 0, context = context, shuffle = false)
+        playAllAudio(items, context ?: LIBRARY_AUDIO_QUEUE_CONTEXT)
     }
 
     fun shuffleAll(items: List<DownloadItem>, context: String? = null) {
-        playQueueItems(items, startIndex = 0, context = context, shuffle = true)
+        shuffleAllAudio(items, context ?: LIBRARY_AUDIO_QUEUE_CONTEXT)
     }
 
-    private fun playQueueItems(
-        items: List<DownloadItem>,
-        startIndex: Int,
-        context: String?,
-        shuffle: Boolean,
+    fun playAllAudio(visible: List<DownloadItem>, context: String = LIBRARY_AUDIO_QUEUE_CONTEXT) {
+        playLibraryAudioQueue(LibraryAudioQueueBuilder.playAll(visible), context)
+    }
+
+    fun shuffleAllAudio(visible: List<DownloadItem>, context: String = LIBRARY_AUDIO_QUEUE_CONTEXT) {
+        playLibraryAudioQueue(LibraryAudioQueueBuilder.shuffleAll(visible), context)
+    }
+
+    fun reorderAudioQueueIfActive(
+        visible: List<DownloadItem>,
+        fromIndex: Int,
+        toIndex: Int,
+        context: String = LIBRARY_AUDIO_QUEUE_CONTEXT,
+    ): List<DownloadItem> {
+        val player = playerService.uiState.value
+        val isActiveContext = player.playbackContext == context
+        val result = LibraryAudioQueueBuilder.reorder(
+            items = visible,
+            fromIndex = fromIndex,
+            toIndex = toIndex,
+            currentIndex = if (isActiveContext) player.queueIndex else 0,
+            shuffle = player.isShuffle,
+        )
+        if (isActiveContext) {
+            playerService.reorderQueue(fromIndex, toIndex)
+        }
+        return result.items
+    }
+
+    fun playLibraryAudioQueue(
+        queue: LibraryAudioQueue<DownloadItem>,
+        context: String? = LIBRARY_AUDIO_QUEUE_CONTEXT,
     ) {
-        val queueItems = items.map { item ->
+        val queueItems = queue.items.map { item ->
             val uri = item.localUri ?: item.id
             val space = uiState.value.spacesMap[item.sourceUrl] ?: uiState.value.spacesMap[item.id]
             PlaybackQueueItem(
@@ -292,9 +320,9 @@ class LibraryViewModel(
         }
         playerService.playQueue(
             items = queueItems,
-            startIndex = startIndex,
+            startIndex = queue.currentIndex,
             context = context,
-            shuffle = shuffle,
+            shuffle = queue.shuffle,
             sourceContext = source,
         )
     }
@@ -366,6 +394,10 @@ class LibraryViewModel(
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             return LibraryViewModel(application) as T
         }
+    }
+
+    companion object {
+        const val LIBRARY_AUDIO_QUEUE_CONTEXT = "Biblioteca"
     }
 }
 
