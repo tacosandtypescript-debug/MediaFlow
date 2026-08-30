@@ -41,11 +41,7 @@ class YtDlpRuntimeTest {
                 .getJSONArray("player_client")
                 .let { array -> List(array.length()) { array.getString(it) } },
         )
-        val ua = opts.getJSONObject("http_headers").getString("User-Agent")
-        assertTrue(ua.contains("Chrome/13"))
-        val chrome = Regex("Chrome/(\\d+)").find(ua)?.groupValues?.get(1)?.toInt()
-        assertTrue(chrome in 131..136)
-        assertFalse(ua.contains("Chrome/150"))
+        assertFalse(opts.has("http_headers"))
     }
 
     @Test
@@ -65,6 +61,8 @@ class YtDlpRuntimeTest {
         assertEquals(template, opts.getString("outtmpl"))
         assertEquals(dir.absolutePath, opts.getJSONObject("paths").getString("home"))
         assertEquals("https://www.facebook.com/", opts.getJSONObject("http_headers").getString("Referer"))
+        val ua = opts.getJSONObject("http_headers").getString("User-Agent")
+        assertTrue(ua.contains("Chrome/13"))
         assertEquals("0.0.0.0", opts.getString("source_address"))
         assertEquals(3, opts.getInt("retries"))
         assertTrue(opts.getBoolean("writethumbnail"))

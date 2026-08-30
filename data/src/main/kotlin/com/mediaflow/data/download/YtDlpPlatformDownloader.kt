@@ -728,7 +728,11 @@ class YtDlpPlatformDownloader(
                     text.contains("not available", true) ||
                     text.contains("status code 403", true)) ->
                 "Instagram no entregó $mediaLabel de forma pública y anónima. Puede ser privado, requerir sesión o estar limitado temporalmente; no se creó ningún archivo."
-            else -> "$platform no pudo entregar $mediaLabel: ${text.ifBlank { "error desconocido" }}"
+            text.contains("HTTP Error 403", true) ||
+                text.contains("status code 403", true) ||
+                text.contains("Forbidden", true) ->
+                "$platform bloqueó la descarga de $mediaLabel. Vuelve a intentarlo."
+            else -> "$platform no pudo entregar $mediaLabel."
         }
     }
 

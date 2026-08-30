@@ -51,20 +51,30 @@ internal object YtDlpRuntime {
             .put("writethumbnail", true)
         format?.let { opts.put("format", it) }
         mergeOutputFormat?.let { opts.put("merge_output_format", it) }
-        referer?.let { opts.getJSONObject("http_headers").put("Referer", it) }
+        // Chrome UA is only for Instagram/TikTok/Facebook referer downloads.
+        // YouTube android_vr googlevideo URLs return HTTP 403 if fetched as Chrome.
+        if (referer != null) {
+            opts.put(
+                "http_headers",
+                JSONObject()
+                    .put("User-Agent", USER_AGENT)
+                    .put("Referer", referer),
+            )
+        }
         return opts
     }
 
     fun baseOptions(outputDirectory: File, outputTemplate: String): JSONObject {
         outputDirectory.mkdirs()
         val absoluteTemplate = absoluteOutputTemplate(outputDirectory, outputTemplate)
-        val headers = JSONObject().put("User-Agent", USER_AGENT)
         val paths = JSONObject()
             .put("home", outputDirectory.absolutePath)
             .put("temp", outputDirectory.absolutePath)
         // Chaquopy has no JS runtime. android_vr needs neither JS nor a PO token
         // and still exposes AAC/m4a (140). tv is the existing no-cookie fallback;
         // web is SABR-only without a PO token so it is omitted.
+        // Do not pin a global Chrome User-Agent: yt-dlp attaches the player
+        // client's UA on each format. Overriding it 403s YouTube CDN.
         val youtubeArgs = JSONObject().put(
             "player_client",
             JSONArray().put("android_vr").put("tv"),
@@ -86,7 +96,6 @@ internal object YtDlpRuntime {
             .put("socket_timeout", 30)
             .put("source_address", "0.0.0.0")
             .put("extractor_args", JSONObject().put("youtube", youtubeArgs))
-            .put("http_headers", headers)
             .put("no_color", true)
     }
 
