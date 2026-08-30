@@ -51,15 +51,4 @@ object XUrlParser {
         val match = STATUS_PATH_REGEX.find(path) ?: return null
         return match.groupValues[1]
     }
-
-    /**
-     * Normalizes an X URL to standard https://x.com/...
-     */
-    fun normalizeUrl(url: String): String {
-        val trimmed = url.trim()
-        val uri = runCatching { URI(trimmed) }.getOrNull() ?: return trimmed
-        val path = uri.rawPath ?: ""
-        val query = if (uri.rawQuery != null) "?${uri.rawQuery}" else ""
-        return "https://x.com$path$query"
-    }
 }

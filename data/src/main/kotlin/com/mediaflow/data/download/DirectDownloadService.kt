@@ -72,14 +72,6 @@ class DirectDownloadService : DownloadService(
             sendAddDownload(context, DirectDownloadService::class.java, request, true)
         }
 
-        fun pauseAll(context: Context) {
-            sendPauseDownloads(context, DirectDownloadService::class.java, true)
-        }
-
-        fun resumeAll(context: Context) {
-            sendResumeDownloads(context, DirectDownloadService::class.java, true)
-        }
-
         fun removeDownload(context: Context, id: String) {
             sendRemoveDownload(context, DirectDownloadService::class.java, id, true)
         }

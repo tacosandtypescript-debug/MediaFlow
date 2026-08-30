@@ -732,10 +732,6 @@ class YtDlpPlatformDownloader(
         }
     }
 
-    private fun sanitize(value: String): String = YtDlpRuntime.restrictFileName(
-        value.replace(Regex("[\\\\/:*?\"<>|\\u0000-\\u001F]"), ""),
-    )
-
     private fun tryDirectStreamUrl(
         id: String,
         request: DownloadRequest,

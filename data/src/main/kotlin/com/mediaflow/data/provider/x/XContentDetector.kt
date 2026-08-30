@@ -7,17 +7,6 @@ import org.json.JSONObject
  * Detects whether an X resource is a Space, Video, or generic post.
  */
 object XContentDetector {
-
-    /**
-     * Inspects a URL quickly to see if it is explicitly an X Space URL.
-     */
-    fun detectFromUrl(url: String): XContentType {
-        if (!XUrlParser.isXUrl(url)) return XContentType.UNSUPPORTED
-        if (XUrlParser.extractDirectSpaceId(url) != null) return XContentType.SPACE
-        if (XUrlParser.extractStatusId(url) != null) return XContentType.MEDIA_POST // Needs full inspection
-        return XContentType.UNSUPPORTED
-    }
-
     /**
      * Inspects yt-dlp extracted JSON output to categorize the content type with full certainty.
      */

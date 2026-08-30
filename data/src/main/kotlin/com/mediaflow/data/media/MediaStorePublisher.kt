@@ -85,7 +85,7 @@ object MediaStorePublisher {
         return publish(context, file, mimeType, displayName)
     }
 
-    fun publish(context: Context, file: File, mimeType: String, displayName: String): Uri? {
+    private fun publish(context: Context, file: File, mimeType: String, displayName: String): Uri? {
         if (!file.exists() || file.length() == 0L || Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
             return null
         }
