@@ -17,6 +17,7 @@ import com.mediaflow.data.media.metadata.EmbeddedTrackTags
 import com.mediaflow.data.player.background.MediaPlaybackService
 import com.mediaflow.data.player.background.PlayerSessionHolder
 import com.mediaflow.data.provider.x.XUrlParser
+import com.mediaflow.data.provider.x.spaces.XSpaceCapabilities
 import com.mediaflow.data.provider.x.live.LiveSpaceEndMonitor
 import com.mediaflow.data.provider.x.live.PendingLiveDownloadRepositoryImpl
 import com.mediaflow.data.provider.x.live.SpaceDownloadDedup
@@ -34,6 +35,9 @@ import com.mediaflow.domain.player.EnginePlaybackState
 import com.mediaflow.domain.player.PlaybackEvent
 import com.mediaflow.domain.player.PlayerService
 import com.mediaflow.domain.player.PlayerServiceState
+import com.mediaflow.domain.player.xspace.XSpaceLivePlayerEvent
+import com.mediaflow.domain.player.xspace.XSpaceLivePlayerMachine
+import com.mediaflow.domain.player.xspace.XSpaceLivePlayerState
 import com.mediaflow.domain.repository.DownloadRepository
 import com.mediaflow.domain.repository.DownloadRequest
 import com.mediaflow.domain.repository.FavoritesRepository
@@ -94,6 +98,7 @@ class PlayerViewModel(
     private val taggedMediaUri = MutableStateFlow<String?>(null)
     private val liveEndState = MutableStateFlow<LiveSpaceEndState>(LiveSpaceEndState.ActiveLive)
     private val isAutoDownloadEnabled = MutableStateFlow(false)
+    private val spacePlayer = MutableStateFlow(XSpaceLivePlayerMachine.initial())
 
     private val downloadRepo: DownloadRepository = downloadRepository ?: Media3DownloadRepository.get(app)
 
@@ -117,6 +122,7 @@ class PlayerViewModel(
         scrubPositionMs,
         embeddedTags,
         taggedMediaUri,
+        spacePlayer,
     ) { args: Array<Any?> ->
         val service = args[0] as PlayerServiceState
         val controls = args[1] as Boolean
@@ -133,6 +139,7 @@ class PlayerViewModel(
         val scrubPos = args[10] as Long
         val rawTags = args[11] as EmbeddedTrackTags
         val tagsUri = args[12] as? String
+        val spaceSession = args[13] as XSpaceLivePlayerState
         val uri = service.filePath.orEmpty()
         val tags = if (PlayerDisplayMetadata.tagsBelongToCurrent(tagsUri, service.filePath, service.mediaId)) {
             rawTags
@@ -168,6 +175,8 @@ class PlayerViewModel(
             isAutoDownloadEnabled = autoDownload,
             isFavorite = isFav,
             playlists = playlists,
+            spacePlayer = spaceSession,
+            spaceCapabilities = space?.let { XSpaceCapabilities.from(it) },
         )
     }.stateIn(viewModelScope, SharingStarted.Eagerly, PlayerUiState())
 
@@ -184,6 +193,7 @@ class PlayerViewModel(
                     cancelHideControls()
                     isControlsVisible.value = true
                 }
+                syncSpacePlayerFromEngine(state)
             }
         }
 
@@ -196,6 +206,7 @@ class PlayerViewModel(
                         val state = playerService.uiState.value
                         val space = currentSpace.value
                         if (state.isLive || space?.isLive == true) {
+                            reduceSpacePlayer(XSpaceLivePlayerEvent.IngestEnded)
                             checkSpaceEnded()
                         }
                     }
@@ -244,6 +255,16 @@ class PlayerViewModel(
             val space = resolveSpaceForMedia(mediaUri)
             currentSpace.value = space
             val effectiveLive = isLive || space?.isLive == true
+            val caps = space?.let { XSpaceCapabilities.from(it) }
+            if (space?.isEnded == true) {
+                reduceSpacePlayer(
+                    XSpaceLivePlayerEvent.OpenReplay(seekAllowed = caps?.stream?.seekSupported == true),
+                )
+            } else if (effectiveLive || space?.isLive == true) {
+                reduceSpacePlayer(
+                    XSpaceLivePlayerEvent.OpenLive(liveSeekAllowed = caps?.liveSeekAllowed == true),
+                )
+            }
 
             space?.id?.let { spaceId ->
                 isAutoDownloadEnabled.value = pendingDownloadRepo.isAutoDownloadEnabled(spaceId)
@@ -373,13 +394,26 @@ class PlayerViewModel(
         showControlsTemporarily()
         val state = uiState.value.serviceState
         when {
-            state.isPlaying -> playerService.pause()
+            state.isPlaying -> {
+                playerService.pause()
+                reduceSpacePlayer(XSpaceLivePlayerEvent.Pause)
+            }
             state.isEnded -> {
                 playerService.seekTo(0L)
                 playerService.play()
+                reduceSpacePlayer(XSpaceLivePlayerEvent.Resume)
             }
-            else -> playerService.play()
+            else -> {
+                playerService.play()
+                reduceSpacePlayer(XSpaceLivePlayerEvent.Resume)
+            }
         }
+    }
+
+    fun jumpToLiveEdge() {
+        showControlsTemporarily()
+        reduceSpacePlayer(XSpaceLivePlayerEvent.JumpToLiveEdge)
+        playerService.play()
     }
 
     fun seekTo(positionMs: Long) {
@@ -704,6 +738,30 @@ class PlayerViewModel(
         currentSpace.value = ended
         spaceRepository.saveSpace(ended, mediaId = ended.url)
         playerService.markBroadcastEnded()
+        val caps = XSpaceCapabilities.from(ended)
+        if (!ended.audioStreamUrl.isNullOrBlank()) {
+            reduceSpacePlayer(XSpaceLivePlayerEvent.StartReplay(seekAllowed = caps.stream.seekSupported))
+        } else {
+            reduceSpacePlayer(XSpaceLivePlayerEvent.IngestEnded)
+        }
+    }
+
+    private fun reduceSpacePlayer(event: XSpaceLivePlayerEvent) {
+        spacePlayer.value = XSpaceLivePlayerMachine.reduce(spacePlayer.value, event)
+    }
+
+    private fun syncSpacePlayerFromEngine(state: PlayerServiceState) {
+        val space = currentSpace.value ?: return
+        when (state.playbackState) {
+            EnginePlaybackState.PREPARING -> reduceSpacePlayer(XSpaceLivePlayerEvent.Buffering)
+            EnginePlaybackState.PLAYING -> {
+                if (space.isLive && spacePlayer.value.liveLagMs == 0L) {
+                    reduceSpacePlayer(XSpaceLivePlayerEvent.ConnectedAtLiveEdge)
+                }
+            }
+            EnginePlaybackState.ERROR -> reduceSpacePlayer(XSpaceLivePlayerEvent.Error())
+            else -> Unit
+        }
     }
 
     private fun matchesDownload(item: DownloadItem, mediaUri: String): Boolean {
