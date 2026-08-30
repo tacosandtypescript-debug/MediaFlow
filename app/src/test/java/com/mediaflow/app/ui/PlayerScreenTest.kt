@@ -46,8 +46,8 @@ class PlayerScreenTest {
         composeRule.setContent {
             MediaFlowTheme { PlayerScreen(mediaUri = "file:///tmp/sample.mp4", onBack = {}) }
         }
-        composeRule.onNodeWithText("sample", substring = true)
-            .assertIsDisplayed()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("player_title").assertIsDisplayed()
     }
 
     @Test

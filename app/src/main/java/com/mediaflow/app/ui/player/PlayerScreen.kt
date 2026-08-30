@@ -170,7 +170,11 @@ fun PlayerScreen(
                 }
             } else if (uiState.isAudioOnly) {
                 val vizVm: com.mediaflow.app.ui.player.visualizer.settings.VisualizerSettingsViewModel =
-                    viewModel()
+                    viewModel(
+                        factory = androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.getInstance(
+                            context.applicationContext as android.app.Application,
+                        ),
+                    )
                 val viz by vizVm.settings.collectAsState()
                 val artwork = preferredArtworkUrl(
                     uiState.artworkUri,
