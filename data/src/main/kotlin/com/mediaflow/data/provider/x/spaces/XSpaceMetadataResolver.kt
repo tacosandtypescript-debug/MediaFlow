@@ -98,7 +98,7 @@ open class XSpaceMetadataResolver(
                 qualityLabel = "Audio Original (AAC)",
                 container = "m4a",
                 audioCodec = "aac",
-                durationSeconds = space.durationSeconds.takeIf { it > 0 },
+                durationSeconds = SpaceAvailabilityResolver.displayDurationSeconds(space),
                 isProgressive = false,
                 requiresMuxing = false,
             ),

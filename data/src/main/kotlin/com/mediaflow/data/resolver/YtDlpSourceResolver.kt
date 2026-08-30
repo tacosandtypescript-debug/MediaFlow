@@ -70,7 +70,7 @@ class YtDlpSourceResolver(
                     sourceUrl = trimmed,
                     title = space.title,
                     thumbnailUrl = space.host.avatarUrl,
-                    durationSeconds = space.durationSeconds.takeIf { it > 0 },
+                    durationSeconds = com.mediaflow.data.provider.x.spaces.SpaceAvailabilityResolver.displayDurationSeconds(space),
                     availableFormats = formats,
                     spaceMetadata = space,
                     errorMessage = statusMessage,
@@ -264,7 +264,9 @@ class YtDlpSourceResolver(
             sourceUrl = sourceUrl,
             title = spaceMetadata?.title ?: title,
             thumbnailUrl = spaceMetadata?.host?.avatarUrl ?: thumbnail ?: playlistEntries.firstOrNull()?.thumbnailUrl,
-            durationSeconds = spaceMetadata?.durationSeconds?.takeIf { it > 0 } ?: duration,
+            durationSeconds = spaceMetadata?.let {
+                com.mediaflow.data.provider.x.spaces.SpaceAvailabilityResolver.displayDurationSeconds(it)
+            } ?: duration,
             availableFormats = effectiveFormats.sortedWith(
                 compareByDescending<MediaFormat> { it.height ?: 0 }
                     .thenByDescending { it.fps ?: 0.0 }
