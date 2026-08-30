@@ -118,6 +118,12 @@ object TikTokExtractPipeline {
         try {
             val code = connection.responseCode
             val location = connection.getHeaderField("Location")
+            if (code == 301 || code == 302 || code == 303 || code == 307 || code == 308) {
+                return@TikTokRedirectHop TikTokHopResult(code, location, bodySnippet = null)
+            }
+            mapBlocked(code, null)?.let {
+                return@TikTokRedirectHop TikTokHopResult(code, location, bodySnippet = null)
+            }
             val stream = if (code >= 400) connection.errorStream else connection.inputStream
             val snippet = stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText().take(2048) }
             TikTokHopResult(code, location, snippet)
