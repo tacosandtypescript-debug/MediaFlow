@@ -34,4 +34,15 @@ class PlaybackFinishedGateTest {
         gate.markStarted()
         assertTrue(gate.tryMarkEmitted())
     }
+
+    @Test
+    fun `stale END_FILE after FILE_LOADED is ignored until eof clears`() {
+        val gate = PlaybackFinishedGate()
+        gate.reset()
+        // FILE_LOADED raced with previous END_FILE: stay disarmed.
+        assertFalse(gate.tryMarkEmitted())
+        // eof-reached becomes false when the new file actually plays.
+        gate.markStarted()
+        assertTrue(gate.tryMarkEmitted())
+    }
 }

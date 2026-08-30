@@ -131,6 +131,23 @@ class PlayerServiceQueueTest {
         assertFalse(playerService.uiState.value.hasNext)
     }
 
+    @Test
+    fun playbackFinished_onOpenDoesNotSkipToNextQueueItem() = runTest {
+        val (playerService, engine) = createService()
+        val items = listOf(
+            PlaybackQueueItem("uri1", "Song 1"),
+            PlaybackQueueItem("uri2", "Song 2"),
+        )
+        playerService.playQueue(items, startIndex = 0)
+        runCurrent()
+
+        engine.emitFinished("uri1", durationMs = 0L)
+        runCurrent()
+
+        assertEquals("uri1", playerService.uiState.value.mediaId)
+        assertEquals(0, playerService.uiState.value.queueIndex)
+    }
+
     private class FakePlaybackEngine : PlaybackEngine {
         private val _state = MutableStateFlow(EngineState())
         override val state = _state.asStateFlow()
@@ -156,8 +173,8 @@ class PlayerServiceQueueTest {
         override fun detachSurface() {}
         override fun release() {}
 
-        fun emitFinished(mediaId: String) {
-            _events.tryEmit(PlaybackEvent.PlaybackFinished(mediaId, 1_000L))
+        fun emitFinished(mediaId: String, durationMs: Long = 1_000L) {
+            _events.tryEmit(PlaybackEvent.PlaybackFinished(mediaId, durationMs))
         }
     }
 

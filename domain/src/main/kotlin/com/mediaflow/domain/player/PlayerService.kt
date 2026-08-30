@@ -148,7 +148,13 @@ class PlayerService(
                         saveCurrentProgressNow(isEof = true)
 
                         val afterSave = _uiState.value
-                        if (afterSave.hasNext && afterSave.mediaId == event.mediaId) {
+                        val playedLongEnough = event.durationMs > 1_500L ||
+                            afterSave.durationMs > 1_500L ||
+                            afterSave.currentPositionMs > 1_500L
+                        if (afterSave.hasNext &&
+                            afterSave.mediaId == event.mediaId &&
+                            playedLongEnough
+                        ) {
                             playNext()
                         }
                     }

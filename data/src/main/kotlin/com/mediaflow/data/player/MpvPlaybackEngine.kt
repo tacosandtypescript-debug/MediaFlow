@@ -59,6 +59,10 @@ class MpvPlaybackEngine(
                 "eof-reached" -> {
                     if (value) {
                         emitPlaybackFinishedOnce(mediaId)
+                    } else {
+                        // A new file actually started; END_FILE from loadfile
+                        // replace must not count as this track finishing.
+                        playbackFinishedGate.markStarted()
                     }
                 }
                 "mute" -> {
@@ -113,8 +117,15 @@ class MpvPlaybackEngine(
                     val durMs = (durSec * 1000.0).toLong().coerceAtLeast(0L)
                     val vid = mpv.getPropertyString("vid")
                     val hasVideo = vid != null && vid != "no" && vid != "auto"
+                    val eofReached = runCatching {
+                        mpv.getPropertyBoolean("eof-reached")
+                    }.getOrNull() == true
 
-                    playbackFinishedGate.markStarted()
+                    // FILE_LOADED can race with END_FILE of the previous
+                    // loadfile. Stay disarmed until eof-reached is false.
+                    if (!eofReached) {
+                        playbackFinishedGate.markStarted()
+                    }
                     _state.value = _state.value.copy(
                         durationMs = durMs,
                         playbackState = if (_state.value.isPaused) EnginePlaybackState.PAUSED else EnginePlaybackState.PLAYING,
@@ -132,7 +143,8 @@ class MpvPlaybackEngine(
                     }
                 }
                 MPV.mpvEvent.MPV_EVENT_END_FILE -> {
-                    emitPlaybackFinishedOnce(mediaId)
+                    // loadfile replace also emits END_FILE (reason STOP).
+                    // Real completion is eof-reached=true.
                 }
                 MPV.mpvEvent.MPV_EVENT_PLAYBACK_RESTART -> {
                     if (_state.value.isPlaying) {
