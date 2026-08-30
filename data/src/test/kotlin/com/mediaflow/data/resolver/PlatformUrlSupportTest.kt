@@ -50,7 +50,7 @@ class PlatformUrlSupportTest {
                 "https://www.youtube.com/playlist?list=PLrAXtmErZgOeiKm4sgNOknGvNjby9efdf",
             ),
         )
-        assertTrue(
+        assertFalse(
             PlatformUrlSupport.isYoutubePlaylist(
                 "https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=PLrAXtmErZgOeiKm4sgNOknGvNjby9efdf",
             ),

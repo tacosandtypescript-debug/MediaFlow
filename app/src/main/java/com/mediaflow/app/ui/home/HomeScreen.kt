@@ -191,11 +191,13 @@ fun HomeScreen(
 
             Spacer(Modifier.height(12.dp))
 
-            FileNameField(
-                fileName = state.fileName,
-                suggestedFileName = state.suggestedFileName,
-                onFileNameChange = viewModel::onFileNameChanged,
-            )
+            if (state.sourceInfo?.playlistEntries.isNullOrEmpty()) {
+                FileNameField(
+                    fileName = state.fileName,
+                    suggestedFileName = state.suggestedFileName,
+                    onFileNameChange = viewModel::onFileNameChanged,
+                )
+            }
 
             Spacer(Modifier.height(24.dp))
 

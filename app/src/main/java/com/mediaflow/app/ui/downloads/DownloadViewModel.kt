@@ -143,9 +143,7 @@ class DownloadViewModel(
                         lastId = startDownload(
                             request.copy(
                                 sourceUrl = entry.sourceUrl,
-                                fileName = state.fileName.ifBlank {
-                                    entry.title ?: source.title ?: request.fileName
-                                },
+                                fileName = entry.title ?: source.title ?: request.fileName,
                                 mediaType = selected.mediaType,
                                 formatId = selected.formatId,
                                 mimeType = selected.mimeType ?: request.mimeType,

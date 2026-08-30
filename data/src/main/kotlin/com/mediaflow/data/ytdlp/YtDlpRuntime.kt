@@ -31,6 +31,7 @@ internal object YtDlpRuntime {
             .put("noplaylist", !allowPlaylist)
         if (allowPlaylist) {
             opts.put("extract_flat", "in_playlist")
+            opts.put("ignoreerrors", true)
             opts.put("playlistend", MAX_PLAYLIST_ITEMS)
         }
         return opts
