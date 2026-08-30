@@ -76,6 +76,7 @@
     <string name="download_cancel">Cancelar descarga</string>
     <string name="download_retry">Reintentar descarga</string>
     <string name="download_remove">Eliminar del historial</string>
+    <string name="download_more">Más acciones</string>
     <string name="download_open">Abrir archivo descargado</string>
     <string name="share">Compartir</string>
     <string name="share_video">Compartir vídeo</string>
@@ -189,6 +190,22 @@
     <string name="settings_wifi_only">Descargar solo con Wi-Fi</string>
     <string name="settings_notifications">Notificaciones</string>
     <string name="settings_default_quality">Calidad predeterminada</string>
+    <string name="settings_section_player">Reproductor</string>
+    <string name="settings_visualizer_title">Visualizador de audio</string>
+    <string name="settings_visualizer_enable">Visualizador reactivo</string>
+    <string name="settings_visualizer_style">Estilo</string>
+    <string name="settings_visualizer_intensity">Intensidad</string>
+    <string name="settings_visualizer_motion">Movimiento</string>
+    <string name="settings_visualizer_cover">Usar colores de la portada</string>
+    <string name="settings_visualizer_bars">Barras del sistema dinámicas</string>
+    <string name="settings_visualizer_pause">Reducir efectos en pausa</string>
+    <string name="settings_visualizer_battery">Ahorro de batería</string>
+    <string name="visualizer_style_balls">Pelotas</string>
+    <string name="visualizer_style_aurora">Aurora</string>
+    <string name="visualizer_style_waves">Ondas</string>
+    <string name="visualizer_style_rings">Anillos</string>
+    <string name="visualizer_style_particles">Partículas</string>
+    <string name="visualizer_style_spectrum">Espectro</string>
     <string name="settings_section_about">Acerca de</string>
     <string name="settings_version">Versión %1$s</string>
 

@@ -41,6 +41,16 @@ fun SettingsScreen(
     themeMode: ThemeMode,
     onThemeModeChange: (ThemeMode) -> Unit,
     modifier: Modifier = Modifier,
+    visualizerSettings: com.mediaflow.app.ui.player.visualizer.settings.VisualizerSettings =
+        com.mediaflow.app.ui.player.visualizer.settings.VisualizerSettings(),
+    onVisualizerEnabled: (Boolean) -> Unit = {},
+    onVisualizerStyle: (com.mediaflow.app.ui.player.visualizer.settings.VisualizerStyle) -> Unit = {},
+    onVisualizerIntensity: (Float) -> Unit = {},
+    onVisualizerMotion: (Float) -> Unit = {},
+    onVisualizerCover: (Boolean) -> Unit = {},
+    onVisualizerBars: (Boolean) -> Unit = {},
+    onVisualizerPause: (Boolean) -> Unit = {},
+    onVisualizerBattery: (Boolean) -> Unit = {},
 ) {
     Scaffold(
         modifier = modifier,
@@ -84,6 +94,24 @@ fun SettingsScreen(
                         }
                     }
                 }
+            }
+
+            Spacer(Modifier.height(16.dp))
+
+            SettingsSectionHeader(stringResource(R.string.settings_section_player))
+            SettingsCard {
+                SettingsLabel(stringResource(R.string.settings_visualizer_title))
+                com.mediaflow.app.ui.player.visualizer.settings.VisualizerSettingsPanel(
+                    settings = visualizerSettings,
+                    onEnabled = onVisualizerEnabled,
+                    onStyle = onVisualizerStyle,
+                    onIntensity = onVisualizerIntensity,
+                    onMotion = onVisualizerMotion,
+                    onCoverColors = onVisualizerCover,
+                    onBars = onVisualizerBars,
+                    onReducePause = onVisualizerPause,
+                    onBattery = onVisualizerBattery,
+                )
             }
 
             Spacer(Modifier.height(16.dp))

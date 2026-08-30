@@ -169,6 +169,35 @@ fun PlayerScreen(
                     Spacer(Modifier.height(16.dp))
                 }
             } else if (uiState.isAudioOnly) {
+                val vizVm: com.mediaflow.app.ui.player.visualizer.settings.VisualizerSettingsViewModel =
+                    viewModel()
+                val viz by vizVm.settings.collectAsState()
+                val artwork = preferredArtworkUrl(
+                    uiState.artworkUri,
+                    uiState.serviceState.artworkUrl,
+                )
+                val palette = com.mediaflow.app.ui.player.palette.rememberPlayerPalette(artwork)
+                val activity = context as? Activity
+                DisposableEffect(viz.dynamicSystemBars, palette.background, uiState.isAudioOnly) {
+                    val window = activity?.window
+                    if (window != null && viz.dynamicSystemBars) {
+                        window.statusBarColor = android.graphics.Color.argb(
+                            255,
+                            (palette.background.red * 255).toInt(),
+                            (palette.background.green * 255).toInt(),
+                            (palette.background.blue * 255).toInt(),
+                        )
+                        window.navigationBarColor = window.statusBarColor
+                        WindowInsetsControllerCompat(window, window.decorView).isAppearanceLightStatusBars =
+                            !palette.lightIcons
+                        WindowInsetsControllerCompat(window, window.decorView).isAppearanceLightNavigationBars =
+                            !palette.lightIcons
+                    }
+                    onDispose {
+                        window?.statusBarColor = android.graphics.Color.TRANSPARENT
+                        window?.navigationBarColor = android.graphics.Color.TRANSPARENT
+                    }
+                }
                 AudioNowPlaying(
                     title = displayTitle,
                     artist = uiState.artist
@@ -211,6 +240,7 @@ fun PlayerScreen(
                     },
                     onDelete = { showDeleteDialog = true },
                     modifier = Modifier.fillMaxSize(),
+                    visualizerSettings = viz,
                 )
             } else {
                 Column(

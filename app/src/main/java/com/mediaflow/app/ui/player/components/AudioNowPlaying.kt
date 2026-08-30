@@ -22,7 +22,9 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.mediaflow.app.R
-import com.mediaflow.app.ui.player.background.PlayerAmbientBackground
+import com.mediaflow.app.ui.player.palette.rememberPlayerPalette
+import com.mediaflow.app.ui.player.visualizer.VisualizerLayer
+import com.mediaflow.app.ui.player.visualizer.settings.VisualizerSettings
 import com.mediaflow.app.ui.player.controls.AudioPrimaryControls
 import com.mediaflow.app.ui.player.gestures.ArtworkSwipePager
 import com.mediaflow.core.model.XSpace
@@ -59,13 +61,17 @@ fun AudioNowPlaying(
     onShare: () -> Unit,
     onDelete: () -> Unit,
     modifier: Modifier = Modifier,
+    visualizerSettings: VisualizerSettings = VisualizerSettings(),
 ) {
     val isPlaying = playbackState == EnginePlaybackState.PLAYING
+    val palette = rememberPlayerPalette(artworkUrl)
 
     Box(modifier = modifier.fillMaxSize()) {
-        PlayerAmbientBackground(
-            artworkUrl = artworkUrl,
+        VisualizerLayer(
+            settings = visualizerSettings,
+            palette = palette,
             isPlaying = isPlaying,
+            modifier = Modifier.fillMaxSize(),
         )
         Column(modifier = Modifier.fillMaxSize()) {
         AudioNowPlayingTopBar(

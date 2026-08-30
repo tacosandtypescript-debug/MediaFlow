@@ -267,9 +267,21 @@ fun AppNavigation(
                     }
 
                     composable(route = MediaFlowDestination.Settings.route) {
+                        val vizVm: com.mediaflow.app.ui.player.visualizer.settings.VisualizerSettingsViewModel =
+                            viewModel()
+                        val viz by vizVm.settings.collectAsState()
                         SettingsScreen(
                             themeMode = themeMode,
                             onThemeModeChange = themeViewModel::setThemeMode,
+                            visualizerSettings = viz,
+                            onVisualizerEnabled = vizVm::setEnabled,
+                            onVisualizerStyle = vizVm::setStyle,
+                            onVisualizerIntensity = vizVm::setIntensity,
+                            onVisualizerMotion = vizVm::setMotion,
+                            onVisualizerCover = vizVm::setUseCoverColors,
+                            onVisualizerBars = vizVm::setDynamicSystemBars,
+                            onVisualizerPause = vizVm::setReduceOnPause,
+                            onVisualizerBattery = vizVm::setBatterySaver,
                         )
                     }
 
