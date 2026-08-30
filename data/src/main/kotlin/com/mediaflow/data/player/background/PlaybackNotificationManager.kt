@@ -3,23 +3,21 @@ package com.mediaflow.data.player.background
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
-import android.app.PendingIntent
 import android.content.Context
-import android.content.Intent
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
-import android.media.session.MediaSession
+import android.support.v4.media.session.MediaSessionCompat
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import com.mediaflow.core.model.XSpace
+import com.mediaflow.data.player.artwork.PlaybackArtworkLoader
+import com.mediaflow.data.player.external.PlayerExternalSnapshotFactory
+import com.mediaflow.data.player.notification.PlaybackTransportActions
 import com.mediaflow.domain.player.PlayerServiceState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.net.URL
 
 /**
- * Creates and updates foreground media playback notifications with transport controls,
- * Space metadata, live badge, and album art.
+ * MediaStyle notification: cover, title, artist, previous / play-pause / next.
  */
 class PlaybackNotificationManager(
     private val context: Context,
@@ -29,11 +27,11 @@ class PlaybackNotificationManager(
         const val CHANNEL_ID = "mediaflow_playback_channel"
         private const val CHANNEL_NAME = "Reproducción de medios"
 
-        const val ACTION_PLAY = "com.mediaflow.action.PLAY"
-        const val ACTION_PAUSE = "com.mediaflow.action.PAUSE"
-        const val ACTION_STOP = "com.mediaflow.action.STOP"
-        const val ACTION_PREV = "com.mediaflow.action.PREV"
-        const val ACTION_NEXT = "com.mediaflow.action.NEXT"
+        const val ACTION_PLAY = PlaybackTransportActions.ACTION_PLAY
+        const val ACTION_PAUSE = PlaybackTransportActions.ACTION_PAUSE
+        const val ACTION_STOP = PlaybackTransportActions.ACTION_STOP
+        const val ACTION_PREV = PlaybackTransportActions.ACTION_PREV
+        const val ACTION_NEXT = PlaybackTransportActions.ACTION_NEXT
     }
 
     private val notificationManager =
@@ -59,90 +57,59 @@ class PlaybackNotificationManager(
     }
 
     suspend fun loadArtworkBitmap(url: String?): Bitmap? = withContext(Dispatchers.IO) {
-        if (url.isNullOrBlank() || !url.startsWith("http")) return@withContext null
-        runCatching {
-            val stream = URL(url).openStream()
-            val bmp = BitmapFactory.decodeStream(stream)
-            stream.close()
-            bmp
-        }.getOrNull()
+        PlaybackArtworkLoader.load(context, url)
     }
 
     fun buildNotification(
         serviceState: PlayerServiceState,
         space: XSpace? = null,
-        sessionToken: MediaSession.Token? = null,
+        sessionToken: MediaSessionCompat.Token? = null,
         artwork: Bitmap? = null,
     ): Notification {
-        val title = space?.title ?: serviceState.title ?: "MediaFlow Player"
-        val isLive = serviceState.isLive || space?.isLive == true
-
-        val hostText = if (space != null) {
-            "Host: ${space.host.formattedHandle}" + if (isLive) " · 🔴 EN VIVO" else ""
+        val snapshot = PlayerExternalSnapshotFactory.from(serviceState, space)
+        val playPauseIntent = PlaybackTransportActions.serviceIntent(
+            context,
+            if (snapshot.isPlaying) ACTION_PAUSE else ACTION_PLAY,
+        )
+        val playPauseIcon = if (snapshot.isPlaying) {
+            android.R.drawable.ic_media_pause
         } else {
-            if (isLive) "🔴 Transmisión en directo" else "Reproduciendo archivo local"
+            android.R.drawable.ic_media_play
         }
-
-        val openAppIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)?.apply {
-            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
-        }
-
-        val contentPendingIntent = PendingIntent.getActivity(
-            context,
-            0,
-            openAppIntent ?: Intent(),
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-        )
-
-        // Play / Pause Action
-        val playPauseIntent = Intent(context, MediaPlaybackService::class.java).apply {
-            action = if (serviceState.isPlaying) ACTION_PAUSE else ACTION_PLAY
-        }
-        val playPausePendingIntent = PendingIntent.getService(
-            context,
-            1,
-            playPauseIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-        )
-
-        // Stop Action
-        val stopIntent = Intent(context, MediaPlaybackService::class.java).apply {
-            action = ACTION_STOP
-        }
-        val stopPendingIntent = PendingIntent.getService(
-            context,
-            2,
-            stopIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-        )
+        val playPauseTitle = if (snapshot.isPlaying) "Pausar" else "Reproducir"
 
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setContentTitle(title)
-            .setContentText(hostText)
+            .setContentTitle(snapshot.title)
+            .setContentText(snapshot.artist)
+            .setSubText(if (snapshot.isLive) "En vivo" else null)
             .setSmallIcon(android.R.drawable.ic_media_play)
-            .setContentIntent(contentPendingIntent)
+            .setContentIntent(PlaybackTransportActions.nowPlayingIntent(context, snapshot.mediaId))
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .setOngoing(serviceState.isPlaying)
+            .setOngoing(snapshot.isPlaying)
             .setOnlyAlertOnce(true)
+            .setSilent(true)
+            .addAction(
+                android.R.drawable.ic_media_previous,
+                "Anterior",
+                PlaybackTransportActions.serviceIntent(context, ACTION_PREV),
+            )
+            .addAction(playPauseIcon, playPauseTitle, playPauseIntent)
+            .addAction(
+                android.R.drawable.ic_media_next,
+                "Siguiente",
+                PlaybackTransportActions.serviceIntent(context, ACTION_NEXT),
+            )
 
         if (artwork != null) {
             builder.setLargeIcon(artwork)
         }
 
-        // Action: Play/Pause
-        val playPauseIcon = if (serviceState.isPlaying) android.R.drawable.ic_media_pause else android.R.drawable.ic_media_play
-        val playPauseTitle = if (serviceState.isPlaying) "Pausar" else "Reproducir"
-        builder.addAction(playPauseIcon, playPauseTitle, playPausePendingIntent)
-
-        // Action: Stop
-        builder.addAction(android.R.drawable.ic_menu_close_clear_cancel, "Detener", stopPendingIntent)
-
-        // Set Framework MediaStyle for modern Android notification widget
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            val style = androidx.media.app.NotificationCompat.MediaStyle()
-                .setShowActionsInCompactView(0, 1)
-            builder.setStyle(style)
+        val style = androidx.media.app.NotificationCompat.MediaStyle()
+            .setShowActionsInCompactView(0, 1, 2)
+        if (sessionToken != null) {
+            style.setMediaSession(sessionToken)
         }
+        builder.setStyle(style)
 
         return builder.build()
     }
