@@ -94,8 +94,16 @@ class TikTokLinkResolverTest {
     }
 
     @Test
-    fun `short link without Location is REDIRECT_FAILED`() {
+    fun `short link 200 without video id is VIDEO_ID_NOT_FOUND`() {
         val hopper = TikTokHttpHopper { TikTokHttpHopper.Hop(status = 200, location = null) }
+        val result = TikTokLinkResolver(hopper).resolve("https://vm.tiktok.com/NOPE/")
+        val failure = result as TikTokResolveResult.Failure
+        assertEquals(TikTokResolveStage.VIDEO_ID_NOT_FOUND, failure.stage)
+    }
+
+    @Test
+    fun `short link 302 without Location is REDIRECT_FAILED`() {
+        val hopper = TikTokHttpHopper { TikTokHttpHopper.Hop(status = 302, location = null) }
         val result = TikTokLinkResolver(hopper).resolve("https://vm.tiktok.com/NOPE/")
         val failure = result as TikTokResolveResult.Failure
         assertEquals(TikTokResolveStage.REDIRECT_FAILED, failure.stage)

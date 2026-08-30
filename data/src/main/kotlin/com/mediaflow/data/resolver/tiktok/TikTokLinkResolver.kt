@@ -54,6 +54,12 @@ class TikTokLinkResolver(
             if (hop.blocked || hop.status == 403 || hop.status == 429) {
                 return fail(TikTokResolveStage.TIKTOK_BLOCKED, "HTTP ${hop.status}")
             }
+            if (hop.status in 200..299) {
+                return fail(
+                    TikTokResolveStage.VIDEO_ID_NOT_FOUND,
+                    "TikTok no devolvió /video/{id} tras las redirecciones",
+                )
+            }
             val location = hop.location?.takeIf { it.isNotBlank() }
                 ?: return fail(TikTokResolveStage.REDIRECT_FAILED, "No Location for $current")
             val next = resolveLocation(current, location)

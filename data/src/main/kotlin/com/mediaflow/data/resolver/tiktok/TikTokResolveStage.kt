@@ -2,7 +2,7 @@ package com.mediaflow.data.resolver.tiktok
 
 /**
  * Shared failure codes for the TikTok pipeline.
- * Resolution stops before EXTRACTOR_FAILED; later codes are owned by download.
+ * Resolution stops before EXTRACTOR_FAILED; later codes are owned by extract/download.
  */
 enum class TikTokResolveStage {
     URL_RESOLUTION_FAILED,

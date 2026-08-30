@@ -11,6 +11,10 @@ import com.mediaflow.data.provider.x.spaces.XSpaceMetadataResolver
 import com.mediaflow.data.provider.x.spaces.XSpaceStore
 import com.mediaflow.data.repository.XSpaceRepositoryImpl
 import com.mediaflow.data.ytdlp.YtDlpRuntime
+import com.mediaflow.data.resolver.tiktok.TikTokExtractPipeline
+import com.mediaflow.data.resolver.tiktok.TikTokUrlSanitizer
+import com.mediaflow.data.resolver.tiktok.TikTokResolveException
+import com.mediaflow.data.resolver.tiktok.TikTokResolveStage
 import com.mediaflow.domain.repository.PlaylistEntry
 import com.mediaflow.domain.repository.SourceInfo
 import com.mediaflow.domain.repository.SourceResolver
@@ -35,7 +39,7 @@ class YtDlpSourceResolver(
     private val analysisDirectory = File(appContext.filesDir, "yt_dlp_analysis").apply { mkdirs() }
 
     override suspend fun analyze(sourceUrl: String): SourceInfo = withContext(Dispatchers.IO) {
-        val trimmed = sourceUrl.trim()
+        val trimmed = TikTokUrlSanitizer.extractUrl(sourceUrl) ?: sourceUrl.trim()
         val direct = directResolver.analyze(trimmed)
         if (direct.availableFormats.singleOrNull()?.formatId == "direct") return@withContext direct
 
@@ -78,7 +82,18 @@ class YtDlpSourceResolver(
             }
         }
 
-        val extractionUrl = PlatformUrlSupport.canonicalExtractionUrl(trimmed)
+        val extractionUrl = if (PlatformUrlSupport.platformFor(trimmed) == PlatformUrlSupport.Platform.TIKTOK) {
+            val resolved = runCatching { TikTokExtractPipeline.resolveCanonical(trimmed) }
+                .getOrElse { error ->
+                    return@withContext SourceInfo(
+                        sourceUrl = trimmed,
+                        errorMessage = friendlyAnalysisError(trimmed, error),
+                    )
+                }
+            resolved.canonicalUrl
+        } else {
+            PlatformUrlSupport.canonicalExtractionUrl(trimmed)
+        }
         runCatching {
             try {
                 val json = YtDlpRuntime.extractJson(
@@ -95,7 +110,20 @@ class YtDlpSourceResolver(
                 analysisDirectory.listFiles().orEmpty().forEach { it.delete() }
             }
         }.getOrElse { error ->
-            analyzeAnonymousFallback(trimmed)?.let { return@withContext it }
+            analyzeAnonymousFallback(extractionUrl)?.let { return@withContext it }
+            if (PlatformUrlSupport.platformFor(trimmed) == PlatformUrlSupport.Platform.TIKTOK) {
+                return@withContext SourceInfo(
+                    sourceUrl = trimmed,
+                    errorMessage = friendlyAnalysisError(
+                        trimmed,
+                        TikTokResolveException(
+                            TikTokResolveStage.EXTRACTOR_FAILED,
+                            "El extractor no pudo leer $extractionUrl.",
+                            error,
+                        ),
+                    ),
+                )
+            }
 
             // Fallback for X Space if yt-dlp fails due to replay disabled or missing audio stream
             if (XUrlParser.isXUrl(trimmed)) {
@@ -193,6 +221,27 @@ class YtDlpSourceResolver(
     internal fun friendlyAnalysisError(sourceUrl: String, error: Throwable): String {
         val text = (error.message ?: error.cause?.message).orEmpty()
         val platform = PlatformUrlSupport.platformFor(sourceUrl)?.label ?: "La plataforma"
+        val resolveStage = (error as? TikTokResolveException)?.stage
+            ?: (error.cause as? TikTokResolveException)?.stage
+        if (resolveStage != null) {
+            val detail = when (resolveStage) {
+                TikTokResolveStage.URL_RESOLUTION_FAILED ->
+                    "No se pudo resolver el enlace de TikTok."
+                TikTokResolveStage.REDIRECT_FAILED ->
+                    "TikTok no completó la redirección del enlace corto."
+                TikTokResolveStage.VIDEO_ID_NOT_FOUND ->
+                    "TikTok no devolvió un /video/{id} canónico."
+                TikTokResolveStage.TIKTOK_BLOCKED ->
+                    "TikTok bloqueó el análisis (HTTP 403/429). MediaFlow no usa cookies de sesión."
+                TikTokResolveStage.EXTRACTOR_FAILED ->
+                    "El extractor no pudo leer la URL canónica de TikTok."
+                TikTokResolveStage.MEDIA_URL_FAILED ->
+                    "TikTok no publicó una URL de vídeo descargable."
+                TikTokResolveStage.DOWNLOAD_FAILED ->
+                    "La descarga de TikTok falló después de resolver la URL canónica."
+            }
+            return "${resolveStage}: $detail"
+        }
         return when {
             text.contains("Twitter Space ended and replay is disabled", ignoreCase = true) ->
                 "La grabación de este X Space no está disponible o fue desactivada por el autor."
