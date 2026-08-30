@@ -2,6 +2,7 @@ package com.mediaflow.app.navigation
 
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.foundation.layout.Column
@@ -47,6 +48,8 @@ import com.mediaflow.app.ui.downloads.DownloadViewModel
 import com.mediaflow.app.ui.downloads.DownloadsScreen
 import com.mediaflow.app.ui.home.HomeScreen
 import com.mediaflow.app.ui.library.LibraryScreen
+import com.mediaflow.app.ui.motion.MiniPlayerTransitions
+import com.mediaflow.app.ui.motion.PlayerTransitions
 import com.mediaflow.app.ui.player.PlayerScreen
 import com.mediaflow.app.ui.player.miniplayer.MiniPlayer
 import com.mediaflow.app.ui.settings.SettingsScreen
@@ -127,7 +130,11 @@ fun AppNavigation(
                     )
                 },
                 bottomBar = {
-                    if (showBottomBar) {
+                    AnimatedVisibility(
+                        visible = showBottomBar,
+                        enter = MiniPlayerTransitions.enter(),
+                        exit = MiniPlayerTransitions.exit(),
+                    ) {
                         Column {
                             // Persistent Mini Player above NavigationBar
                             MiniPlayer(
@@ -135,7 +142,9 @@ fun AppNavigation(
                                 onOpenPlayer = { mediaUri ->
                                     navController.navigate(
                                         MediaFlowDestination.Player.routeFor(Uri.encode(mediaUri)),
-                                    )
+                                    ) {
+                                        launchSingleTop = true
+                                    }
                                 },
                                 onTogglePlayPause = {
                                     if (playerServiceState.isPlaying) {
@@ -230,10 +239,13 @@ fun AppNavigation(
                     }
 
                     composable(route = MediaFlowDestination.Downloads.route) {
+                        val downloadsViewMode by downloadViewModel.viewMode.collectAsState()
                         DownloadsScreen(
                             downloads = downloads,
                             spacesMap = spacesMap,
                             progressMap = downloadProgressMap,
+                            viewMode = downloadsViewMode,
+                            onViewModeChange = downloadViewModel::setViewMode,
                             onOpen = { item ->
                                 val uri = item.localUri ?: item.id
                                 navController.navigate(
@@ -266,6 +278,10 @@ fun AppNavigation(
                         arguments = listOf(
                             navArgument("mediaId") { type = NavType.StringType },
                         ),
+                        enterTransition = { PlayerTransitions.enter() },
+                        exitTransition = { PlayerTransitions.exit() },
+                        popEnterTransition = { PlayerTransitions.popEnter() },
+                        popExitTransition = { PlayerTransitions.popExit() },
                     ) { entry ->
                         val encodedMediaId = entry.arguments?.getString("mediaId").orEmpty()
                         val mediaUri = Uri.decode(encodedMediaId)
