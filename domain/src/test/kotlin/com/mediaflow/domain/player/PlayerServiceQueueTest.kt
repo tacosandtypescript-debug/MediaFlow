@@ -58,6 +58,126 @@ class PlayerServiceQueueTest {
     }
 
     @Test
+    fun tapSongB_buildsFullQueueAtIndexOne() = runTest {
+        val (playerService, _) = createService()
+        val items = listOf(
+            PlaybackQueueItem("uri-a", "A"),
+            PlaybackQueueItem("uri-b", "B"),
+            PlaybackQueueItem("uri-c", "C"),
+            PlaybackQueueItem("uri-d", "D"),
+        )
+
+        playerService.playQueue(items, startIndex = 1, context = "Biblioteca Audio", sourceContext = "library_audio")
+        runCurrent()
+
+        val state = playerService.uiState.value
+        assertEquals(4, state.queue.size)
+        assertEquals(1, state.queueIndex)
+        assertEquals("uri-b", state.mediaId)
+        assertEquals("uri-a", state.queue[0].mediaUri)
+        assertEquals("uri-c", state.queue[2].mediaUri)
+        assertTrue(state.hasNext)
+        assertTrue(state.hasPrevious)
+        assertEquals("library_audio", state.sourceContext)
+        assertFalse(state.isShuffle)
+    }
+
+    @Test
+    fun nextTrack_fromB_playsC() = runTest {
+        val (playerService, _) = createService()
+        val items = listOf(
+            PlaybackQueueItem("uri-a", "A"),
+            PlaybackQueueItem("uri-b", "B"),
+            PlaybackQueueItem("uri-c", "C"),
+            PlaybackQueueItem("uri-d", "D"),
+        )
+        playerService.playQueue(items, startIndex = 1)
+        runCurrent()
+
+        playerService.nextTrack()
+        runCurrent()
+
+        assertEquals("uri-c", playerService.uiState.value.mediaId)
+        assertEquals(2, playerService.uiState.value.queueIndex)
+    }
+
+    @Test
+    fun finishB_autoAdvancesToC() = runTest {
+        val (playerService, engine) = createService()
+        val items = listOf(
+            PlaybackQueueItem("uri-a", "A"),
+            PlaybackQueueItem("uri-b", "B"),
+            PlaybackQueueItem("uri-c", "C"),
+            PlaybackQueueItem("uri-d", "D"),
+        )
+        playerService.playQueue(items, startIndex = 1)
+        runCurrent()
+
+        engine.emitFinished("uri-b", durationMs = 30_000L)
+        runCurrent()
+
+        assertEquals("uri-c", playerService.uiState.value.mediaId)
+        assertEquals(2, playerService.uiState.value.queueIndex)
+        assertEquals(4, playerService.uiState.value.queue.size)
+    }
+
+    @Test
+    fun playAll_startsAtIndexZeroWithoutShuffle() = runTest {
+        val (playerService, _) = createService()
+        val items = listOf(
+            PlaybackQueueItem("uri-a", "A"),
+            PlaybackQueueItem("uri-b", "B"),
+            PlaybackQueueItem("uri-c", "C"),
+        )
+        playerService.playAll(items, context = "Biblioteca Audio", sourceContext = "library_audio")
+        runCurrent()
+
+        val state = playerService.uiState.value
+        assertEquals(0, state.queueIndex)
+        assertEquals("uri-a", state.mediaId)
+        assertFalse(state.isShuffle)
+        assertEquals(items.map { it.mediaUri }, state.queue.map { it.mediaUri })
+    }
+
+    @Test
+    fun shuffleAll_enablesShuffleAndKeepsAllItems() = runTest {
+        val (playerService, _) = createService()
+        val items = listOf(
+            PlaybackQueueItem("uri-a", "A"),
+            PlaybackQueueItem("uri-b", "B"),
+            PlaybackQueueItem("uri-c", "C"),
+            PlaybackQueueItem("uri-d", "D"),
+        )
+        playerService.shuffleAll(items, context = "Biblioteca Audio", sourceContext = "library_audio")
+        runCurrent()
+
+        val state = playerService.uiState.value
+        assertTrue(state.isShuffle)
+        assertEquals(4, state.queue.size)
+        assertEquals(0, state.queueIndex)
+        assertEquals(items.map { it.mediaUri }.toSet(), state.queue.map { it.mediaUri }.toSet())
+    }
+
+    @Test
+    fun setShuffle_preservesCurrentTrack() = runTest {
+        val (playerService, _) = createService()
+        val items = listOf(
+            PlaybackQueueItem("uri-a", "A"),
+            PlaybackQueueItem("uri-b", "B"),
+            PlaybackQueueItem("uri-c", "C"),
+        )
+        playerService.playQueue(items, startIndex = 1)
+        runCurrent()
+        playerService.setShuffle(true, random = kotlin.random.Random(1))
+        assertTrue(playerService.uiState.value.isShuffle)
+        assertEquals("uri-b", playerService.uiState.value.mediaId)
+        playerService.setShuffle(false)
+        assertFalse(playerService.uiState.value.isShuffle)
+        assertEquals("uri-b", playerService.uiState.value.mediaId)
+        assertEquals(1, playerService.uiState.value.queueIndex)
+    }
+
+    @Test
     fun playNextAndPlayPrevious_navigatesQueue() = runTest {
         val (playerService, _) = createService()
         val items = listOf(
@@ -69,7 +189,7 @@ class PlayerServiceQueueTest {
         playerService.playQueue(items, startIndex = 0)
         runCurrent()
 
-        playerService.playNext()
+        playerService.nextTrack()
         runCurrent()
 
         assertEquals("uri2", playerService.uiState.value.mediaId)
@@ -77,7 +197,7 @@ class PlayerServiceQueueTest {
         assertTrue(playerService.uiState.value.hasNext)
         assertTrue(playerService.uiState.value.hasPrevious)
 
-        playerService.playPrevious()
+        playerService.previousTrack()
         runCurrent()
 
         assertEquals("uri1", playerService.uiState.value.mediaId)

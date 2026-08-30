@@ -145,8 +145,8 @@ class MediaPlaybackService : Service() {
                 stopForegroundAndSelf()
             },
             onSeekRequested = { pos -> playerService.seekTo(pos) },
-            onSkipNextRequested = { playerService.playNext() },
-            onSkipPreviousRequested = { playerService.playPrevious() },
+            onSkipNextRequested = { playerService.nextTrack() },
+            onSkipPreviousRequested = { playerService.previousTrack() },
         )
 
         notificationManager = PlaybackNotificationManager(this)
@@ -198,10 +198,13 @@ class MediaPlaybackService : Service() {
                     if (audioFocusManager.requestAudioFocus()) {
                         val current = playerService.uiState.value
                         val sameMedia = current.mediaId == mediaUri || current.filePath == mediaUri
+                        val queueIndex = current.queue.indexOfFirst { it.mediaUri == mediaUri }
                         val alreadyReady = sameMedia &&
                             current.playbackState != EnginePlaybackState.IDLE
                         if (alreadyReady) {
                             if (!current.isPlaying) playerService.play()
+                        } else if (queueIndex >= 0) {
+                            playerService.skipToIndex(queueIndex)
                         } else {
                             playerService.openMedia(
                                 mediaId = mediaUri,
@@ -231,11 +234,11 @@ class MediaPlaybackService : Service() {
             }
             PlaybackNotificationManager.ACTION_NEXT,
             PlaybackTransportActions.ACTION_NEXT -> {
-                playerService.playNext()
+                playerService.nextTrack()
             }
             PlaybackNotificationManager.ACTION_PREV,
             PlaybackTransportActions.ACTION_PREV -> {
-                playerService.playPrevious()
+                playerService.previousTrack()
             }
         }
 

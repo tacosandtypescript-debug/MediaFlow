@@ -263,7 +263,37 @@ class PlayerViewModel(
             )
 
             val activeState = playerService.uiState.value
-            if (activeState.mediaId == mediaUri && activeState.playbackState != EnginePlaybackState.IDLE) {
+            val queueIndex = activeState.queue.indexOfFirst { it.mediaUri == mediaUri }
+            val alreadyThisTrack = activeState.mediaId == mediaUri &&
+                activeState.playbackState != EnginePlaybackState.IDLE
+            if (alreadyThisTrack || (queueIndex >= 0 && activeState.queueIndex == queueIndex &&
+                    activeState.playbackState != EnginePlaybackState.IDLE)
+            ) {
+                startPlaybackService(
+                    mediaUri = mediaUri,
+                    resolvedTitle = resolvedTitle,
+                    space = space,
+                    tags = tags,
+                    artwork = artwork,
+                    preservedArtwork = activeState.artworkUrl.takeIf {
+                        activeState.mediaId == mediaUri || activeState.filePath == mediaUri
+                    },
+                    effectiveLive = effectiveLive,
+                )
+                return@launch
+            }
+
+            if (queueIndex >= 0) {
+                playerService.skipToIndex(queueIndex)
+                startPlaybackService(
+                    mediaUri = mediaUri,
+                    resolvedTitle = resolvedTitle,
+                    space = space,
+                    tags = tags,
+                    artwork = artwork,
+                    preservedArtwork = activeState.queue.getOrNull(queueIndex)?.artworkUrl,
+                    effectiveLive = effectiveLive,
+                )
                 return@launch
             }
 
@@ -288,23 +318,42 @@ class PlayerViewModel(
                 isLive = effectiveLive,
             )
 
-            // Start foreground playback service
-            MediaPlaybackService.start(
-                context = app,
+            startPlaybackService(
                 mediaUri = mediaUri,
-                title = resolvedTitle,
-                artist = space?.let { "Host: ${it.host.formattedHandle}" }
-                    ?: PlayerDisplayMetadata.artist(tags.artist, null),
-                artworkUrl = preferredArtworkUrl(
-                    artwork ?: preservedArtwork,
-                    space?.host?.avatarUrl,
-                ),
-                isLive = effectiveLive,
-                spaceId = space?.id,
-                spaceUrl = space?.url,
-                autoDownloadAfterEnd = isAutoDownloadEnabled.value,
+                resolvedTitle = resolvedTitle,
+                space = space,
+                tags = tags,
+                artwork = artwork,
+                preservedArtwork = preservedArtwork,
+                effectiveLive = effectiveLive,
             )
         }
+    }
+
+    private fun startPlaybackService(
+        mediaUri: String,
+        resolvedTitle: String,
+        space: XSpace?,
+        tags: EmbeddedTrackTags,
+        artwork: String?,
+        preservedArtwork: String?,
+        effectiveLive: Boolean,
+    ) {
+        MediaPlaybackService.start(
+            context = app,
+            mediaUri = mediaUri,
+            title = resolvedTitle,
+            artist = space?.let { "Host: ${it.host.formattedHandle}" }
+                ?: PlayerDisplayMetadata.artist(tags.artist, null),
+            artworkUrl = preferredArtworkUrl(
+                artwork ?: preservedArtwork,
+                space?.host?.avatarUrl,
+            ),
+            isLive = effectiveLive,
+            spaceId = space?.id,
+            spaceUrl = space?.url,
+            autoDownloadAfterEnd = isAutoDownloadEnabled.value,
+        )
     }
 
     fun togglePlayPause() {
@@ -415,11 +464,11 @@ class PlayerViewModel(
     }
 
     fun playNext() {
-        playerService.playNext()
+        playerService.nextTrack()
     }
 
     fun playPrevious() {
-        playerService.playPrevious()
+        playerService.previousTrack()
     }
 
     fun skipToIndex(index: Int) {
