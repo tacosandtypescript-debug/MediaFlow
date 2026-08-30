@@ -84,7 +84,7 @@ class LibraryScreenTest {
         composeRule.onNodeWithText("Episodio 12: Inteligencia Artificial").assertIsDisplayed()
         composeRule.onNodeWithText("Host: @antigravity").assertIsDisplayed()
         composeRule.onNodeWithText("SPACE").assertIsDisplayed()
-        composeRule.onNodeWithText("· 45:20").assertIsDisplayed()
+        composeRule.onNodeWithText("45:20").assertIsDisplayed()
 
         composeRule.onNodeWithTag("audio_media_row").performClick()
         assertTrue("Item click should invoke playback", played)

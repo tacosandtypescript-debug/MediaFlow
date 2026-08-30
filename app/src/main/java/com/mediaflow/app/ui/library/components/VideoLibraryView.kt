@@ -84,9 +84,10 @@ fun VideoLibraryView(
                         ) {
                             MediaArtwork(
                                 artworkUrl = preferredArtworkUrl(item.thumbnailUri),
-                                size = 180.dp,
                                 mediaType = MediaType.VIDEO,
-                                shape = RoundedCornerShape(4.dp),
+                                shape = RoundedCornerShape(8.dp),
+                                fillMax = true,
+                                modifier = Modifier.fillMaxSize(),
                             )
 
                             item.durationSeconds?.let { s ->

@@ -75,10 +75,11 @@ fun MediaArtwork(
     artworkUrl: String?,
     modifier: Modifier = Modifier,
     size: Dp = 56.dp,
-    shape: Shape = RoundedCornerShape(12.dp),
+    shape: Shape = RoundedCornerShape(8.dp),
     isSpace: Boolean = false,
     mediaType: MediaType = MediaType.AUDIO,
     contentDescription: String? = null,
+    fillMax: Boolean = false,
 ) {
     val context = LocalContext.current
     val fallbackIcon: ImageVector = when {
@@ -96,7 +97,7 @@ fun MediaArtwork(
 
     Box(
         modifier = modifier
-            .size(size)
+            .then(if (fillMax) Modifier.fillMaxSize() else Modifier.size(size))
             .clip(shape)
             .background(gradientBrush)
             .testTag("media_artwork"),

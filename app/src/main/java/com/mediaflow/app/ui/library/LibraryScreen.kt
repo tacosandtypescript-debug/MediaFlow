@@ -133,39 +133,50 @@ fun LibraryScreen(
             LibraryRecentsBar(
                 isGrid = isGrid,
                 onToggleGrid = { isGrid = !isGrid },
-                showGridToggle = false,
+                showGridToggle = uiState.selectedFilter == LibraryFilter.ALL,
             )
         }
 
         when (uiState.selectedFilter) {
-            LibraryFilter.ALL -> LibraryAllView(
-                items = visibleAll,
-                playlists = visiblePlaylists,
-                spacesMap = uiState.spacesMap,
-                progressMap = uiState.progressMap,
-                playingMediaId = uiState.playingMediaId,
-                isPlayerPlaying = uiState.isPlayerPlaying,
-                favoriteUris = uiState.favoriteUris,
-                onPlayItem = { item, index ->
-                    viewModel.playQueue(visibleAll, index, "Biblioteca")
-                    onOpenItem(item)
-                },
-                onToggleFavorite = { uri -> viewModel.toggleFavorite(uri) },
-                onAddToPlaylist = { item -> itemForAddToPlaylist = item },
-                onAddToQueue = { item -> viewModel.addToQueue(item) },
-                onDeleteMedia = { item -> itemToDelete = item },
-                onOpenPlaylist = { playlist -> activePlaylistForDetail = playlist },
-                onPlayPlaylist = { playlist ->
-                    val mediaMap = uiState.allItems.associateBy { it.localUri ?: it.id }
-                    val playlistItems = playlist.mediaUris.mapNotNull { mediaMap[it] }
-                    if (playlistItems.isNotEmpty()) {
-                        viewModel.playQueue(playlistItems, 0, "Playlist: ${playlist.name}")
-                        onOpenItem(playlistItems.first())
-                    }
-                },
-                onRenamePlaylist = { playlistToRename = it },
-                onDeletePlaylist = viewModel::deletePlaylist,
-            )
+            LibraryFilter.ALL -> if (isGrid) {
+                VideoLibraryView(
+                    items = visibleAll,
+                    playingMediaId = uiState.playingMediaId,
+                    favoriteUris = uiState.favoriteUris,
+                    onPlayItem = { item -> onOpenItem(item) },
+                    onToggleFavorite = { uri -> viewModel.toggleFavorite(uri) },
+                    onDeleteMedia = { item -> itemToDelete = item },
+                )
+            } else {
+                LibraryAllView(
+                    items = visibleAll,
+                    playlists = visiblePlaylists,
+                    spacesMap = uiState.spacesMap,
+                    progressMap = uiState.progressMap,
+                    playingMediaId = uiState.playingMediaId,
+                    isPlayerPlaying = uiState.isPlayerPlaying,
+                    favoriteUris = uiState.favoriteUris,
+                    onPlayItem = { item, index ->
+                        viewModel.playQueue(visibleAll, index, "Biblioteca")
+                        onOpenItem(item)
+                    },
+                    onToggleFavorite = { uri -> viewModel.toggleFavorite(uri) },
+                    onAddToPlaylist = { item -> itemForAddToPlaylist = item },
+                    onAddToQueue = { item -> viewModel.addToQueue(item) },
+                    onDeleteMedia = { item -> itemToDelete = item },
+                    onOpenPlaylist = { playlist -> activePlaylistForDetail = playlist },
+                    onPlayPlaylist = { playlist ->
+                        val mediaMap = uiState.allItems.associateBy { it.localUri ?: it.id }
+                        val playlistItems = playlist.mediaUris.mapNotNull { mediaMap[it] }
+                        if (playlistItems.isNotEmpty()) {
+                            viewModel.playQueue(playlistItems, 0, "Playlist: ${playlist.name}")
+                            onOpenItem(playlistItems.first())
+                        }
+                    },
+                    onRenamePlaylist = { playlistToRename = it },
+                    onDeletePlaylist = viewModel::deletePlaylist,
+                )
+            }
             LibraryFilter.AUDIO -> AudioLibraryView(
                 items = visibleAudio,
                 spacesMap = uiState.spacesMap,

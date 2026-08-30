@@ -150,13 +150,6 @@ fun AudioMediaRow(
                         modifier = Modifier.weight(1f, fill = false),
                     )
 
-                    if (!durationText.isNullOrBlank()) {
-                        Text(
-                            text = "· $durationText",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
-                        )
-                    }
                 }
 
                 // In-progress indicator
@@ -174,7 +167,15 @@ fun AudioMediaRow(
                 }
             }
 
-            // Favorite Button
+            if (!durationText.isNullOrBlank()) {
+                Text(
+                    text = durationText,
+                    style = MaterialTheme.typography.labelMedium.copy(fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(end = 4.dp),
+                )
+            }
+
             FavoriteButton(
                 isFavorite = isFavorite,
                 onToggle = onToggleFavorite,
