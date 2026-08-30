@@ -1,93 +1,118 @@
 # MediaFlow
 
-Android app to analyze, download, and play audio and video from public HTTPS links — YouTube, YouTube Music, TikTok, Instagram, Facebook, and X Spaces.
+**Descarga y reproduce audio y vídeo en Android** a partir de un enlace HTTPS público.
 
-Kotlin + Jetpack Compose. Spanish UI. Visual identity: MediaFlow purple `#7C3AED` (not a clone of other music apps).
+Interfaz en español. Identidad visual morada MediaFlow (`#7C3AED`), no un clon de otras apps de música.
 
-Package: `com.mediaflow.app` · Repo: [tacosandtypescript-debug/MediaFlow](https://github.com/tacosandtypescript-debug/MediaFlow) · branch `master` · version **1.2.5** (`versionCode` 4).
+[![Release](https://img.shields.io/github/v/release/tacosandtypescript-debug/MediaFlow?include_prereleases)](https://github.com/tacosandtypescript-debug/MediaFlow/releases)
+[![License: MIT](https://img.shields.io/badge/license-MIT-7C3AED.svg)](LICENSE)
 
----
-
-## Features
-
-**Home**
-- Paste a public HTTPS URL, choose Audio or Video, optional file name, then analyze and download.
-- Recent downloads on the home grid.
-- X Spaces: listen live when X publishes a stream; replay and **Descargar Space** when the Space has ended. Record while live is independent of pause. No invented metadata or DRM bypass.
-
-**Library**
-- All / video mosaic / audio list, sort, search, multi-select, favorites, local playlists.
-- Play all, shuffle, drag-to-reorder audio queue.
-- Artwork from the largest available thumbnail (`maxres` when YouTube publishes it).
-
-**Player**
-- Dedicated Now Playing (audio, video, X Space), miniplayer, queue, ±10 s, skip.
-- Audio visualizers driven by player PCM (no microphone permission).
-- System bars follow cover colors. Visualizer can be turned off.
-
-**Downloads**
-- Queue with progress notifications. HLS Spaces use concurrent fragment downloads.
-- Files published under MediaStore (`Music/MediaFlow/`, `Movies/MediaFlow/`).
+Paquete `com.mediaflow.app` · versión **1.2.5** (`versionCode` 4) · rama `master`.
 
 ---
 
-## Privacy and secrets
+## Instalar
 
-- No login, no session cookies, no Google/X/TikTok API keys in this repo.
-- `local.properties`, keystores, `.apk`, Gradle caches, and git worktrees are gitignored.
-- Guest tokens for public X endpoints are requested at runtime and not stored as developer secrets.
+APKs firmadas en debug (sideload; hay que permitir orígenes desconocidos):
 
----
+| APK | Para |
+|-----|------|
+| [MediaFlow-1.2.5-arm64-v8a-debug.apk](https://github.com/tacosandtypescript-debug/MediaFlow/releases/download/v1.2.5/MediaFlow-1.2.5-arm64-v8a-debug.apk) (~93 MB) | Teléfonos ARM64 (la mayoría, p. ej. Samsung Galaxy A36) |
+| [MediaFlow-1.2.5-universal-debug.apk](https://github.com/tacosandtypescript-debug/MediaFlow/releases/download/v1.2.5/MediaFlow-1.2.5-universal-debug.apk) (~216 MB) | Cualquier ABI |
 
-## Responsible use
-
-You are responsible for the URLs you paste and for local copyright law. MediaFlow does not circumvent DRM and is not a store listing.
-
----
-
-## Stack
-
-| Layer | Tech |
-|-------|------|
-| UI | Kotlin, Jetpack Compose, Material 3 |
-| Extract | [yt-dlp](https://github.com/yt-dlp/yt-dlp) via `yt-dlp-android` in `:data` |
-| Playback | libmpv |
-| Storage | MediaStore + local download history |
-| Images | Coil |
-| SDK | JDK 17 · minSdk 24 · targetSdk 37 |
-
-Modules: `:app` (Compose UI) · `:domain` (use cases) · `:data` (yt-dlp, player, Spaces) · `:core:model`.
-
----
-
-## Build
-
-Needs **JDK 17** and an Android SDK.
+Todas las versiones: [Releases](https://github.com/tacosandtypescript-debug/MediaFlow/releases).
 
 ```bash
+adb install -r MediaFlow-1.2.5-arm64-v8a-debug.apk
+```
+
+No está publicada en Google Play.
+
+---
+
+## Qué hace
+
+Pegas un enlace, MediaFlow lo analiza y puedes **descargarlo** o **reproducirlo**. Los archivos quedan en el teléfono (`Music/MediaFlow/`, `Movies/MediaFlow/`) y en **Biblioteca**.
+
+Sitios que suele reconocer: **YouTube**, **YouTube Music**, **TikTok**, **Instagram**, **Facebook**, **X Spaces**. Solo contenido público. Sin inicio de sesión y **sin eludir DRM**.
+
+### Inicio
+- Pegar URL, elegir Audio o Vídeo, calidad y nombre opcional.
+- Analizar (título, portada, formatos reales) y descargar.
+- Listas: encola cada ítem detectado.
+- X Spaces: escuchar en vivo si X publica stream; **Reproducir repetición** y **Descargar Space** si ya terminó. Grabar en vivo no se corta al pausar el audio.
+- Descargas recientes en la parrilla.
+
+### Biblioteca
+- Filtros: todo, vídeos (mosaico), audio (lista), favoritos, playlists.
+- Orden, búsqueda, selección múltiple, compartir, eliminar.
+- Reproducir todo, aleatorio, reordenar la cola arrastrando.
+- Portadas en la mayor resolución que publique la fuente.
+
+### Reproductor
+- Now Playing de audio, vídeo o Space (pantalla propia, no la de una canción).
+- Miniplayer, cola, ±10 s, siguiente/anterior.
+- Visualizadores de audio desde el PCM del reproductor (sin micrófono). Se pueden apagar.
+- Barras del sistema alineadas con el color del cover.
+
+### Descargas
+- Cola con notificación de progreso.
+- Spaces HLS con varios fragmentos en paralelo.
+
+---
+
+## Uso responsable
+
+Tú eres responsable de los enlaces que pegas y de la ley de tu país. MediaFlow no evade protecciones de las plataformas ni sustituye una tienda oficial.
+
+---
+
+## Privacidad
+
+- Sin cuentas, sin cookies de sesión, sin API keys de Google / X / TikTok en este repositorio.
+- `local.properties`, keystores, APKs de build, caches de Gradle y worktrees de git **no se suben**.
+- Los tokens de invitado de X se piden en tiempo de ejecución; no son secretos de desarrollador.
+
+---
+
+## Compilar
+
+Requisitos: **JDK 17** y Android SDK.
+
+```bash
+git clone https://github.com/tacosandtypescript-debug/MediaFlow.git
+cd MediaFlow
 ./gradlew :app:assembleDebug
-```
-
-Outputs (ABI splits):
-
-| File | Use |
-|------|-----|
-| `app/build/outputs/apk/debug/app-arm64-v8a-debug.apk` | Most phones (including Samsung Galaxy A36) |
-| `app/build/outputs/apk/debug/app-x86_64-debug.apk` | x86_64 emulator |
-| `app/build/outputs/apk/debug/app-universal-debug.apk` | Any ABI, larger |
-
-```bash
-adb install -r app/build/outputs/apk/debug/app-arm64-v8a-debug.apk
-```
-
-```bash
 ./gradlew test
 ```
 
-Prebuilt APKs are attached to [GitHub Releases](https://github.com/tacosandtypescript-debug/MediaFlow/releases) (debug-signed; enable “install unknown apps”).
+| Salida | Uso |
+|--------|-----|
+| `app/build/outputs/apk/debug/app-arm64-v8a-debug.apk` | Teléfonos |
+| `app/build/outputs/apk/debug/app-x86_64-debug.apk` | Emulador x86_64 |
+| `app/build/outputs/apk/debug/app-universal-debug.apk` | Universal |
 
 ---
 
-## License
+## Arquitectura
+
+| Módulo | Rol |
+|--------|-----|
+| `:app` | UI Compose, navegación Inicio / Biblioteca / Descargas / Ajustes / Player |
+| `:domain` | Casos de uso e interfaces |
+| `:data` | yt-dlp, libmpv, MediaStore, Spaces, descargas |
+| `:core:model` | Modelos (`DownloadItem`, `XSpace`, …) |
+
+| Capa | Tecnología |
+|------|------------|
+| UI | Kotlin, Jetpack Compose, Material 3 |
+| Extracción | [yt-dlp](https://github.com/yt-dlp/yt-dlp) (`yt-dlp-android`) |
+| Reproducción | libmpv |
+| Imágenes | Coil |
+| SDK | minSdk 24 · targetSdk 37 · JDK 17 |
+
+---
+
+## Licencia
 
 [MIT](LICENSE)
