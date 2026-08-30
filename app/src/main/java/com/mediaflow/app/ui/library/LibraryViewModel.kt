@@ -264,6 +264,10 @@ class LibraryViewModel(
         playLibraryAudioQueue(LibraryAudioQueueBuilder.playAll(visible), context)
     }
 
+    fun shuffleAllAudio(visible: List<DownloadItem>, context: String = LIBRARY_AUDIO_QUEUE_CONTEXT) {
+        playLibraryAudioQueue(LibraryAudioQueueBuilder.shuffleAll(visible), context)
+    }
+
     fun playLibraryAudioQueue(
         queue: LibraryAudioQueue<DownloadItem>,
         context: String? = LIBRARY_AUDIO_QUEUE_CONTEXT,

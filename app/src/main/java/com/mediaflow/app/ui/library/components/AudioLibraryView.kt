@@ -17,7 +17,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Audiotrack
 import androidx.compose.material.icons.outlined.PlayArrow
+import androidx.compose.material.icons.outlined.Shuffle
 import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -51,6 +53,7 @@ fun AudioLibraryView(
     onAddToQueue: (item: DownloadItem) -> Unit,
     onDeleteMedia: (item: DownloadItem) -> Unit,
     onPlayAll: () -> Unit = {},
+    onShuffleAll: () -> Unit = {},
     selectedIds: Set<String> = emptySet(),
     inSelectionMode: Boolean = false,
     onLongPressItem: (DownloadItem) -> Unit = {},
@@ -86,6 +89,20 @@ fun AudioLibraryView(
                     Spacer(Modifier.width(4.dp))
                     Text(
                         text = stringResource(R.string.library_play_all),
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
+                OutlinedButton(
+                    onClick = onShuffleAll,
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier
+                        .height(44.dp)
+                        .testTag("library_shuffle_all_btn"),
+                ) {
+                    Icon(Icons.Outlined.Shuffle, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text(
+                        text = stringResource(R.string.library_shuffle_all),
                         fontWeight = FontWeight.Bold,
                     )
                 }

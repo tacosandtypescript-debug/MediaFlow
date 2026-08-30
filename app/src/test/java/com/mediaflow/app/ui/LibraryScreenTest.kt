@@ -54,6 +54,10 @@ class LibraryScreenTest {
         val playAll = Regex("<string name=\"library_play_all\">([^<]+)</string>").find(strings)?.groupValues?.get(1).orEmpty()
         assertTrue(playAll.isNotBlank())
         assertTrue("Play All label must not include emojis", playAll.none { it.category == CharCategory.SURROGATE || it.code > 0x2600 })
+        assertTrue(source.contains("library_shuffle_all"))
+        val shuffle = Regex("<string name=\"library_shuffle_all\">([^<]+)</string>").find(strings)?.groupValues?.get(1).orEmpty()
+        assertTrue(shuffle.isNotBlank())
+        assertTrue("Shuffle label must not include emojis", shuffle.none { it.category == CharCategory.SURROGATE || it.code > 0x2600 })
     }
 
     @Test

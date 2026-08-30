@@ -116,6 +116,8 @@
     <string name="library_audio_empty_title">No hay audios todavía</string>
     <string name="library_audio_empty_subtitle">Descarga un audio o un X Space para escucharlo aquí.</string>
     <string name="library_play_all">Reproducir todo</string>
+    <string name="library_shuffle">Aleatorio</string>
+    <string name="library_shuffle_all">Aleatorio</string>
     <string name="library_video_empty_title">No hay videos todavía</string>
     <string name="library_video_empty_subtitle">Descarga un video para verlo aquí.</string>
     <string name="favorites_empty_title">Aún no hay favoritos</string>

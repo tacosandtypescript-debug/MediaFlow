@@ -31,6 +31,7 @@ import com.mediaflow.app.ui.common.media.DeleteMediaDialog
 import com.mediaflow.app.ui.common.media.preferredArtworkUrl
 import com.mediaflow.app.ui.favorites.FavoritesView
 import com.mediaflow.app.ui.library.components.AudioLibraryView
+import com.mediaflow.app.ui.library.LibraryAudioQueueBuilder
 import com.mediaflow.app.ui.library.components.LibraryAllView
 import com.mediaflow.app.ui.library.components.LibraryFilter
 import com.mediaflow.app.ui.library.components.LibraryFilterChips
@@ -236,6 +237,13 @@ fun LibraryScreen(
                     if (visibleAudio.isNotEmpty()) {
                         viewModel.playAllAudio(visibleAudio)
                         onOpenItem(visibleAudio.first())
+                    }
+                },
+                onShuffleAll = {
+                    if (visibleAudio.isNotEmpty()) {
+                        val shuffled = LibraryAudioQueueBuilder.shuffleAll(visibleAudio)
+                        viewModel.playLibraryAudioQueue(shuffled)
+                        shuffled.items.firstOrNull()?.let(onOpenItem)
                     }
                 },
                 onPlayItem = { item, index ->
