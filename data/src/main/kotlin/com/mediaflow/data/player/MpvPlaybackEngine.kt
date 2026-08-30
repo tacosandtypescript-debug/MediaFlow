@@ -10,14 +10,18 @@ import `is`.xyz.mpv.MPV
 import `is`.xyz.mpv.MPVNode
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.io.FileNotFoundException
 
@@ -30,6 +34,9 @@ class MpvPlaybackEngine(
 ) : PlaybackEngine {
 
     private val engineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val analysisScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private var analysisJob: Job? = null
+    private var analysisFilterOn = false
 
     private val eventObserver = object : MPV.EventObserver {
         override fun eventProperty(property: String) {}
@@ -172,6 +179,11 @@ class MpvPlaybackEngine(
         instance.observeProperty("vid", MPV.mpvFormat.MPV_FORMAT_STRING)
         instance.observeProperty("track-list", MPV.mpvFormat.MPV_FORMAT_NODE)
         instance.addObserver(eventObserver)
+        analysisScope.launch {
+            PlaybackAudioBridge.enabled.collectLatest { want ->
+                syncAnalysisLoop(instance, want)
+            }
+        }
         instance
     }
 
@@ -225,6 +237,7 @@ class MpvPlaybackEngine(
         // Close previous descriptor safely
         currentResolvedSource?.close()
         currentResolvedSource = resolved
+        PlaybackAudioBridge.reset()
 
         try {
             mpv.command("loadfile", resolved.path)
@@ -257,6 +270,7 @@ class MpvPlaybackEngine(
         try {
             mpv.setPropertyBoolean("pause", true)
         } catch (_: Throwable) {}
+        PlaybackAudioBridge.reset()
     }
 
     override fun stop() {
@@ -274,6 +288,7 @@ class MpvPlaybackEngine(
             mpv.command("seek", targetSeconds.toString(), "absolute")
         } catch (_: Throwable) {}
         _state.value = _state.value.copy(currentPositionMs = positionMs)
+        PlaybackAudioBridge.reset()
     }
 
     override fun setSpeed(speed: Float) {
@@ -346,9 +361,13 @@ class MpvPlaybackEngine(
         val mediaId = currentMediaId.orEmpty()
 
         try {
+            analysisJob?.cancel()
+            analysisScope.cancel()
             mpv.removeObserver(eventObserver)
             mpv.destroy()
         } catch (_: Throwable) {}
+        PlaybackAudioBridge.reset()
+        PlaybackAudioBridge.setVisualizerEnabled(false)
 
         currentResolvedSource?.close()
         currentResolvedSource = null
@@ -364,6 +383,37 @@ class MpvPlaybackEngine(
         _state.value = _state.value.copy(playbackState = EnginePlaybackState.ENDED)
         engineScope.launch {
             _events.emit(PlaybackEvent.PlaybackFinished(mediaId, _state.value.durationMs))
+        }
+    }
+
+    private suspend fun syncAnalysisLoop(instance: MPV, want: Boolean) {
+        analysisJob?.cancel()
+        if (!want) {
+            runCatching { instance.command("af", "clr", "") }
+            analysisFilterOn = false
+            PlaybackAudioBridge.reset()
+            return
+        }
+        if (!analysisFilterOn) {
+            runCatching { instance.command("af", "set", MpvAudioAnalysis.FilterGraph) }
+            analysisFilterOn = true
+        }
+        analysisJob = analysisScope.launch {
+            while (isActive && PlaybackAudioBridge.enabled.value) {
+                val playing = _state.value.isPlaying
+                if (!MpvAudioAnalysis.shouldRun(true, playing)) {
+                    PlaybackAudioBridge.reset()
+                    delay(80)
+                    continue
+                }
+                val blob = runCatching {
+                    instance.getPropertyString("af-metadata")
+                        ?: instance.getPropertyNode("af-metadata")?.toString().orEmpty()
+                }.getOrDefault("")
+                val map = MpvAudioAnalysis.parseMetadataBlob(blob.orEmpty())
+                PlaybackAudioBridge.publish(MpvAudioAnalysis.frameFromMetadata(map, playing))
+                delay(50)
+            }
         }
     }
 

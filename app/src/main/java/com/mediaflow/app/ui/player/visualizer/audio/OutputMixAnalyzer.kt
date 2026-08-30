@@ -1,64 +1,129 @@
 package com.mediaflow.app.ui.player.visualizer.audio
 
-import android.media.audiofx.Visualizer
+import com.mediaflow.data.player.PlaybackAudioBridge
+import com.mediaflow.data.player.PlaybackPcmFrame
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
- * Captures the mixed output session. Does not start unless [enabled] is true.
+ * Maps [PlaybackAudioBridge] player PCM / band frames off the UI thread.
+ * Does not start unless the visualizer is enabled and playback is active.
  */
-class OutputMixAnalyzer {
+class OutputMixAnalyzer(
+    private val frames: StateFlow<PlaybackPcmFrame> = PlaybackAudioBridge.frame,
+) {
     private val _state = MutableStateFlow(AudioReactiveState())
     val state: StateFlow<AudioReactiveState> = _state.asStateFlow()
-    private var visualizer: Visualizer? = null
+
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private var collectJob: Job? = null
     private var previousEnergy = 0f
 
+    @Volatile
+    var isAnalyzing: Boolean = false
+        private set
+
+    enum class Transport { Play, Pause, Seek, Next, Previous }
+
     fun setEnabled(enabled: Boolean, isPlaying: Boolean) {
-        if (!AudioReactiveMapper.shouldAnalyze(enabled) || !isPlaying) {
-            release()
-            _state.value = AudioReactiveMapper.fromBands(0f, 0f, 0f, 0f, isPlaying = false, previousEnergy = 0f)
-            previousEnergy = 0f
+        val run = AudioReactiveMapper.shouldAnalyze(enabled, isPlaying)
+        PlaybackAudioBridge.setVisualizerEnabled(run)
+        if (!run) {
+            stopAnalysis()
             return
         }
-        if (visualizer != null) return
-        runCatching {
-            val viz = Visualizer(0)
-            val range = Visualizer.getCaptureSizeRange()
-            viz.captureSize = range[1].coerceAtMost(512)
-            viz.setDataCaptureListener(
-                object : Visualizer.OnDataCaptureListener {
-                    override fun onWaveFormDataCapture(v: Visualizer?, waveform: ByteArray?, sr: Int) = Unit
-                    override fun onFftDataCapture(v: Visualizer?, fft: ByteArray?, sr: Int) {
-                        if (fft == null) return
-                        val bands = AudioReactiveMapper.bandsFromFft(fft)
-                        val rms = AudioReactiveMapper.rmsFromWave(fft)
-                        val mapped = AudioReactiveMapper.fromBands(
-                            bass = bands.first,
-                            mids = bands.second,
-                            highs = bands.third,
-                            rms = rms,
-                            isPlaying = true,
-                            previousEnergy = previousEnergy,
-                        )
-                        previousEnergy = mapped.energy
-                        _state.value = mapped
-                    }
-                },
-                Visualizer.getMaxCaptureRate() / 4,
-                false,
-                true,
-            )
-            viz.enabled = true
-            visualizer = viz
-        }.onFailure {
-            visualizer = null
+        if (isAnalyzing) return
+        isAnalyzing = true
+        collectJob = scope.launch {
+            frames.collect { frame ->
+                val mapped = withContext(Dispatchers.Default) {
+                    ingest(frame)
+                }
+                _state.value = mapped
+            }
         }
     }
 
+    fun onTransport(event: Transport) {
+        previousEnergy = 0f
+        when (event) {
+            Transport.Pause -> {
+                isAnalyzing = false
+                collectJob?.cancel()
+                collectJob = null
+                PlaybackAudioBridge.setVisualizerEnabled(false)
+                _state.value = AudioReactiveMapper.fromBands(
+                    0f, 0f, 0f, 0f, isPlaying = false, previousEnergy = 0f,
+                )
+            }
+            Transport.Seek, Transport.Next, Transport.Previous -> {
+                PlaybackAudioBridge.reset()
+                _state.value = AudioReactiveMapper.fromBands(
+                    0f, 0f, 0f, 0f, isPlaying = isAnalyzing, previousEnergy = 0f,
+                )
+            }
+            Transport.Play -> { /* analysis continues if setEnabled(true, true) */ }
+        }
+    }
+
+    fun ingest(frame: PlaybackPcmFrame): AudioReactiveState {
+        if (!isAnalyzing && !frame.isPlaying) {
+            previousEnergy = 0f
+            return AudioReactiveState(isPlaying = false)
+        }
+        val mapped = AudioReactiveMapper.fromPlaybackFrame(
+            pcm = frame.pcm,
+            fft = frame.fft,
+            bass = frame.bass,
+            lowMids = frame.lowMids,
+            mids = frame.mids,
+            highs = frame.highs,
+            rms = frame.rms,
+            isPlaying = frame.isPlaying,
+            previousEnergy = previousEnergy,
+        )
+        previousEnergy = mapped.energy
+        return mapped
+    }
+
+    fun ingestPcm(pcm: ByteArray, isPlaying: Boolean): AudioReactiveState {
+        val mapped = AudioReactiveMapper.fromPcm(pcm, isPlaying, previousEnergy)
+        previousEnergy = mapped.energy
+        _state.value = mapped
+        return mapped
+    }
+
+    fun ingestFft(fft: ByteArray, rms: Float, isPlaying: Boolean): AudioReactiveState {
+        val bands = AudioReactiveMapper.bandsFromFft(fft)
+        val mapped = AudioReactiveMapper.fromBands(
+            bands.first, bands.second, bands.third, rms, isPlaying, previousEnergy,
+        )
+        previousEnergy = mapped.energy
+        _state.value = mapped
+        return mapped
+    }
+
     fun release() {
-        runCatching { visualizer?.enabled = false }
-        runCatching { visualizer?.release() }
-        visualizer = null
+        stopAnalysis()
+        scope.cancel()
+    }
+
+    private fun stopAnalysis() {
+        isAnalyzing = false
+        collectJob?.cancel()
+        collectJob = null
+        previousEnergy = 0f
+        _state.value = AudioReactiveMapper.fromBands(
+            0f, 0f, 0f, 0f, isPlaying = false, previousEnergy = 0f,
+        )
+        PlaybackAudioBridge.reset()
     }
 }

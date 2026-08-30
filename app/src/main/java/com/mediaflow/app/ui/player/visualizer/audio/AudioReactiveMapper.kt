@@ -1,8 +1,9 @@
 package com.mediaflow.app.ui.player.visualizer.audio
 
-import kotlin.math.abs
+import kotlin.math.cos
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.sin
 import kotlin.math.sqrt
 
 /**
@@ -20,12 +21,13 @@ object AudioReactiveMapper {
         rms: Float,
         isPlaying: Boolean,
         previousEnergy: Float,
+        lowMids: Float = 0f,
     ): AudioReactiveState {
         if (!isPlaying) {
             return AudioReactiveState(isPlaying = false)
         }
-        val b = clamp01(bass)
-        val m = clamp01(mids)
+        val b = clamp01(bass + lowMids * 0.45f)
+        val m = clamp01(mids + lowMids * 0.35f)
         val h = clamp01(highs)
         val a = clamp01(rms)
         if (a < 0.004f && b < 0.004f && m < 0.004f && h < 0.004f) {
@@ -46,7 +48,62 @@ object AudioReactiveMapper {
         )
     }
 
-    /** Parse Android Visualizer FFT magnitudes into 3 bands (skip DC bin). */
+    fun fromPcm(
+        pcm: ByteArray,
+        isPlaying: Boolean,
+        previousEnergy: Float,
+    ): AudioReactiveState {
+        if (!isPlaying) return AudioReactiveState(isPlaying = false)
+        val fft = fftFromPcm(pcm)
+        val bands = bandsFromFft(fft)
+        val rms = rmsFromWave(pcm)
+        return fromBands(bands.first, bands.second, bands.third, rms, true, previousEnergy)
+    }
+
+    fun fromPlaybackFrame(
+        pcm: ByteArray,
+        fft: ByteArray,
+        bass: Float,
+        lowMids: Float,
+        mids: Float,
+        highs: Float,
+        rms: Float,
+        isPlaying: Boolean,
+        previousEnergy: Float,
+    ): AudioReactiveState {
+        if (!isPlaying) return AudioReactiveState(isPlaying = false)
+        if (pcm.isNotEmpty()) return fromPcm(pcm, true, previousEnergy)
+        if (fft.isNotEmpty()) {
+            val bands = bandsFromFft(fft)
+            return fromBands(bands.first, bands.second, bands.third, rms, true, previousEnergy)
+        }
+        return fromBands(bass, mids, highs, rms, true, previousEnergy, lowMids = lowMids)
+    }
+
+    /** DFT packed like android.media.audiofx.Visualizer FFT (re,im pairs). */
+    fun fftFromPcm(pcm: ByteArray): ByteArray {
+        val n = highestPowerOfTwo(pcm.size).coerceAtMost(256)
+        if (n < 8) return ByteArray(0)
+        val out = ByteArray(n)
+        val half = n / 2
+        for (k in 0 until half) {
+            var re = 0.0
+            var im = 0.0
+            for (t in 0 until n) {
+                val sample = ((pcm.getOrElse(t) { 128.toByte() }.toInt() and 0xFF) - 128) / 128.0
+                val angle = 2.0 * Math.PI * k * t / n
+                re += sample * cos(angle)
+                im -= sample * sin(angle)
+            }
+            out[k * 2] = (re / n * 128.0).toInt().coerceIn(-128, 127).toByte()
+            if (k * 2 + 1 < out.size) {
+                out[k * 2 + 1] = (im / n * 128.0).toInt().coerceIn(-128, 127).toByte()
+            }
+        }
+        return out
+    }
+
+    /** Parse FFT magnitudes into bass / mids / highs (skip DC bin). */
     fun bandsFromFft(fft: ByteArray): Triple<Float, Float, Float> {
         if (fft.size < 8) return Triple(0f, 0f, 0f)
         val n = fft.size / 2
@@ -81,6 +138,14 @@ object AudioReactiveMapper {
     }
 
     fun shouldAnalyze(enabled: Boolean): Boolean = enabled
+
+    fun shouldAnalyze(enabled: Boolean, isPlaying: Boolean): Boolean = enabled && isPlaying
+
+    private fun highestPowerOfTwo(n: Int): Int {
+        var p = 1
+        while (p * 2 <= n) p *= 2
+        return p
+    }
 
     private fun clamp01(v: Float): Float = min(1f, max(0f, v))
 }

@@ -31,10 +31,9 @@ fun VisualizerLayer(
     modifier: Modifier = Modifier,
 ) {
     val analyzer = remember { OutputMixAnalyzer() }
-    val analyze = AudioReactiveMapper.shouldAnalyze(settings.enabled) &&
-        (isPlaying || !settings.reduceOnPause)
+    val analyze = AudioReactiveMapper.shouldAnalyze(settings.enabled, isPlaying)
     LaunchedEffect(analyze, isPlaying, settings.enabled) {
-        analyzer.setEnabled(settings.enabled && analyze, isPlaying)
+        analyzer.setEnabled(settings.enabled, isPlaying)
     }
     DisposableEffect(Unit) { onDispose { analyzer.release() } }
     val signal by analyzer.state.collectAsState()
