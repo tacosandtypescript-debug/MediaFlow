@@ -2,16 +2,15 @@ package com.mediaflow.data.player.background
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.media.MediaMetadata
-import android.media.session.MediaSession
-import android.media.session.PlaybackState
-import com.mediaflow.core.model.XSpace
+import android.support.v4.media.MediaMetadataCompat
+import android.support.v4.media.session.MediaSessionCompat
+import android.support.v4.media.session.PlaybackStateCompat
 import com.mediaflow.domain.player.EnginePlaybackState
 import com.mediaflow.domain.player.PlayerServiceState
 
 /**
- * Manages the Android system [MediaSession] for lock screen controls, bluetooth devices,
- * headset hardware buttons, and system media control centers.
+ * Android MediaSession for lock screen, Bluetooth, headsets, and MediaStyle.
+ * Driven only by [PlayerServiceState].
  */
 class MediaSessionController(
     context: Context,
@@ -22,81 +21,56 @@ class MediaSessionController(
     private val onSkipNextRequested: () -> Unit = {},
     private val onSkipPreviousRequested: () -> Unit = {},
 ) {
-    private val mediaSession: MediaSession = MediaSession(context, "MediaFlowPlaybackSession").apply {
-        setFlags(
-            MediaSession.FLAG_HANDLES_MEDIA_BUTTONS or
-                MediaSession.FLAG_HANDLES_TRANSPORT_CONTROLS
-        )
-        setCallback(object : MediaSession.Callback() {
-            override fun onPlay() {
-                onPlayRequested()
-            }
-
-            override fun onPause() {
-                onPauseRequested()
-            }
-
-            override fun onStop() {
-                onStopRequested()
-            }
-
-            override fun onSeekTo(pos: Long) {
-                onSeekRequested(pos)
-            }
-
-            override fun onSkipToNext() {
-                onSkipNextRequested()
-            }
-
-            override fun onSkipToPrevious() {
-                onSkipPreviousRequested()
-            }
+    private val mediaSession: MediaSessionCompat = MediaSessionCompat(context, "MediaFlowPlaybackSession").apply {
+        setCallback(object : MediaSessionCompat.Callback() {
+            override fun onPlay() = onPlayRequested()
+            override fun onPause() = onPauseRequested()
+            override fun onStop() = onStopRequested()
+            override fun onSeekTo(pos: Long) = onSeekRequested(pos)
+            override fun onSkipToNext() = onSkipNextRequested()
+            override fun onSkipToPrevious() = onSkipPreviousRequested()
         })
         isActive = true
     }
 
-    val sessionToken: MediaSession.Token
+    val sessionToken: MediaSessionCompat.Token
         get() = mediaSession.sessionToken
 
-    /**
-     * Updates session playback state and available transport actions.
-     */
     fun updatePlaybackState(serviceState: PlayerServiceState) {
-        val stateBuilder = PlaybackState.Builder()
-
         val playbackStateCode = when (serviceState.playbackState) {
-            EnginePlaybackState.PLAYING -> PlaybackState.STATE_PLAYING
-            EnginePlaybackState.PAUSED -> PlaybackState.STATE_PAUSED
-            EnginePlaybackState.PREPARING -> PlaybackState.STATE_BUFFERING
-            EnginePlaybackState.ENDED -> PlaybackState.STATE_STOPPED
-            EnginePlaybackState.ERROR -> PlaybackState.STATE_ERROR
-            EnginePlaybackState.IDLE -> PlaybackState.STATE_NONE
+            EnginePlaybackState.PLAYING -> PlaybackStateCompat.STATE_PLAYING
+            EnginePlaybackState.PAUSED -> PlaybackStateCompat.STATE_PAUSED
+            EnginePlaybackState.PREPARING -> PlaybackStateCompat.STATE_BUFFERING
+            EnginePlaybackState.ENDED -> PlaybackStateCompat.STATE_STOPPED
+            EnginePlaybackState.ERROR -> PlaybackStateCompat.STATE_ERROR
+            EnginePlaybackState.IDLE -> PlaybackStateCompat.STATE_NONE
         }
 
-        var actions = PlaybackState.ACTION_PLAY or
-            PlaybackState.ACTION_PAUSE or
-            PlaybackState.ACTION_PLAY_PAUSE or
-            PlaybackState.ACTION_STOP
+        var actions = PlaybackStateCompat.ACTION_PLAY or
+            PlaybackStateCompat.ACTION_PAUSE or
+            PlaybackStateCompat.ACTION_PLAY_PAUSE or
+            PlaybackStateCompat.ACTION_STOP or
+            PlaybackStateCompat.ACTION_SKIP_TO_NEXT or
+            PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS
 
         if (!serviceState.isLive) {
-            actions = actions or PlaybackState.ACTION_SEEK_TO or
-                PlaybackState.ACTION_REWIND or
-                PlaybackState.ACTION_FAST_FORWARD
+            actions = actions or PlaybackStateCompat.ACTION_SEEK_TO or
+                PlaybackStateCompat.ACTION_REWIND or
+                PlaybackStateCompat.ACTION_FAST_FORWARD
         }
 
-        stateBuilder.setActions(actions)
-        stateBuilder.setState(
-            playbackStateCode,
-            serviceState.currentPositionMs,
-            if (serviceState.isPlaying) serviceState.speed else 0f,
+        mediaSession.setPlaybackState(
+            PlaybackStateCompat.Builder()
+                .setActions(actions)
+                .setState(
+                    playbackStateCode,
+                    serviceState.currentPositionMs,
+                    if (serviceState.isPlaying) serviceState.speed else 0f,
+                )
+                .build(),
         )
-
-        mediaSession.setPlaybackState(stateBuilder.build())
     }
 
-    /**
-     * Updates session metadata (title, host, duration, artwork).
-     */
     fun updateMetadata(
         title: String,
         artist: String? = null,
@@ -104,20 +78,21 @@ class MediaSessionController(
         durationMs: Long = 0L,
         artworkBitmap: Bitmap? = null,
     ) {
-        val metaBuilder = MediaMetadata.Builder()
-            .putString(MediaMetadata.METADATA_KEY_TITLE, title)
-            .putString(MediaMetadata.METADATA_KEY_ARTIST, artist ?: "MediaFlow")
-            .putString(MediaMetadata.METADATA_KEY_ALBUM, album ?: "Audio")
+        val metaBuilder = MediaMetadataCompat.Builder()
+            .putString(MediaMetadataCompat.METADATA_KEY_TITLE, title)
+            .putString(MediaMetadataCompat.METADATA_KEY_ARTIST, artist ?: "MediaFlow")
+            .putString(MediaMetadataCompat.METADATA_KEY_ALBUM, album ?: "Audio")
+            .putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_TITLE, title)
+            .putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_SUBTITLE, artist ?: "MediaFlow")
 
         if (durationMs > 0L) {
-            metaBuilder.putLong(MediaMetadata.METADATA_KEY_DURATION, durationMs)
+            metaBuilder.putLong(MediaMetadataCompat.METADATA_KEY_DURATION, durationMs)
         }
-
         if (artworkBitmap != null) {
-            metaBuilder.putBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART, artworkBitmap)
-            metaBuilder.putBitmap(MediaMetadata.METADATA_KEY_ART, artworkBitmap)
+            metaBuilder.putBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART, artworkBitmap)
+            metaBuilder.putBitmap(MediaMetadataCompat.METADATA_KEY_ART, artworkBitmap)
+            metaBuilder.putBitmap(MediaMetadataCompat.METADATA_KEY_DISPLAY_ICON, artworkBitmap)
         }
-
         mediaSession.setMetadata(metaBuilder.build())
     }
 
