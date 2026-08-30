@@ -16,7 +16,7 @@ import java.util.Locale
  */
 class DirectUrlSourceResolver : SourceResolver {
     override suspend fun analyze(sourceUrl: String): SourceInfo {
-        PlatformUrlSupport.platformFor(sourceUrl)?.let { platform ->
+        PlatformUrlSupport.platformFor(sourceUrl)?.takeIf { it != PlatformUrlSupport.Platform.DIRECT }?.let { platform ->
             return SourceInfo(
                 sourceUrl = sourceUrl.trim(),
                 title = "${platform.label} video",
@@ -76,7 +76,7 @@ class DirectUrlSourceResolver : SourceResolver {
         qualityLabel: String?,
         customFileName: String?,
     ): Result<DownloadRequest> {
-        PlatformUrlSupport.platformFor(sourceUrl)?.let { platform ->
+        PlatformUrlSupport.platformFor(sourceUrl)?.takeIf { it != PlatformUrlSupport.Platform.DIRECT }?.let { platform ->
             val isAudio = mediaType == MediaType.AUDIO
             val ext = if (isAudio) "m4a" else "mp4"
             val mime = if (isAudio) "audio/mp4" else "video/mp4"
