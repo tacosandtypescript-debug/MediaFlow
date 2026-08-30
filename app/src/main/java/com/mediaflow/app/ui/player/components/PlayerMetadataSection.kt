@@ -1,6 +1,7 @@
 package com.mediaflow.app.ui.player.components
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -32,61 +33,98 @@ fun PlayerMetadataSection(
     isFavorite: Boolean = false,
     onToggleFavorite: () -> Unit,
     modifier: Modifier = Modifier,
+    album: String? = null,
+    nowPlaying: Boolean = false,
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 24.dp, vertical = 6.dp)
+            .padding(horizontal = if (nowPlaying) 24.dp else 24.dp, vertical = if (nowPlaying) 4.dp else 6.dp)
             .testTag("player_metadata_section"),
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = title,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
+                style = if (nowPlaying) {
+                    MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.ExtraBold)
+                } else {
+                    MaterialTheme.typography.titleLarge
+                },
+                fontWeight = if (nowPlaying) FontWeight.ExtraBold else FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.testTag("player_title"),
             )
 
-            Spacer(Modifier.height(4.dp))
+            Spacer(Modifier.height(if (nowPlaying) 6.dp else 4.dp))
 
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                if (isSpace) {
-                    Surface(
-                        shape = RoundedCornerShape(4.dp),
-                        color = MaterialTheme.colorScheme.secondaryContainer,
-                    ) {
-                        Text(
-                            text = "X SPACE",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSecondaryContainer,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                        )
-                    }
-                }
-
-                subtitle?.let {
+            if (nowPlaying) {
+                if (!subtitle.isNullOrBlank()) {
                     Text(
-                        text = it,
-                        style = MaterialTheme.typography.bodyMedium,
+                        text = subtitle,
+                        style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.testTag("player_artist"),
+                    )
+                }
+                if (!album.isNullOrBlank()) {
+                    Text(
+                        text = album,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
+            } else {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    if (isSpace) {
+                        Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = MaterialTheme.colorScheme.secondaryContainer,
+                        ) {
+                            Text(
+                                text = "X SPACE",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                            )
+                        }
+                    }
+
+                    subtitle?.let {
+                        Text(
+                            text = it,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.testTag("player_artist"),
+                        )
+                    }
+                }
             }
         }
 
-        FavoriteButton(
-            isFavorite = isFavorite,
-            onToggle = onToggleFavorite,
-            modifier = Modifier.size(44.dp),
-        )
+        Box(
+            modifier = Modifier
+                .size(48.dp)
+                .testTag("player_favorite"),
+            contentAlignment = Alignment.Center,
+        ) {
+            FavoriteButton(
+                isFavorite = isFavorite,
+                onToggle = onToggleFavorite,
+                modifier = Modifier.size(48.dp),
+            )
+        }
     }
 }

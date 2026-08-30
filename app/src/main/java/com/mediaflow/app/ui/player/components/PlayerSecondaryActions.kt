@@ -11,7 +11,6 @@ import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.PlaylistAdd
 import androidx.compose.material.icons.outlined.QueueMusic
 import androidx.compose.material.icons.outlined.Share
-import androidx.compose.material.icons.outlined.Speed
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Icon
@@ -22,6 +21,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -42,20 +42,26 @@ fun PlayerSecondaryActions(
     onShare: (() -> Unit)? = null,
     onDelete: () -> Unit,
     modifier: Modifier = Modifier,
+    nowPlaying: Boolean = false,
 ) {
+    val iconTint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (nowPlaying) 0.85f else 1f)
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceAround,
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 24.dp, vertical = 6.dp)
+            .padding(horizontal = if (nowPlaying) 16.dp else 24.dp, vertical = if (nowPlaying) 2.dp else 6.dp)
             .testTag("player_secondary_actions"),
     ) {
         // Speed Button
         if (!isLive) {
             Surface(
                 shape = RoundedCornerShape(8.dp),
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                color = if (nowPlaying) {
+                    Color.Transparent
+                } else {
+                    MaterialTheme.colorScheme.surfaceContainerHigh
+                },
                 modifier = Modifier.testTag("speed_btn"),
             ) {
                 IconButton(
@@ -74,7 +80,7 @@ fun PlayerSecondaryActions(
                         text = "${speed}x",
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface,
+                        color = if (nowPlaying) iconTint else MaterialTheme.colorScheme.onSurface,
                     )
                 }
             }
@@ -88,8 +94,8 @@ fun PlayerSecondaryActions(
             Icon(
                 imageVector = Icons.Outlined.PlaylistAdd,
                 contentDescription = "Añadir a playlist",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(24.dp),
+                tint = iconTint,
+                modifier = Modifier.size(if (nowPlaying) 22.dp else 24.dp),
             )
         }
 
@@ -101,8 +107,8 @@ fun PlayerSecondaryActions(
                 Icon(
                     imageVector = Icons.Outlined.Share,
                     contentDescription = stringResource(R.string.share),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(24.dp),
+                    tint = iconTint,
+                    modifier = Modifier.size(if (nowPlaying) 22.dp else 24.dp),
                 )
             }
         }
@@ -124,8 +130,8 @@ fun PlayerSecondaryActions(
                 Icon(
                     imageVector = Icons.Outlined.QueueMusic,
                     contentDescription = "Ver cola",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(24.dp),
+                    tint = iconTint,
+                    modifier = Modifier.size(if (nowPlaying) 22.dp else 24.dp),
                 )
             }
         }
@@ -138,8 +144,8 @@ fun PlayerSecondaryActions(
             Icon(
                 imageVector = Icons.Outlined.DeleteOutline,
                 contentDescription = "Eliminar",
-                tint = MaterialTheme.colorScheme.error.copy(alpha = 0.8f),
-                modifier = Modifier.size(24.dp),
+                tint = MaterialTheme.colorScheme.error.copy(alpha = if (nowPlaying) 0.7f else 0.8f),
+                modifier = Modifier.size(if (nowPlaying) 22.dp else 24.dp),
             )
         }
     }

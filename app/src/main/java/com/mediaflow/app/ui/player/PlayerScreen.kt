@@ -5,7 +5,6 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -32,7 +31,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -44,7 +42,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.mediaflow.app.ui.common.media.DeleteMediaDialog
-import com.mediaflow.app.ui.player.components.AudioPlayerView
+import com.mediaflow.app.ui.player.components.AudioNowPlaying
 import com.mediaflow.app.ui.player.components.BufferingIndicator
 import com.mediaflow.app.ui.player.components.LivePlayerView
 import com.mediaflow.app.ui.player.components.PlaybackControls
@@ -170,66 +168,85 @@ fun PlayerScreen(
 
                     Spacer(Modifier.height(16.dp))
                 }
+            } else if (uiState.isAudioOnly) {
+                AudioNowPlaying(
+                    title = displayTitle,
+                    artist = uiState.artist
+                        ?: uiState.serviceState.artistOrHost
+                        ?: stringResource(R.string.player_media_audio),
+                    album = uiState.album
+                        ?: uiState.spaceMetadata?.let { "X SPACE" }
+                        ?: uiState.playbackContext?.takeIf { it.isNotBlank() },
+                    artworkUrl = preferredArtworkUrl(
+                        uiState.artworkUri,
+                        uiState.serviceState.artworkUrl,
+                    ),
+                    space = uiState.spaceMetadata,
+                    isFavorite = uiState.isFavorite,
+                    playbackState = uiState.serviceState.playbackState,
+                    currentPositionMs = uiState.currentPositionMs,
+                    durationMs = uiState.durationMs,
+                    speed = uiState.speed,
+                    queueCount = uiState.queue.size,
+                    isBuffering = uiState.isBuffering,
+                    onBack = onBack,
+                    onToggleFavorite = viewModel::toggleFavorite,
+                    onSeekTo = viewModel::seekTo,
+                    onScrubbingChanged = { viewModel.setScrubbing(it) },
+                    onScrubPositionChange = viewModel::updateScrubPosition,
+                    onPlayPause = viewModel::togglePlayPause,
+                    onRewind10 = { viewModel.seekRelative(-10_000L) },
+                    onForward10 = { viewModel.seekRelative(10_000L) },
+                    onSpeedChange = viewModel::setSpeed,
+                    onAddToPlaylist = { showAddToPlaylistSheet = true },
+                    onOpenQueue = { showQueueSheet = true },
+                    onShare = {
+                        val path = uiState.serviceState.filePath ?: uiState.mediaUri
+                        MediaShare.share(
+                            context = context,
+                            uriString = path,
+                            title = displayTitle,
+                            isAudio = true,
+                        )
+                    },
+                    onDelete = { showDeleteDialog = true },
+                    modifier = Modifier.fillMaxSize(),
+                )
             } else {
-                // Audio & Video Player Composition
                 Column(
                     modifier = Modifier.fillMaxSize(),
                     verticalArrangement = Arrangement.SpaceBetween,
                 ) {
-                    // 1. Header Context
                     PlayerHeaderContext(
                         contextText = uiState.playbackContext ?: "Reproduciendo",
                         isLive = false,
                         onBack = onBack,
                     )
 
-                    // 2. Center Art / Surface
                     Box(
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxWidth(),
                         contentAlignment = Alignment.Center,
                     ) {
-                        if (uiState.isAudioOnly) {
-                            val spaceSubtitle = uiState.spaceMetadata?.let { space ->
-                                "Host: ${space.host.formattedHandle}"
-                            }
-                            AudioPlayerView(
-                                title = displayTitle,
-                                space = uiState.spaceMetadata,
-                                subtitle = spaceSubtitle,
-                                isPlaying = uiState.isPlaying,
-                                artworkUrl = uiState.serviceState.artworkUrl,
-                                modifier = Modifier.fillMaxSize(),
-                            )
-                        } else {
-                            PlayerSurface(
-                                onSurfaceCreated = viewModel::onSurfaceAvailable,
-                                onSurfaceDestroyed = viewModel::onSurfaceDestroyed,
-                                isFullscreen = uiState.isFullscreen,
-                                modifier = Modifier.fillMaxSize(),
-                            )
-                        }
+                        PlayerSurface(
+                            onSurfaceCreated = viewModel::onSurfaceAvailable,
+                            onSurfaceDestroyed = viewModel::onSurfaceDestroyed,
+                            isFullscreen = uiState.isFullscreen,
+                            modifier = Modifier.fillMaxSize(),
+                        )
                     }
 
-                    // 3. Metadata Section (Title, Host/Artist, Heart)
                     PlayerMetadataSection(
                         title = displayTitle,
-                        subtitle = uiState.spaceMetadata?.let { "Host: ${it.host.formattedHandle}" }
+                        subtitle = uiState.artist
                             ?: uiState.serviceState.artistOrHost
-                            ?: stringResource(
-                                if (uiState.isAudioOnly) {
-                                    R.string.player_media_audio
-                                } else {
-                                    R.string.player_media_video
-                                },
-                            ),
-                        isSpace = uiState.spaceMetadata != null,
+                            ?: stringResource(R.string.player_media_video),
+                        album = uiState.album,
                         isFavorite = uiState.isFavorite,
                         onToggleFavorite = viewModel::toggleFavorite,
                     )
 
-                    // 4. Timeline
                     PlayerTimeline(
                         currentPositionMs = uiState.currentPositionMs,
                         durationMs = uiState.durationMs,
@@ -237,12 +254,14 @@ fun PlayerScreen(
                         onScrubbingChanged = { scrubbing ->
                             viewModel.setScrubbing(scrubbing)
                         },
+                        onScrubPositionChange = viewModel::updateScrubPosition,
                         modifier = Modifier.padding(horizontal = 20.dp, vertical = 2.dp),
                     )
 
-                    // 5. Dominant Transport Controls
                     PlaybackControls(
                         playbackState = uiState.serviceState.playbackState,
+                        isPlaying = uiState.isPlaying,
+                        isBuffering = uiState.isBuffering,
                         hasNext = uiState.hasNext,
                         hasPrevious = uiState.hasPrevious,
                         isLive = false,
@@ -253,7 +272,6 @@ fun PlayerScreen(
                         onForward10 = { viewModel.seekRelative(10_000L) },
                     )
 
-                    // 6. Secondary Actions (Queue, Add to Playlist, Speed, Delete)
                     PlayerSecondaryActions(
                         speed = uiState.speed,
                         queueCount = uiState.queue.size,
@@ -267,7 +285,7 @@ fun PlayerScreen(
                                 context = context,
                                 uriString = path,
                                 title = displayTitle,
-                                isAudio = uiState.isAudioOnly,
+                                isAudio = false,
                             )
                         },
                         onDelete = { showDeleteDialog = true },
@@ -277,9 +295,8 @@ fun PlayerScreen(
                 }
             }
 
-            // Buffering / Loading Indicator
             BufferingIndicator(
-                visible = uiState.isBuffering && !uiState.isLiveSession,
+                visible = uiState.isBuffering && !uiState.isLiveSession && !uiState.isAudioOnly,
                 modifier = Modifier.align(Alignment.Center),
                 label = stringResource(R.string.player_buffering),
             )
