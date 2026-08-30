@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import android.net.Uri
 import coil.compose.SubcomposeAsyncImage
 import coil.request.ImageRequest
+import coil.size.Size
 import com.mediaflow.core.model.MediaType
 import java.io.File
 
@@ -115,6 +116,7 @@ fun MediaArtwork(
             SubcomposeAsyncImage(
                 model = ImageRequest.Builder(context)
                     .data(coilArtworkModel(artworkUrl!!))
+                    .size(Size.ORIGINAL)
                     .crossfade(false)
                     .build(),
                 contentDescription = contentDescription,

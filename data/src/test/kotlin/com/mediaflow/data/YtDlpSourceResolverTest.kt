@@ -207,7 +207,12 @@ class YtDlpSourceResolverTest {
               "id": "jf6tbohQG_E",
               "title": "IYKYK",
               "duration": 156,
-              "thumbnail": "https://i.ytimg.com/vi/jf6tbohQG_E/maxresdefault.jpg",
+              "thumbnail": "https://i.ytimg.com/vi/jf6tbohQG_E/hqdefault.jpg",
+              "thumbnails": [
+                {"url": "https://i.ytimg.com/vi/jf6tbohQG_E/default.jpg", "width": 120, "height": 90},
+                {"url": "https://i.ytimg.com/vi/jf6tbohQG_E/hqdefault.jpg", "width": 480, "height": 360},
+                {"url": "https://i.ytimg.com/vi/jf6tbohQG_E/maxresdefault.jpg", "width": 1280, "height": 720}
+              ],
               "formats": [
                 {"format_id":"sb0","ext":"mhtml","format_note":"storyboard","vcodec":"none","acodec":"none","height":180},
                 {"format_id":"140","ext":"m4a","vcodec":"none","acodec":"mp4a.40.2","abr":128},
@@ -220,6 +225,10 @@ class YtDlpSourceResolverTest {
         )
 
         assertEquals("IYKYK", info.title)
+        assertEquals(
+            "https://i.ytimg.com/vi/jf6tbohQG_E/maxresdefault.jpg",
+            info.thumbnailUrl,
+        )
         assertEquals(156L, info.durationSeconds)
         assertTrue(info.playlistEntries.isEmpty())
         assertEquals(emptyList<String>(), info.availableFormats.map { it.formatId }.filter { it.startsWith("sb") })

@@ -16,43 +16,55 @@ internal object ThumbnailPersister {
     fun localFile(context: Context, downloadId: String, extension: String = "jpg"): File =
         File(thumbsDir(context), "$downloadId.${normalizeExtension(extension)}")
 
-    fun existingUri(context: Context, downloadId: String): String? {
+    fun existingUri(context: Context, downloadId: String): String? =
+        existingFile(context, downloadId)?.let(::fileUri)
+
+    private fun existingFile(context: Context, downloadId: String): File? {
         val dir = thumbsDir(context)
-        val match = dir.listFiles().orEmpty().firstOrNull { file ->
-            file.isFile &&
-                file.length() > 0L &&
-                file.nameWithoutExtension == downloadId &&
-                file.extension.lowercase() in IMAGE_EXTENSIONS
-        }
-        return match?.let(::fileUri)
+        return dir.listFiles().orEmpty()
+            .filter { file ->
+                file.isFile &&
+                    file.length() > 0L &&
+                    file.nameWithoutExtension == downloadId &&
+                    file.extension.lowercase() in IMAGE_EXTENSIONS
+            }
+            .maxByOrNull { it.length() }
     }
 
     fun persist(context: Context, downloadId: String, remoteUrl: String?): String? {
-        existingUri(context, downloadId)?.let { return it }
-        val url = remoteUrl?.takeIf(::isPersistableImageUrl) ?: return null
-        val extension = extensionFromUrl(url)
-        val dest = localFile(context, downloadId, extension)
-        return runCatching {
-            val connection = URL(url).openConnection() as HttpURLConnection
-            connection.instanceFollowRedirects = true
-            connection.connectTimeout = 15_000
-            connection.readTimeout = 20_000
-            connection.setRequestProperty(
-                "User-Agent",
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.6778.139 Safari/537.36",
-            )
-            check(connection.responseCode in 200..299) {
-                "Miniatura HTTP ${connection.responseCode}"
-            }
-            connection.inputStream.use { input ->
-                dest.outputStream().use { output -> input.copyTo(output) }
-            }
-            check(dest.length() > 0L) { "Miniatura vacía" }
-            fileUri(dest)
-        }.getOrElse {
-            dest.delete()
-            null
+        val existing = existingFile(context, downloadId)
+        if (existing != null && existing.length() >= MIN_KEEP_BYTES) {
+            return fileUri(existing)
         }
+        val urls = ArtworkUrlQuality.candidates(remoteUrl).filter(::isPersistableImageUrl)
+        if (urls.isEmpty()) return existing?.let(::fileUri)
+        for (url in urls) {
+            val extension = extensionFromUrl(url)
+            val dest = localFile(context, downloadId, extension)
+            val saved = runCatching {
+                val connection = URL(url).openConnection() as HttpURLConnection
+                connection.instanceFollowRedirects = true
+                connection.connectTimeout = 15_000
+                connection.readTimeout = 20_000
+                connection.setRequestProperty(
+                    "User-Agent",
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.6778.139 Safari/537.36",
+                )
+                check(connection.responseCode in 200..299) {
+                    "Miniatura HTTP ${connection.responseCode}"
+                }
+                connection.inputStream.use { input ->
+                    dest.outputStream().use { output -> input.copyTo(output) }
+                }
+                check(dest.length() > 0L) { "Miniatura vacía" }
+                fileUri(dest)
+            }.getOrElse {
+                dest.delete()
+                null
+            }
+            if (saved != null) return saved
+        }
+        return existing?.let(::fileUri)
     }
 
     /**
@@ -157,4 +169,6 @@ internal object ThumbnailPersister {
 
     /** Coil and isLoadableArtworkUrl need file:/// (three slashes), not File.toURI()'s file:/. */
     private fun fileUri(file: File): String = Uri.fromFile(file).toString()
+
+    private const val MIN_KEEP_BYTES = 40_960L
 }

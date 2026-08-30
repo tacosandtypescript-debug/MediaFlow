@@ -282,7 +282,10 @@ class YtDlpSourceResolver(
     internal suspend fun parseForTest(sourceUrl: String, output: String): SourceInfo {
         val root = JSONObject(output.trim())
         val title = root.optString("title").takeIf { it.isNotBlank() }
-        val thumbnail = root.optString("thumbnail").takeIf { it.isNotBlank() }
+        val thumbnail = com.mediaflow.data.download.ArtworkUrlQuality.pickBest(
+            root.optJSONArray("thumbnails"),
+            root.optString("thumbnail").takeIf { it.isNotBlank() },
+        )
         val duration = root.optDouble("duration", Double.NaN)
             .takeIf { !it.isNaN() && it >= 0 }
             ?.toLong()
@@ -364,13 +367,10 @@ class YtDlpSourceResolver(
     }
 
     private fun playlistThumbnail(json: JSONObject): String? {
-        json.optString("thumbnail").takeIf { it.startsWith("https://") }?.let { return it }
-        val thumbs = json.optJSONArray("thumbnails") ?: return null
-        for (index in thumbs.length() - 1 downTo 0) {
-            val url = thumbs.optJSONObject(index)?.optString("url").orEmpty()
-            if (url.startsWith("https://")) return url
-        }
-        return null
+        return com.mediaflow.data.download.ArtworkUrlQuality.pickBest(
+            json.optJSONArray("thumbnails"),
+            json.optString("thumbnail").takeIf { it.startsWith("https://") },
+        )
     }
 
     private fun playlistFormats(): List<MediaFormat> = listOf(
