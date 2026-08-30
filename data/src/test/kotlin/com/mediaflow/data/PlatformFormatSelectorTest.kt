@@ -4,6 +4,8 @@ import com.mediaflow.core.model.MediaType
 import com.mediaflow.data.download.PlatformFormatSelector
 import com.mediaflow.domain.repository.DownloadRequest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class PlatformFormatSelectorTest {
@@ -93,7 +95,10 @@ class PlatformFormatSelectorTest {
             extension = "m4a",
         )
 
-        assertEquals("bestaudio[ext=m4a]/bestaudio", PlatformFormatSelector.select(request))
+        assertEquals(
+            AUDIO_SELECTOR,
+            PlatformFormatSelector.select(request),
+        )
     }
 
     @Test
@@ -103,6 +108,36 @@ class PlatformFormatSelectorTest {
             mediaType = MediaType.AUDIO,
         )
 
-        assertEquals("bestaudio[ext=m4a]/bestaudio", PlatformFormatSelector.select(request))
+        assertEquals(
+            AUDIO_SELECTOR,
+            PlatformFormatSelector.select(request),
+        )
+    }
+
+    @Test
+    fun `opus audio format ids still request m4a instead of webm`() {
+        val request = DownloadRequest(
+            sourceUrl = "https://www.youtube.com/watch?v=example",
+            mediaType = MediaType.AUDIO,
+            formatId = "251",
+            extension = "webm",
+        )
+
+        assertEquals(
+            AUDIO_SELECTOR,
+            PlatformFormatSelector.select(request),
+        )
+    }
+
+    @Test
+    fun `audio selector prefers mp4 before unfiltered bestaudio`() {
+        assertTrue(AUDIO_SELECTOR.contains("ba[ext=m4a]/b[ext=mp4]/b"))
+        assertFalse(AUDIO_SELECTOR.contains("/bestaudio/"))
+        assertFalse(AUDIO_SELECTOR.contains("/ba/"))
+    }
+
+    private companion object {
+        const val AUDIO_SELECTOR =
+            "bestaudio[ext=m4a]/bestaudio[acodec^=mp4a]/bestaudio[ext=mp3]/140/ba[ext=m4a]/b[ext=mp4]/b"
     }
 }

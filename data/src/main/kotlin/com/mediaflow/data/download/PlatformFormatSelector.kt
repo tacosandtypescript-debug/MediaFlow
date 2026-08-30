@@ -10,17 +10,19 @@ import com.mediaflow.domain.repository.DownloadRequest
  */
 object PlatformFormatSelector {
     private const val VIDEO_MP4_PREFERRED = "bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/b"
-    private const val AUDIO_M4A_PREFERRED = "bestaudio[ext=m4a]/bestaudio"
+    // Never put unfiltered `bestaudio` before an MP4: YouTube would pick Opus/webm
+    // (format 251), which MediaExtractor cannot save as m4a.
+    private const val AUDIO_M4A_PREFERRED =
+        "bestaudio[ext=m4a]/bestaudio[acodec^=mp4a]/bestaudio[ext=mp3]/140/ba[ext=m4a]/b[ext=mp4]/b"
 
     fun select(request: DownloadRequest): String = when {
         request.formatId == "space_audio_m4a" -> "b/best/0/bestaudio"
-        request.formatId == "bestaudio" -> AUDIO_M4A_PREFERRED
+        request.mediaType == MediaType.AUDIO || request.formatId == "bestaudio" -> AUDIO_M4A_PREFERRED
         request.formatId == "anonymous" -> VIDEO_MP4_PREFERRED
         request.requiresMuxing && !request.formatId.isNullOrBlank() && request.formatId != "yt-dlp" ->
             muxedVideoAndAacAudio(request.formatId!!)
         !request.formatId.isNullOrBlank() && request.formatId != "yt-dlp" && request.formatId != "anonymous" ->
             request.formatId!!
-        request.mediaType == MediaType.AUDIO -> AUDIO_M4A_PREFERRED
         request.qualityLabel?.contains("1080") == true -> heightBoundedMp4(1080)
         request.qualityLabel?.contains("720") == true -> heightBoundedMp4(720)
         request.qualityLabel?.contains("480") == true -> heightBoundedMp4(480)

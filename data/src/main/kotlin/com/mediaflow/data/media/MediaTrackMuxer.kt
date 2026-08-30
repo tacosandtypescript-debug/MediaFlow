@@ -20,6 +20,39 @@ object MediaTrackMuxer {
     fun canMuxWithoutTranscoding(videoMime: String?, audioMime: String?): Boolean =
         videoMime in SUPPORTED_VIDEO_MIMES && audioMime in SUPPORTED_AUDIO_MIMES
 
+    /** Copies the first AAC/MP3 audio track into an M4A/MP4 container. */
+    fun extractAudio(input: File, outputFile: File): Result<Unit> = runCatching {
+        require(input.isFile && input.length() > 0L) { "El archivo de origen está vacío." }
+        outputFile.parentFile?.mkdirs()
+        if (outputFile.exists()) outputFile.delete()
+
+        val extractor = MediaExtractor()
+        var muxer: MediaMuxer? = null
+        var started = false
+        try {
+            extractor.setDataSource(input.absolutePath)
+            val audioTrack = findTrack(extractor, "audio/")
+            require(audioTrack >= 0) { "El archivo no tiene una pista de audio extraíble." }
+            val audioFormat = extractor.getTrackFormat(audioTrack)
+            val audioMime = audioFormat.getString(MediaFormat.KEY_MIME)
+            require(audioMime in SUPPORTED_AUDIO_MIMES) {
+                "El audio $audioMime no se puede guardar como m4a sin transcodificar."
+            }
+            muxer = MediaMuxer(outputFile.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
+            val muxedTrack = muxer.addTrack(audioFormat)
+            muxer.start()
+            started = true
+            copyTrack(extractor, audioTrack, muxer, muxedTrack)
+        } finally {
+            extractor.release()
+            if (started) runCatching { muxer?.stop() }
+            muxer?.release()
+        }
+        require(outputFile.isFile && outputFile.length() > 0L) { "El audio extraído está vacío." }
+    }.onFailure {
+        outputFile.delete()
+    }
+
     fun mergeMp4(videoFile: File, audioFile: File, outputFile: File): Result<Unit> = runCatching {
         require(videoFile.isFile && videoFile.length() > 0L) { "La pista de vídeo está vacía." }
         require(audioFile.isFile && audioFile.length() > 0L) { "La pista de audio está vacía." }

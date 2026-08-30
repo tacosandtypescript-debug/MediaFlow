@@ -199,10 +199,14 @@ class YtDlpPlatformDownloader(
         commitFailure: Boolean = true,
     ): Boolean {
         val current = _items.value.firstOrNull { it.id == id } ?: return false
-        val extension = output.extension.lowercase()
+        val audioReady = runCatching { prepareAudioFile(request, output) }.getOrElse { error ->
+            if (commitFailure) updateFailed(id, error, request.mediaType)
+            return false
+        }
+        val extension = audioReady.extension.lowercase()
         val mimeType = mimeFor(extension)
         val validation = MediaFileValidator.validate(
-            output,
+            audioReady,
             request.mediaType,
             extension,
             request.durationSeconds,
@@ -224,27 +228,27 @@ class YtDlpPlatformDownloader(
                 ?: MediaMetadata(
                     title = YtDlpRuntime.fileStem(request.fileName) ?: current.title?.ifBlank { null },
                 )
-            mediaMetadataWriter.writeMetadata(output, metadata)
+            mediaMetadataWriter.writeMetadata(audioReady, metadata)
         }.onFailure { error ->
-            android.util.Log.w("YtDlpPlatformDownloader", "No se pudieron incrustar metadatos en ${output.name}: ${error.message}")
+            android.util.Log.w("YtDlpPlatformDownloader", "No se pudieron incrustar metadatos en ${audioReady.name}: ${error.message}")
         }
 
-        val publishedUri = MediaStorePublisher.publishIfMissing(context, output, mimeType, output.name)
+        val publishedUri = MediaStorePublisher.publishIfMissing(context, audioReady, mimeType, audioReady.name)
         publishedUri?.let(ownership::add)
-        val thumbnailUri = harvestThumbnail(id, output, request.thumbnailUrl) ?: current.thumbnailUri
+        val thumbnailUri = harvestThumbnail(id, audioReady, request.thumbnailUrl) ?: current.thumbnailUri
         update(current.copy(
-            fileName = output.name,
-            title = output.nameWithoutExtension,
-            localUri = publishedUri?.toString() ?: android.net.Uri.fromFile(output).toString(),
+            fileName = audioReady.name,
+            title = audioReady.nameWithoutExtension,
+            localUri = publishedUri?.toString() ?: android.net.Uri.fromFile(audioReady).toString(),
             thumbnailUri = thumbnailUri,
             progress = 1f,
             isProgressKnown = true,
-            totalBytes = output.length(),
-            downloadedBytes = output.length(),
+            totalBytes = audioReady.length(),
+            downloadedBytes = audioReady.length(),
             status = DownloadStatus.COMPLETED,
             completedAt = System.currentTimeMillis(),
             selectedFormat = current.selectedFormat?.copy(
-                extension = output.extension.lowercase(),
+                extension = audioReady.extension.lowercase(),
                 mimeType = mimeType,
             ),
             durationSeconds = validation.durationSeconds ?: current.durationSeconds,
@@ -268,9 +272,7 @@ class YtDlpPlatformDownloader(
         // cookies. Try that first, but never mark the download failed if the
         // anonymous URL is missing or the CDN transfer fails — yt-dlp runs next.
         // Anonymous CDN paths are progressive MP4. Audio-only downloads go through yt-dlp.
-        if (request.mediaType != MediaType.AUDIO &&
-            tryAnonymousDirectDownload(id, request, sourceUrl, platform)
-        ) {
+        if (tryAnonymousDirectDownload(id, request, sourceUrl, platform)) {
             return
         }
 
@@ -339,12 +341,41 @@ class YtDlpPlatformDownloader(
         sessions[id] = Session(request, future)
         executor.execute {
             runCatching { future.get() }
-                .onSuccess { finish(id, request, startedAt) }
+                .onSuccess {
+                    when (finish(id, request, startedAt)) {
+                        FinishResult.DONE -> Unit
+                        FinishResult.RETRY_AUDIO_FROM_VIDEO -> {
+                            if (allowProgressiveFallback && format != AUDIO_FROM_VIDEO_FALLBACK) {
+                                android.util.Log.w(
+                                    "YtDlpPlatformDownloader",
+                                    "El archivo de audio no se pudo extraer. Descargando MP4 para sacar el sonido.",
+                                )
+                                downloadCombined(
+                                    id,
+                                    request.copy(requiresMuxing = false, formatId = "bestaudio"),
+                                    targetUrl,
+                                    AUDIO_FROM_VIDEO_FALLBACK,
+                                    referer,
+                                    allowProgressiveFallback = false,
+                                )
+                            } else {
+                                updateFailed(
+                                    id,
+                                    IllegalStateException("No se pudo extraer el audio de este vídeo"),
+                                    request.mediaType,
+                                )
+                            }
+                        }
+                    }
+                }
                 .onFailure { error ->
-                    val canFallback = allowProgressiveFallback &&
+                    val canVideoFallback = allowProgressiveFallback &&
                         request.mediaType == MediaType.VIDEO &&
                         format != PROGRESSIVE_VIDEO_FALLBACK
-                    if (canFallback) {
+                    val canAudioFallback = allowProgressiveFallback &&
+                        request.mediaType == MediaType.AUDIO &&
+                        format != AUDIO_FROM_VIDEO_FALLBACK
+                    if (canVideoFallback) {
                         android.util.Log.w(
                             "YtDlpPlatformDownloader",
                             "El formato de vídeo $format falló (${error.message}). Reintentando MP4 progresivo.",
@@ -354,6 +385,19 @@ class YtDlpPlatformDownloader(
                             request.copy(requiresMuxing = false, formatId = "yt-dlp"),
                             targetUrl,
                             PROGRESSIVE_VIDEO_FALLBACK,
+                            referer,
+                            allowProgressiveFallback = false,
+                        )
+                    } else if (canAudioFallback) {
+                        android.util.Log.w(
+                            "YtDlpPlatformDownloader",
+                            "El audio $format falló (${error.message}). Descargando MP4 para extraer el sonido.",
+                        )
+                        downloadCombined(
+                            id,
+                            request.copy(requiresMuxing = false, formatId = "bestaudio"),
+                            targetUrl,
+                            AUDIO_FROM_VIDEO_FALLBACK,
                             referer,
                             allowProgressiveFallback = false,
                         )
@@ -521,12 +565,24 @@ class YtDlpPlatformDownloader(
         start(id, request)
     }
 
-    private fun finish(id: String, request: DownloadRequest, startedAt: Long) {
-        val current = _items.value.firstOrNull { it.id == id } ?: return
-        val output = findSessionOutput(id, request, minOf(startedAt, current.createdAt))
-        if (output == null || output.length() == 0L) {
+    private fun finish(id: String, request: DownloadRequest, startedAt: Long): FinishResult {
+        val current = _items.value.firstOrNull { it.id == id } ?: return FinishResult.DONE
+        val found = findSessionOutput(id, request, minOf(startedAt, current.createdAt))
+        if (found == null || found.length() == 0L) {
             updateFailed(id, IllegalStateException("yt-dlp terminó sin generar un archivo"))
-            return
+            return FinishResult.DONE
+        }
+        val output = runCatching { prepareAudioFile(request, found) }.getOrElse { error ->
+            if (request.mediaType == MediaType.AUDIO) {
+                android.util.Log.w(
+                    "YtDlpPlatformDownloader",
+                    "No se pudo dejar el audio en m4a (${error.message}).",
+                    error,
+                )
+                return FinishResult.RETRY_AUDIO_FROM_VIDEO
+            }
+            updateFailed(id, error, request.mediaType)
+            return FinishResult.DONE
         }
         val extension = output.extension.lowercase()
         val validation = MediaFileValidator.validate(
@@ -540,8 +596,11 @@ class YtDlpPlatformDownloader(
             request.audioCodec,
         )
             .getOrElse { error ->
+                if (request.mediaType == MediaType.AUDIO) {
+                    return FinishResult.RETRY_AUDIO_FROM_VIDEO
+                }
                 updateFailed(id, error, request.mediaType)
-                return
+                return FinishResult.DONE
             }
 
         // Attempt non-blocking metadata embedding
@@ -582,6 +641,7 @@ class YtDlpPlatformDownloader(
         ))
         persistThumbnailAsync(id, request.thumbnailUrl)
         sessions.remove(id)
+        return FinishResult.DONE
     }
 
     private fun updateFailed(id: String, error: Throwable, mediaType: MediaType? = null) {
@@ -753,6 +813,18 @@ class YtDlpPlatformDownloader(
         )
     }
 
+    private fun prepareAudioFile(request: DownloadRequest, output: File): File {
+        if (request.mediaType != MediaType.AUDIO) return output
+        val ext = output.extension.lowercase()
+        if (ext in setOf("m4a", "mp3", "aac")) return output
+        val audioOut = File(output.parentFile, "${output.nameWithoutExtension}.m4a")
+        MediaTrackMuxer.extractAudio(output, audioOut).getOrThrow()
+        if (audioOut.absolutePath != output.absolutePath) {
+            output.delete()
+        }
+        return audioOut
+    }
+
     private fun mimeFor(extension: String): String = when (extension) {
         "webm" -> "video/webm"
         "mkv" -> "video/x-matroska"
@@ -765,6 +837,8 @@ class YtDlpPlatformDownloader(
 
     private data class Session(val request: DownloadRequest, val future: Future<*>)
 
+    private enum class FinishResult { DONE, RETRY_AUDIO_FROM_VIDEO }
+
     private companion object {
         val SESSION_MEDIA_EXTENSIONS = setOf(
             "mp4", "m4v", "m4a", "webm", "mkv", "mov", "mp3", "aac", "opus", "ogg", "wav",
@@ -772,5 +846,6 @@ class YtDlpPlatformDownloader(
         const val ANONYMOUS_BROWSER_USER_AGENT =
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.6778.139 Safari/537.36"
         const val PROGRESSIVE_VIDEO_FALLBACK = "b[ext=mp4]/bv*[ext=mp4]+ba[ext=m4a]/b"
+        const val AUDIO_FROM_VIDEO_FALLBACK = "b[ext=mp4]/bv*[ext=mp4]+ba[ext=m4a]/b"
     }
 }
