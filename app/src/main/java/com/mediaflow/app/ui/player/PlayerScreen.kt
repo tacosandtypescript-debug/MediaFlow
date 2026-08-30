@@ -181,25 +181,22 @@ fun PlayerScreen(
                     uiState.serviceState.artworkUrl,
                 )
                 val palette = com.mediaflow.app.ui.player.palette.rememberPlayerPalette(artwork)
-                val activity = context as? Activity
-                DisposableEffect(viz.dynamicSystemBars, palette.background, uiState.isAudioOnly) {
-                    val window = activity?.window
-                    if (window != null && viz.dynamicSystemBars) {
-                        window.statusBarColor = android.graphics.Color.argb(
-                            255,
-                            (palette.background.red * 255).toInt(),
-                            (palette.background.green * 255).toInt(),
-                            (palette.background.blue * 255).toInt(),
+                val hostActivity = context as? Activity
+                DisposableEffect(palette.background, uiState.isAudioOnly) {
+                    val window = hostActivity?.window
+                    if (window != null) {
+                        com.mediaflow.app.ui.player.palette.SystemBarColorMapper.apply(
+                            window,
+                            com.mediaflow.app.ui.player.palette.SystemBarColorMapper.fromPalette(palette),
                         )
-                        window.navigationBarColor = window.statusBarColor
-                        WindowInsetsControllerCompat(window, window.decorView).isAppearanceLightStatusBars =
-                            !palette.lightIcons
-                        WindowInsetsControllerCompat(window, window.decorView).isAppearanceLightNavigationBars =
-                            !palette.lightIcons
                     }
                     onDispose {
-                        window?.statusBarColor = android.graphics.Color.TRANSPARENT
-                        window?.navigationBarColor = android.graphics.Color.TRANSPARENT
+                        if (window != null) {
+                            com.mediaflow.app.ui.player.palette.SystemBarColorMapper.apply(
+                                window,
+                                com.mediaflow.app.ui.player.palette.SystemBarColorMapper.restoreScheme(),
+                            )
+                        }
                     }
                 }
                 AudioNowPlaying(
