@@ -136,6 +136,18 @@ class PlatformFormatSelectorTest {
         assertFalse(AUDIO_SELECTOR.contains("/ba/"))
     }
 
+    @Test
+    fun spaceAudioSelectsAudioOnlyNotBestVideo() {
+        val request = DownloadRequest(
+            sourceUrl = "https://x.com/i/spaces/1NGarowkqQlJj",
+            mediaType = MediaType.AUDIO,
+            formatId = "space_audio_m4a",
+            extension = "m4a",
+        )
+        assertEquals("bestaudio/ba/b", PlatformFormatSelector.select(request))
+        assertFalse(PlatformFormatSelector.select(request).startsWith("b/best"))
+    }
+
     private companion object {
         const val AUDIO_SELECTOR =
             "b[ext=mp4]/18/bestaudio[ext=m4a]/bestaudio[acodec^=mp4a]/140/ba[ext=m4a]/bestaudio/b"

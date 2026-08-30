@@ -65,7 +65,28 @@ class YtDlpRuntimeTest {
         assertTrue(ua.contains("Chrome/13"))
         assertEquals("0.0.0.0", opts.getString("source_address"))
         assertEquals(3, opts.getInt("retries"))
+        assertEquals(YtDlpRuntime.CONCURRENT_FRAGMENTS, opts.getInt("concurrent_fragment_downloads"))
         assertTrue(opts.getBoolean("writethumbnail"))
+    }
+
+    @Test
+    fun downloadOptionsUseConcurrentHlsFragments() {
+        val dir = File("build/tmp/yt-dlp-hls").apply { mkdirs() }
+        val opts = YtDlpRuntime.downloadOptions(
+            outputDirectory = dir,
+            outputTemplate = File(dir, "space.%(ext)s").absolutePath,
+            format = "bestaudio/ba/b",
+            referer = "https://x.com/",
+        )
+        assertEquals(8, opts.getInt("concurrent_fragment_downloads"))
+        assertEquals("https://x.com/", opts.getJSONObject("http_headers").getString("Referer"))
+    }
+
+    @Test
+    fun youtubePlayerFallbackOnlyForYoutubeUrls() {
+        assertTrue(YtDlpRuntime.usesYoutubePlayerClientFallback("https://www.youtube.com/watch?v=abc"))
+        assertFalse(YtDlpRuntime.usesYoutubePlayerClientFallback("https://x.com/i/spaces/1NGarowkqQlJj"))
+        assertFalse(YtDlpRuntime.usesYoutubePlayerClientFallback("https://prod-fastly.video.pscp.tv/replay.m3u8"))
     }
 
     @Test

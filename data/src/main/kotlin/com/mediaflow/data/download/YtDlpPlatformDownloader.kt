@@ -295,6 +295,7 @@ class YtDlpPlatformDownloader(
         val referer = when (platform) {
             PlatformUrlSupport.Platform.INSTAGRAM -> "https://www.instagram.com/"
             PlatformUrlSupport.Platform.TIKTOK -> "https://www.tiktok.com/"
+            PlatformUrlSupport.Platform.X -> "https://x.com/"
             else -> null
         }
         val space = if (platform == PlatformUrlSupport.Platform.X) {

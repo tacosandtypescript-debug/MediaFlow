@@ -19,6 +19,7 @@ internal object YtDlpRuntime {
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.7103.113 Safari/537.36"
     const val FILE_TIME_TOLERANCE_MS = 1_000L
     const val MAX_PLAYLIST_ITEMS = 50
+    const val CONCURRENT_FRAGMENTS = 8
 
     private val cwdLock = Any()
     @Volatile private var cwdInitialized = false
@@ -92,6 +93,7 @@ internal object YtDlpRuntime {
             .put("check_formats", false)
             .put("retries", 3)
             .put("fragment_retries", 3)
+            .put("concurrent_fragment_downloads", CONCURRENT_FRAGMENTS)
             .put("socket_timeout", 30)
             .put("source_address", "0.0.0.0")
             .put("extractor_args", JSONObject().put("youtube", youtubeArgs))
@@ -140,6 +142,11 @@ internal object YtDlpRuntime {
         return globals.callAttr("__getitem__", "result").toString()
     }
 
+    fun usesYoutubePlayerClientFallback(url: String): Boolean {
+        val canonical = PlatformUrlSupport.canonicalExtractionUrl(url)
+        return PlatformUrlSupport.platformFor(canonical) == PlatformUrlSupport.Platform.YOUTUBE
+    }
+
     fun download(
         context: Context,
         url: String,
@@ -168,15 +175,17 @@ internal object YtDlpRuntime {
                 except Exception:
                     pass
             opts['progress_hooks'] = [hook]
-            clients = [['android'], ['tv_simply'], ['android_vr']]
+            is_youtube = bool(is_youtube)
+            clients = [['android'], ['tv_simply'], ['android_vr']] if is_youtube else [None]
             last = None
             for client in clients:
                 attempt = dict(opts)
-                ea = dict(attempt.get('extractor_args') or {})
-                yt = dict(ea.get('youtube') or {})
-                yt['player_client'] = client
-                ea['youtube'] = yt
-                attempt['extractor_args'] = ea
+                if client is not None:
+                    ea = dict(attempt.get('extractor_args') or {})
+                    yt = dict(ea.get('youtube') or {})
+                    yt['player_client'] = client
+                    ea['youtube'] = yt
+                    attempt['extractor_args'] = ea
                 attempt['progress_hooks'] = [hook]
                 try:
                     with yt_dlp.YoutubeDL(attempt) as ydl:
@@ -186,7 +195,7 @@ internal object YtDlpRuntime {
                 except Exception as e:
                     last = e
                     msg = str(e)
-                    if '403' not in msg and 'Forbidden' not in msg and 'Requested format' not in msg:
+                    if not is_youtube or ('403' not in msg and 'Forbidden' not in msg and 'Requested format' not in msg):
                         raise
             if last is not None:
                 raise last
@@ -195,6 +204,7 @@ internal object YtDlpRuntime {
                 "url" to PlatformUrlSupport.canonicalExtractionUrl(url),
                 "out_dir" to outputDirectory.absolutePath,
                 "opts_json" to options.toString(),
+                "is_youtube" to usesYoutubePlayerClientFallback(url),
                 "listener" to onProgress?.let(::ProgressBridge),
             ),
         )

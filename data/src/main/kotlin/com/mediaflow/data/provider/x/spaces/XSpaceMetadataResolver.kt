@@ -101,6 +101,7 @@ open class XSpaceMetadataResolver(
                 durationSeconds = SpaceAvailabilityResolver.displayDurationSeconds(space),
                 isProgressive = false,
                 requiresMuxing = false,
+                streamUrl = streamUrl,
             ),
         )
     }
