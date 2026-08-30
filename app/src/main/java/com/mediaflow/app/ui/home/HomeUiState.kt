@@ -11,9 +11,12 @@ import com.mediaflow.domain.repository.SourceInfo
  * Defined locally for this phase. If core/model later exposes a shared
  * media type model, this can be replaced without changing the UI shape.
  */
-enum class ContentType(@StringRes val labelRes: Int) {
-    VIDEO(R.string.media_type_video),
-    AUDIO(R.string.media_type_audio),
+enum class ContentType(
+    @StringRes val labelRes: Int,
+    @StringRes val descriptionRes: Int,
+) {
+    VIDEO(R.string.media_type_video, R.string.media_type_video_description),
+    AUDIO(R.string.media_type_audio, R.string.media_type_audio_description),
 }
 
 /**
@@ -183,6 +186,7 @@ data class HomeUiState(
     val qualityOptions: List<QualityOption> = QualityOption.videoOptions,
     val quality: QualityOption = QualityOption.AUTO,
     val fileName: String = "",
+    val suggestedFileName: String? = null,
     val validationState: ValidationState = ValidationState.Empty,
     /** Message shown as error (null when there is no error). */
     @StringRes val errorMessage: Int? = null,

@@ -17,6 +17,7 @@ import com.mediaflow.app.R
 @Composable
 fun FileNameField(
     fileName: String,
+    suggestedFileName: String? = null,
     onFileNameChange: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -24,9 +25,17 @@ fun FileNameField(
         value = fileName,
         onValueChange = onFileNameChange,
         label = { Text(stringResource(R.string.home_file_name_label)) },
-        placeholder = { Text(stringResource(R.string.home_file_name_placeholder)) },
+        placeholder = {
+            Text(suggestedFileName ?: stringResource(R.string.home_file_name_placeholder))
+        },
         supportingText = {
-            Text(stringResource(R.string.home_file_name_hint))
+            Text(
+                if (suggestedFileName.isNullOrBlank()) {
+                    stringResource(R.string.home_file_name_hint)
+                } else {
+                    stringResource(R.string.home_file_name_suggested, suggestedFileName)
+                },
+            )
         },
         singleLine = true,
         modifier = modifier

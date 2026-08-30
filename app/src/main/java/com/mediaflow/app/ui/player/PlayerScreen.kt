@@ -81,8 +81,7 @@ fun PlayerScreen(
 
     LaunchedEffect(mediaUri) {
         if (mediaUri.isNotBlank()) {
-            val title = mediaUri.substringAfterLast('/').ifBlank { null }
-            viewModel.open(mediaUri, title)
+            viewModel.open(mediaUri)
         }
     }
 
@@ -216,7 +215,14 @@ fun PlayerScreen(
                     PlayerMetadataSection(
                         title = displayTitle,
                         subtitle = uiState.spaceMetadata?.let { "Host: ${it.host.formattedHandle}" }
-                            ?: uiState.serviceState.artistOrHost ?: "Audio",
+                            ?: uiState.serviceState.artistOrHost
+                            ?: stringResource(
+                                if (uiState.isAudioOnly) {
+                                    R.string.player_media_audio
+                                } else {
+                                    R.string.player_media_video
+                                },
+                            ),
                         isSpace = uiState.spaceMetadata != null,
                         isFavorite = uiState.isFavorite,
                         onToggleFavorite = viewModel::toggleFavorite,

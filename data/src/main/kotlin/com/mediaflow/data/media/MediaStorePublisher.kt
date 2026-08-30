@@ -26,12 +26,27 @@ object MediaStorePublisher {
             val exact = runCatching {
                 resolver.query(
                     collection,
-                    arrayOf(MediaStore.MediaColumns._ID),
+                    arrayOf(MediaStore.MediaColumns._ID, MediaStore.MediaColumns.SIZE),
                     "${MediaStore.MediaColumns.DISPLAY_NAME} = ? AND ${MediaStore.MediaColumns.RELATIVE_PATH} = ? AND ${MediaStore.MediaColumns.OWNER_PACKAGE_NAME} = ?",
                     arrayOf(displayName, relativePath, context.packageName),
                     null,
                 )?.use { cursor ->
-                    if (cursor.moveToFirst()) ContentUris.withAppendedId(collection, cursor.getLong(0)) else null
+                    if (!cursor.moveToFirst()) {
+                        null
+                    } else {
+                        val uri = ContentUris.withAppendedId(collection, cursor.getLong(0))
+                        val existingSize = cursor.getLong(1)
+                        if (existingSize == file.length()) {
+                            uri
+                        } else {
+                            // A previous attempt can leave an owned row with
+                            // the same name but different bytes. Reusing that
+                            // row would expose stale or unplayable media.
+                            resolver.delete(uri, null, null)
+                            MediaFlowLibraryStore(context).remove(uri)
+                            null
+                        }
+                    }
                 }
             }.getOrNull()
             if (exact != null) return exact

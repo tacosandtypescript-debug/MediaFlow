@@ -52,5 +52,11 @@ fun MediaTypeSelector(
                 )
             }
         }
+        Text(
+            text = stringResource(selected.descriptionRes),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 6.dp),
+        )
     }
 }

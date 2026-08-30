@@ -171,6 +171,8 @@ class MpvPlaybackEngine(
     private var currentMediaId: String? = null
     private var currentResolvedSource: ResolvedSource? = null
     private var pendingStartPositionMs: Long = 0L
+    private var surfaceAttached = false
+    private var reloadWhenSurfaceIsReady = false
     private var isReleased = false
     private val playbackFinishedGate = PlaybackFinishedGate()
 
@@ -179,6 +181,7 @@ class MpvPlaybackEngine(
 
         currentMediaId = mediaSource
         pendingStartPositionMs = startPositionMs
+        reloadWhenSurfaceIsReady = !surfaceAttached
         playbackFinishedGate.reset()
 
         _state.value = _state.value.copy(
@@ -290,13 +293,33 @@ class MpvPlaybackEngine(
         if (isReleased) return
         if (surface is Surface) {
             try {
+                surfaceAttached = true
                 mpv.attachSurface(surface)
+
+                // On Android the SurfaceView can be created just after the
+                // player has already received loadfile. libmpv then aborts a
+                // video load with "Missing surface pointer". Retry the same
+                // source now that the GPU surface is valid. Audio-only media
+                // simply leaves this flag unused because it has no surface.
+                if (reloadWhenSurfaceIsReady) {
+                    reloadWhenSurfaceIsReady = false
+                    currentResolvedSource?.let { resolved ->
+                        playbackFinishedGate.reset()
+                        _state.value = _state.value.copy(
+                            playbackState = EnginePlaybackState.PREPARING,
+                            errorMessage = null,
+                        )
+                        mpv.command("loadfile", resolved.path)
+                        mpv.setPropertyBoolean("pause", false)
+                    }
+                }
             } catch (_: Throwable) {}
         }
     }
 
     override fun detachSurface() {
         if (isReleased) return
+        surfaceAttached = false
         try {
             mpv.detachSurface()
         } catch (_: Throwable) {}

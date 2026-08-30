@@ -88,7 +88,11 @@ fun HomeScreen(
     var entered by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { entered = true }
     LaunchedEffect(state.url, sourceResolver) {
-        if (sourceResolver != null && state.validationState == ValidationState.Valid) {
+        if (
+            sourceResolver != null &&
+            state.validationState == ValidationState.Valid &&
+            state.analysisState == AnalysisState.IDLE
+        ) {
             delay(500)
             viewModel.analyze(sourceResolver)
         }
@@ -184,29 +188,32 @@ fun HomeScreen(
                 )
             }
 
-            SourceAnalysisCard(
-                state = state.analysisState,
-                sourceInfo = state.sourceInfo,
-                formats = state.availableFormats,
-                selectedFormatId = state.selectedFormatId,
-                onFormatSelected = viewModel::onFormatSelected,
-                errorMessage = state.analysisError,
-                modifier = Modifier.padding(bottom = 18.dp),
-            )
-
             AnimatedVisibility(entered, enter = staggeredEnter(80)) {
                 Column {
                     MediaTypeSelector(
                         selected = state.mediaType,
                         onSelect = viewModel::onMediaTypeSelected,
                         videoEnabled = state.sourceInfo?.spaceMetadata == null,
+                        modifier = Modifier.padding(bottom = 18.dp),
                     )
                 }
             }
 
-            Spacer(Modifier.height(18.dp))
+            SourceAnalysisCard(
+                state = state.analysisState,
+                sourceInfo = state.sourceInfo,
+                formats = state.availableFormats,
+                selectedType = state.mediaType,
+                selectedFormatId = state.selectedFormatId,
+                onFormatSelected = viewModel::onFormatSelected,
+                errorMessage = state.analysisError,
+                modifier = Modifier.padding(bottom = 18.dp),
+            )
 
-            AnimatedVisibility(sourceResolver == null, enter = staggeredEnter(120)) {
+            AnimatedVisibility(
+                visible = sourceResolver == null || state.analysisState == AnalysisState.READY,
+                enter = staggeredEnter(120),
+            ) {
                 QualitySelector(
                     options = state.qualityOptions,
                     selected = state.quality,
@@ -219,6 +226,7 @@ fun HomeScreen(
             AnimatedVisibility(entered, enter = staggeredEnter(160)) {
                 FileNameField(
                     fileName = state.fileName,
+                    suggestedFileName = state.suggestedFileName,
                     onFileNameChange = viewModel::onFileNameChanged,
                 )
             }
@@ -229,6 +237,13 @@ fun HomeScreen(
                 DownloadButton(
                     enabled = state.isDownloadButtonEnabled &&
                         (sourceResolver == null || state.analysisState == AnalysisState.READY),
+                    label = stringResource(
+                        if (state.mediaType == ContentType.VIDEO) {
+                            R.string.home_download_video
+                        } else {
+                            R.string.home_download_audio
+                        },
+                    ),
                     onClick = {
                         if (sourceResolver != null && state.analysisState != AnalysisState.READY) {
                             viewModel.analyze(sourceResolver)

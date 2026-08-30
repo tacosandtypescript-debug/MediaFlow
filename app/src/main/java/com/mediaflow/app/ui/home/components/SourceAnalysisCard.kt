@@ -34,6 +34,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.mediaflow.app.R
 import com.mediaflow.app.ui.home.AnalysisState
+import com.mediaflow.app.ui.home.ContentType
 import com.mediaflow.core.model.MediaFormat
 import com.mediaflow.core.model.MediaType
 import com.mediaflow.domain.repository.SourceInfo
@@ -46,6 +47,7 @@ fun SourceAnalysisCard(
     state: AnalysisState,
     sourceInfo: SourceInfo?,
     formats: List<MediaFormat>,
+    selectedType: ContentType,
     selectedFormatId: String?,
     onFormatSelected: (String) -> Unit,
     errorMessage: String?,
@@ -96,7 +98,18 @@ fun SourceAnalysisCard(
                     },
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Text(stringResource(R.string.analysis_choose_format), style = MaterialTheme.typography.labelLarge)
+                Text(
+                    text = stringResource(
+                        R.string.analysis_download_type,
+                        stringResource(selectedType.descriptionRes),
+                    ),
+                    style = MaterialTheme.typography.labelLarge,
+                )
+                Text(
+                    text = stringResource(R.string.analysis_choose_format),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
                 LazyColumn(
                     modifier = Modifier.height((formats.size.coerceAtMost(6) * 64).dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -151,8 +164,16 @@ private fun ThumbnailPreview(url: String?) {
     }
 }
 
+@Composable
 private fun formatLabel(format: MediaFormat): String = buildString {
-    append(if (format.mediaType == MediaType.VIDEO) "Vídeo" else "Audio")
+    append(
+        when {
+            format.mediaType == MediaType.VIDEO && format.requiresMuxing ->
+                stringResource(R.string.format_video_audio_added)
+            format.mediaType == MediaType.VIDEO -> stringResource(R.string.format_video_with_audio)
+            else -> stringResource(R.string.format_audio_only)
+        },
+    )
     append(" · ")
     append(format.qualityLabel ?: format.height?.let { "${it}p" } ?: format.extension ?: "Formato")
     format.extension?.let { append(" · .$it") }
@@ -161,7 +182,10 @@ private fun formatLabel(format: MediaFormat): String = buildString {
     format.audioCodec?.let { append(" + $it") }
     format.fps?.let { append(" · ${it.toInt()} FPS") }
     format.fileSize?.let { append(" · ${formatBytes(it)}") }
-    if (format.requiresMuxing) append(" · Pistas separadas")
+    if (format.requiresMuxing) {
+        append(" · ")
+        append(stringResource(R.string.format_audio_added))
+    }
 }
 
 private fun formatDuration(seconds: Long): String = "%d:%02d".format(seconds / 60, seconds % 60)

@@ -20,6 +20,7 @@ import com.mediaflow.app.R
 fun DownloadButton(
     enabled: Boolean,
     onClick: () -> Unit,
+    label: String = stringResource(R.string.home_download_now),
     modifier: Modifier = Modifier,
 ) {
     Button(
@@ -33,7 +34,7 @@ fun DownloadButton(
     ) {
         Icon(Icons.Outlined.FileDownload, contentDescription = null)
         Text(
-            text = stringResource(R.string.home_download_now),
+            text = label,
             modifier = Modifier.padding(start = 8.dp),
         )
     }

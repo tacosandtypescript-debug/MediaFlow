@@ -62,7 +62,11 @@ fun MiniPlayer(
             ?.removePrefix("Host: ")
             ?.trim()
             ?.takeIf { it.isNotBlank() }
-        val author = hostLabel ?: if (!serviceState.isLive) "Audio" else null
+        val author = hostLabel ?: if (!serviceState.isLive) {
+            stringResource(
+                if (serviceState.isAudioOnly) R.string.player_media_audio else R.string.player_media_video,
+            )
+        } else null
 
         Surface(
             color = MaterialTheme.customColors.miniPlayerBackground,

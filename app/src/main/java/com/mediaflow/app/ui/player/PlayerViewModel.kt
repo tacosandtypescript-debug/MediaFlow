@@ -226,18 +226,18 @@ class PlayerViewModel(
             val preservedArtwork = activeState.artworkUrl.takeIf {
                 activeState.mediaId == mediaUri || activeState.filePath == mediaUri
             }
-            val downloadThumb = withTimeoutOrNull(250) {
+            val download = withTimeoutOrNull(250) {
                 downloadRepo.observeDownloads().first().firstOrNull { item ->
                     item.localUri == mediaUri || item.id == mediaUri || item.sourceUrl == mediaUri
-                }?.thumbnailUri
+                }
             }
             playerService.openMedia(
                 mediaId = mediaUri,
                 filePath = mediaUri,
-                title = space?.title ?: title,
+                title = space?.title ?: title ?: download?.title ?: download?.fileName,
                 artistOrHost = space?.let { "Host: ${it.host.formattedHandle}" },
                 artworkUrl = preferredArtworkUrl(
-                    preservedArtwork ?: downloadThumb,
+                    preservedArtwork ?: download?.thumbnailUri,
                     space?.host?.avatarUrl,
                 ),
                 autoPlay = true,

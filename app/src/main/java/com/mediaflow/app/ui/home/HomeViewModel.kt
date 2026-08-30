@@ -64,6 +64,7 @@ class HomeViewModel : ViewModel() {
             it.copy(
                 analysisState = AnalysisState.ANALYZING,
                 sourceInfo = null,
+                suggestedFileName = null,
                 availableFormats = emptyList(),
                 selectedFormatId = null,
                 analysisError = null,
@@ -80,7 +81,14 @@ class HomeViewModel : ViewModel() {
                             latest.mediaType
                         }
                         applyContentType(
-                            latest.copy(sourceInfo = info, analysisState = AnalysisState.READY),
+                            latest.copy(
+                                sourceInfo = info,
+                                suggestedFileName = info.title
+                                    ?.trim()
+                                    ?.let(::sanitizeFileName)
+                                    ?.takeIf { it.isNotBlank() },
+                                analysisState = AnalysisState.READY,
+                            ),
                             requested,
                         )
                     }
@@ -169,6 +177,7 @@ class HomeViewModel : ViewModel() {
                 isDownloadButtonEnabled = validation == ValidationState.Valid,
                 analysisState = AnalysisState.IDLE,
                 sourceInfo = null,
+                suggestedFileName = null,
                 availableFormats = emptyList(),
                 selectedFormatId = null,
                 analysisError = null,

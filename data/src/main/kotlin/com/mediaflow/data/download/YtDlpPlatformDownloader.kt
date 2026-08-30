@@ -44,6 +44,43 @@ class YtDlpPlatformDownloader(
 
     init {
         runCatching { YtDlpRuntime.ensureReady(context) }
+        executor.execute { repairPublishedFiles() }
+    }
+
+    /**
+     * Repairs a published MediaStore row when a previous run left a stale
+     * copy under the same display name. The private validated file is the
+     * authoritative copy owned by this downloader.
+     */
+    private fun repairPublishedFiles() {
+        _items.value
+            .filter { it.status == DownloadStatus.COMPLETED }
+            .forEach { item ->
+                val fileName = item.fileName ?: return@forEach
+                val output = File(outputDirectory, fileName)
+                if (!output.isFile || output.length() == 0L) return@forEach
+                val mimeType = item.selectedFormat?.mimeType
+                    ?: if (item.mediaType == MediaType.VIDEO) "video/mp4" else "audio/mpeg"
+                val published = runCatching {
+                    MediaFileValidator.validate(
+                        output,
+                        item.mediaType,
+                        item.selectedFormat?.extension,
+                        item.durationSeconds,
+                        item.selectedFormat?.width,
+                        item.selectedFormat?.height,
+                        item.selectedFormat?.videoCodec,
+                        item.selectedFormat?.audioCodec,
+                    ).getOrThrow()
+                    MediaStorePublisher.publishIfMissing(context, output, mimeType, output.name)
+                }.getOrNull() ?: return@forEach
+                published?.let { uri ->
+                    ownership.add(uri)
+                    if (item.localUri != uri.toString()) {
+                        update(item.copy(localUri = uri.toString()))
+                    }
+                }
+            }
     }
 
     fun start(id: String, request: DownloadRequest) {

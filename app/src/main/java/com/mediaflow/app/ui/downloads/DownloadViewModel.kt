@@ -9,7 +9,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.mediaflow.app.ui.home.AnalysisState
+import com.mediaflow.app.ui.home.ContentType
 import com.mediaflow.app.ui.home.HomeUiState
+import com.mediaflow.app.ui.home.PreferredDownloadFormat
+import com.mediaflow.app.ui.home.QualityOption
 import com.mediaflow.core.model.DownloadItem
 import com.mediaflow.core.model.MediaFormat
 import com.mediaflow.core.model.MediaType
@@ -22,6 +25,7 @@ import com.mediaflow.data.resolver.DirectUrlSourceResolver
 import com.mediaflow.data.resolver.YtDlpSourceResolver
 import com.mediaflow.domain.repository.DownloadRepository
 import com.mediaflow.domain.repository.ProgressRepository
+import com.mediaflow.domain.repository.SourceInfo
 import com.mediaflow.domain.repository.XSpaceRepository
 import com.mediaflow.domain.usecase.CancelDownloadUseCase
 import com.mediaflow.domain.usecase.GetDownloadsUseCase
@@ -117,11 +121,15 @@ class DownloadViewModel(
                 check(source.errorMessage == null && source.availableFormats.isNotEmpty()) {
                     source.errorMessage ?: "La fuente no devolvió calidades descargables."
                 }
-                val selected = selectFormat(
-                    source.availableFormats,
-                    state.mediaType.toCoreType(),
-                    state.quality,
-                    state.selectedFormatId,
+                val formatsForSelection = formatsForDownload(source, state.mediaType)
+                check(formatsForSelection.isNotEmpty()) {
+                    "La fuente no ofrece formatos para el tipo seleccionado."
+                }
+                val selected = selectFormatForDownload(
+                    source = source,
+                    targetType = state.mediaType.toCoreType(),
+                    quality = state.quality,
+                    selectedFormatId = state.selectedFormatId,
                 )
                 check(selected != null) { "La calidad seleccionada no está disponible en esta fuente." }
 
@@ -204,21 +212,6 @@ class DownloadViewModel(
     private fun com.mediaflow.app.ui.home.ContentType.toCoreType() =
         if (this == com.mediaflow.app.ui.home.ContentType.VIDEO) MediaType.VIDEO else MediaType.AUDIO
 
-    private fun selectFormat(
-        formats: List<MediaFormat>,
-        targetType: MediaType,
-        quality: com.mediaflow.app.ui.home.QualityOption,
-        selectedFormatId: String?,
-    ): MediaFormat? {
-        val preferred = formats.filter { it.mediaType == targetType }
-        val typed = preferred.ifEmpty { formats }
-        return com.mediaflow.app.ui.home.PreferredDownloadFormat.select(
-            typed,
-            quality,
-            selectedFormatId,
-        )
-    }
-
     class Factory(
         private val application: Application,
         private val progressRepository: ProgressRepository? = null,
@@ -233,4 +226,21 @@ class DownloadViewModel(
             ) as T
         }
     }
+}
+
+internal fun formatsForDownload(source: SourceInfo, contentType: ContentType): List<MediaFormat> =
+    com.mediaflow.app.ui.home.HomeViewModel.formatsFor(source, contentType)
+
+internal fun selectFormatForDownload(
+    source: SourceInfo,
+    targetType: MediaType,
+    quality: QualityOption,
+    selectedFormatId: String?,
+): MediaFormat? {
+    val contentType = if (targetType == MediaType.VIDEO) ContentType.VIDEO else ContentType.AUDIO
+    return PreferredDownloadFormat.select(
+        formatsForDownload(source, contentType),
+        quality,
+        selectedFormatId,
+    )
 }
