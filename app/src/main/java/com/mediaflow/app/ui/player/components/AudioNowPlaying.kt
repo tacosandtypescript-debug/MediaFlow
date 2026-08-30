@@ -1,6 +1,5 @@
 package com.mediaflow.app.ui.player.components
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -19,11 +18,13 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.mediaflow.app.R
+import com.mediaflow.app.ui.player.background.PlayerAmbientBackground
+import com.mediaflow.app.ui.player.controls.AudioPrimaryControls
+import com.mediaflow.app.ui.player.gestures.ArtworkSwipePager
 import com.mediaflow.core.model.XSpace
 import com.mediaflow.domain.player.EnginePlaybackState
 
@@ -50,8 +51,8 @@ fun AudioNowPlaying(
     onScrubbingChanged: (Boolean) -> Unit,
     onScrubPositionChange: (Long) -> Unit = {},
     onPlayPause: () -> Unit,
-    onRewind10: () -> Unit,
-    onForward10: () -> Unit,
+    onPrevious: () -> Unit,
+    onNext: () -> Unit,
     onSpeedChange: (Float) -> Unit,
     onAddToPlaylist: () -> Unit,
     onOpenQueue: () -> Unit,
@@ -59,29 +60,26 @@ fun AudioNowPlaying(
     onDelete: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val background = MaterialTheme.colorScheme.background
-    val wash = MaterialTheme.colorScheme.primary.copy(alpha = 0.28f)
+    val isPlaying = playbackState == EnginePlaybackState.PLAYING
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(wash, background, background),
-                ),
-            ),
-    ) {
+    Box(modifier = modifier.fillMaxSize()) {
+        PlayerAmbientBackground(
+            artworkUrl = artworkUrl,
+            isPlaying = isPlaying,
+        )
+        Column(modifier = Modifier.fillMaxSize()) {
         AudioNowPlayingTopBar(
             onBack = onBack,
             onShare = onShare,
         )
 
-        Box(
+        ArtworkSwipePager(
+            onNext = onNext,
+            onPrevious = onPrevious,
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
                 .padding(horizontal = 24.dp),
-            contentAlignment = Alignment.Center,
         ) {
             AudioPlayerView(
                 title = title,
@@ -114,19 +112,13 @@ fun AudioNowPlaying(
             modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp),
         )
 
-        PlaybackControls(
+        AudioPrimaryControls(
             playbackState = playbackState,
             isPlaying = playbackState == EnginePlaybackState.PLAYING,
-            hasNext = false,
-            hasPrevious = false,
-            isLive = false,
-            onPlayPause = onPlayPause,
-            onPrevious = {},
-            onNext = {},
-            onRewind10 = onRewind10,
-            onForward10 = onForward10,
-            nowPlaying = true,
             isBuffering = isBuffering,
+            onPlayPause = onPlayPause,
+            onPrevious = onPrevious,
+            onNext = onNext,
         )
 
         PlayerSecondaryActions(
@@ -142,6 +134,7 @@ fun AudioNowPlaying(
         )
 
         Spacer(Modifier.height(8.dp))
+        }
     }
 }
 
