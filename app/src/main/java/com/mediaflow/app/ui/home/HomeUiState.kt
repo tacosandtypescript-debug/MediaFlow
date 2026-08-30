@@ -198,5 +198,8 @@ data class HomeUiState(
     val sourceInfo: SourceInfo? = null,
     val availableFormats: List<MediaFormat> = emptyList(),
     val selectedFormatId: String? = null,
+    /** Extractor formats as distinct chips (same height, different codec/FPS stay separate). */
+    val formatChoices: List<com.mediaflow.data.download.formats.RealFormatCatalog.ListedFormat> = emptyList(),
+    val autoBest: Boolean = true,
     val analysisError: String? = null,
 )

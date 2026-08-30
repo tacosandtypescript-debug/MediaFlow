@@ -40,6 +40,7 @@ import com.mediaflow.app.ui.downloads.DownloadStartResult
 import com.mediaflow.app.ui.home.components.DownloadButton
 import com.mediaflow.app.ui.home.components.FileNameField
 import com.mediaflow.app.ui.home.components.MediaTypeSelector
+import com.mediaflow.app.ui.home.components.AnalyzedFormatSelector
 import com.mediaflow.app.ui.home.components.QualitySelector
 import com.mediaflow.app.ui.home.components.SourceAnalysisCard
 import com.mediaflow.app.ui.home.components.UrlInputField
@@ -174,7 +175,15 @@ fun HomeScreen(
                 modifier = Modifier.padding(bottom = 12.dp),
             )
 
-            if (sourceResolver == null || state.analysisState == AnalysisState.READY) {
+            if (state.analysisState == AnalysisState.READY && state.formatChoices.isNotEmpty()) {
+                AnalyzedFormatSelector(
+                    choices = state.formatChoices,
+                    selectedFormatId = state.selectedFormatId,
+                    autoBest = state.autoBest,
+                    onSelectAuto = { viewModel.onQualitySelected(QualityOption.AUTO) },
+                    onSelectFormat = viewModel::onFormatSelected,
+                )
+            } else if (sourceResolver == null || state.analysisState == AnalysisState.READY) {
                 QualitySelector(
                     options = state.qualityOptions,
                     selected = state.quality,

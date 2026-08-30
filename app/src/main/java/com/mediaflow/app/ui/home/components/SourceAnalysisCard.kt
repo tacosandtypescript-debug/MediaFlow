@@ -140,7 +140,8 @@ fun SourceAnalysisCard(
                         )
                         if (selectedFormat != null) {
                             Text(
-                                text = formatLabel(selectedFormat),
+                                text = com.mediaflow.data.download.formats.RealFormatCatalog.labelFor(selectedFormat)
+                                    .takeIf { it.isNotBlank() } ?: formatLabel(selectedFormat),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 maxLines = 1,

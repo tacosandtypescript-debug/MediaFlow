@@ -168,8 +168,10 @@ class HomeViewModelTest {
                 ),
             )
         })
-        vm.onQualitySelected(QualityOption.P720)
-        assertEquals(QualityOption.P720, vm.uiState.value.quality)
+        assertEquals(listOf("22"), vm.uiState.value.formatChoices.map { it.format.formatId })
+        vm.onFormatSelected("22")
+        assertEquals("22", vm.uiState.value.selectedFormatId)
+        assertFalse(vm.uiState.value.autoBest)
         assertFalse(QualityOption.P480 in vm.uiState.value.qualityOptions)
         assertFalse(QualityOption.P1080 in vm.uiState.value.qualityOptions)
     }
@@ -354,7 +356,7 @@ class HomeViewModelTest {
     }
 
     @Test
-    fun `quality option selects format by height`() {
+    fun `same-height distinct codecs remain separate selectable choices`() {
         val vm = newViewModel()
         vm.onUrlChanged("https://example.com/video")
         vm.analyze(object : SourceResolver {
@@ -364,28 +366,34 @@ class HomeViewModelTest {
                 availableFormats = listOf(
                     MediaFormat(
                         "137", "mp4", "video/mp4", MediaType.VIDEO, "1080p",
-                        height = 1080, videoCodec = "avc1", requiresMuxing = true,
+                        height = 1080, fps = 30.0, videoCodec = "avc1", requiresMuxing = true,
+                    ),
+                    MediaFormat(
+                        "248", "webm", "video/webm", MediaType.VIDEO, "1080p",
+                        height = 1080, fps = 60.0, videoCodec = "vp9", requiresMuxing = true,
                     ),
                     MediaFormat(
                         "22", "mp4", "video/mp4", MediaType.VIDEO, "720p",
                         height = 720, videoCodec = "avc1", audioCodec = "mp4a.40.2",
                         isProgressive = true, requiresMuxing = false,
                     ),
-                    MediaFormat(
-                        "18", "mp4", "video/mp4", MediaType.VIDEO, "360p",
-                        height = 360, videoCodec = "avc1", audioCodec = "mp4a.40.2",
-                        isProgressive = true, requiresMuxing = false,
-                    ),
                 ),
             )
         })
 
-        vm.onQualitySelected(QualityOption.P360)
-        assertEquals("18", vm.uiState.value.selectedFormatId)
-        vm.onQualitySelected(QualityOption.P720)
-        assertEquals("22", vm.uiState.value.selectedFormatId)
-        vm.onQualitySelected(QualityOption.P1080)
+        val ids = vm.uiState.value.formatChoices.map { it.format.formatId }
+        assertTrue(ids.contains("137"))
+        assertTrue(ids.contains("248"))
+        val labels = vm.uiState.value.formatChoices.map { it.label }
+        assertEquals(3, labels.distinct().size)
+        vm.onFormatSelected("248")
+        assertEquals("248", vm.uiState.value.selectedFormatId)
+        assertFalse(vm.uiState.value.autoBest)
+        vm.onFormatSelected("137")
         assertEquals("137", vm.uiState.value.selectedFormatId)
+        vm.onQualitySelected(QualityOption.AUTO)
+        assertTrue(vm.uiState.value.autoBest)
+        assertEquals("22", vm.uiState.value.selectedFormatId)
     }
 
     @Test
@@ -411,6 +419,10 @@ class HomeViewModelTest {
 
         vm.onFormatSelected("248")
         assertEquals("248", vm.uiState.value.selectedFormatId)
+        assertFalse(vm.uiState.value.autoBest)
+        assertEquals(2, vm.uiState.value.formatChoices.size)
+        assertTrue(vm.uiState.value.formatChoices.any { "avc1" in it.label || "137" == it.format.formatId })
+        assertTrue(vm.uiState.value.formatChoices.any { it.format.formatId == "248" })
         assertEquals("248", PreferredDownloadFormat.select(vm.uiState.value.availableFormats, QualityOption.AUTO, "248")?.formatId)
     }
 
