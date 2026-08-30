@@ -3,6 +3,7 @@ package com.mediaflow.app.ui
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsNotFocused
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertTextContains
@@ -40,6 +41,13 @@ class HomeScreenTest {
         composeRule.setContent {
             MediaFlowTheme { HomeScreen() }
         }
+    }
+
+    @Test
+    fun urlInputIsNotFocusedAfterFirstComposition() {
+        setHome()
+        composeRule.onNodeWithTag("url_input").assertIsNotFocused()
+        composeRule.onNodeWithTag("paste_button").assertIsDisplayed()
     }
 
     @Test
@@ -139,7 +147,9 @@ class HomeScreenTest {
         clipboard.setPrimaryClip(ClipData.newPlainText("url", "https://example.com/paste"))
 
         setHome()
-        composeRule.onNodeWithTag("paste_button").performClick()
+        composeRule.onNodeWithTag("url_input").assertIsNotFocused()
+        composeRule.onNodeWithTag("paste_button").assertIsDisplayed().performClick()
+        composeRule.onNodeWithTag("url_input").assertTextContains("https://example.com/paste")
         composeRule.onNodeWithText(
             "Enlace válido. La fuente se analizará al iniciar la descarga",
         ).assertIsDisplayed()
