@@ -15,6 +15,9 @@ data class DownloadItem(
     val selectedFormat: MediaFormat? = null,
     val localUri: String? = null,
     val thumbnailUri: String? = null,
+    /** Pixel size of the media or extracted frame; used for mosaic cells. */
+    val width: Int? = null,
+    val height: Int? = null,
     val durationSeconds: Long? = null,
     /** 0..1 only when [isProgressKnown] is true; never a fabricated value. */
     val progress: Float = 0f,

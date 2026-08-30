@@ -38,6 +38,8 @@ class PlatformDownloadStore private constructor(private val file: File) {
         put("id", item.id); put("sourceUrl", item.sourceUrl); put("title", item.title)
         put("fileName", item.fileName); put("mediaType", item.mediaType.name)
         put("localUri", item.localUri); put("thumbnailUri", item.thumbnailUri)
+        item.width?.let { put("width", it) }
+        item.height?.let { put("height", it) }
         put("durationSeconds", item.durationSeconds); put("progress", item.progress)
         put("isProgressKnown", item.isProgressKnown); put("downloadedBytes", item.downloadedBytes)
         put("totalBytes", item.totalBytes); put("status", item.status.name)
@@ -67,6 +69,8 @@ class PlatformDownloadStore private constructor(private val file: File) {
             selectedFormat = json.optJSONObject("format")?.let(::decodeFormat),
             localUri = json.optString("localUri").takeIf { it.isNotBlank() },
             thumbnailUri = json.optString("thumbnailUri").takeIf { it.isNotBlank() },
+            width = json.optInt("width", 0).takeIf { it > 0 },
+            height = json.optInt("height", 0).takeIf { it > 0 },
             durationSeconds = json.optLong("durationSeconds", 0L).takeIf { it > 0L },
             progress = json.optDouble("progress", 0.0).toFloat().coerceIn(0f, 1f),
             isProgressKnown = json.optBoolean("isProgressKnown"),

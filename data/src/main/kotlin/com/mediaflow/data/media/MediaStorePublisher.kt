@@ -49,7 +49,10 @@ object MediaStorePublisher {
                     }
                 }
             }.getOrNull()
-            if (exact != null) return exact
+            if (exact != null) {
+                MediaFlowLibraryStore(context).add(exact)
+                return exact
+            }
 
             // If MediaStore added " (1)" because an external row already has
             // the requested name, reuse an already-owned row with the same
@@ -80,7 +83,10 @@ object MediaStorePublisher {
                     }
                 }.getOrNull()
             }
-            if (ownedMatch != null) return ownedMatch
+            if (ownedMatch != null) {
+                MediaFlowLibraryStore(context).add(ownedMatch)
+                return ownedMatch
+            }
         }
         return publish(context, file, mimeType, displayName)
     }
@@ -116,6 +122,7 @@ object MediaStorePublisher {
                 null,
                 null,
             )
+            MediaFlowLibraryStore(context).add(uri)
             uri
         }.getOrElse {
             resolver.delete(uri, null, null)

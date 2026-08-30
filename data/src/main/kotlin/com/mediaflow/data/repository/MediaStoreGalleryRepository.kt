@@ -34,8 +34,24 @@ class MediaStoreGalleryRepository(context: Context) : GalleryRepository {
             override fun onChange(selfChange: Boolean, uri: Uri?) {
                 emitCurrent()
             }
+
+            override fun onChange(selfChange: Boolean) {
+                emitCurrent()
+            }
         }
         resolver.registerContentObserver(collection, true, observer)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            resolver.registerContentObserver(
+                MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY),
+                true,
+                observer,
+            )
+            resolver.registerContentObserver(
+                MediaStore.Audio.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY),
+                true,
+                observer,
+            )
+        }
         emitCurrent()
         awaitClose { resolver.unregisterContentObserver(observer) }
     }
@@ -46,7 +62,11 @@ class MediaStoreGalleryRepository(context: Context) : GalleryRepository {
     override suspend fun deleteItem(id: String): Boolean = runCatching {
         val uri = Uri.parse(id)
         val deleted = resolver.delete(uri, null, null) > 0
-        if (deleted) ownership.remove(uri)
+        ownership.removeMatching(uri)
+        if (deleted) {
+            resolver.notifyChange(uri, null)
+            resolver.notifyChange(collection, null)
+        }
         deleted
     }.getOrDefault(false)
 
@@ -88,6 +108,10 @@ class MediaStoreGalleryRepository(context: Context) : GalleryRepository {
             MediaStore.MediaColumns.MIME_TYPE,
             MediaStore.MediaColumns.SIZE,
             MediaStore.MediaColumns.DATE_ADDED,
+            MediaStore.MediaColumns.DURATION,
+            MediaStore.MediaColumns.WIDTH,
+            MediaStore.MediaColumns.HEIGHT,
+            MediaStore.MediaColumns.DATA,
         )
         val selection: String
         val selectionArgs: Array<String>
@@ -117,6 +141,7 @@ class MediaStoreGalleryRepository(context: Context) : GalleryRepository {
                 val mimeIndex = cursor.getColumnIndex(MediaStore.MediaColumns.MIME_TYPE)
                 val sizeIndex = cursor.getColumnIndex(MediaStore.MediaColumns.SIZE)
                 val dateIndex = cursor.getColumnIndex(MediaStore.MediaColumns.DATE_ADDED)
+                val durationIndex = cursor.getColumnIndex(MediaStore.MediaColumns.DURATION)
                 while (cursor.moveToNext()) {
                     val itemId = cursor.getLong(idIndex)
                     val mime = cursor.getString(mimeIndex).orEmpty()
@@ -128,11 +153,32 @@ class MediaStoreGalleryRepository(context: Context) : GalleryRepository {
                     // by the controlled row ID and retain the original URI
                     // from the ledger for opening/deleting the item.
                     if (itemId !in ownedMediaStoreIds()) continue
+                    val dataIndex = cursor.getColumnIndex(MediaStore.MediaColumns.DATA)
+                    val dataPath = if (dataIndex >= 0 && !cursor.isNull(dataIndex)) {
+                        cursor.getString(dataIndex)
+                    } else null
+                    if (!dataPath.isNullOrBlank() && !java.io.File(dataPath).isFile) {
+                        ownership.uris()
+                            .mapNotNull { raw -> runCatching { Uri.parse(raw) }.getOrNull() }
+                            .filter { MediaFlowLibraryStore.mediaStoreId(it.toString()) == itemId }
+                            .forEach(ownership::removeMatching)
+                        continue
+                    }
                     val itemUri = ownership.uris().firstOrNull {
                         MediaFlowLibraryStore.mediaStoreId(it) == itemId
                     }?.let(Uri::parse) ?: ContentUris.withAppendedId(collectionUri, itemId)
                     val name = cursor.getString(nameIndex).orEmpty()
-                    val duplicateKey = "${normalizeCollisionName(name)}|$mime|${cursor.getLongOrNull(sizeIndex) ?: -1L}"
+                    val size = cursor.getLongOrNull(sizeIndex)
+                    val durationMs = cursor.getColumnIndex(MediaStore.MediaColumns.DURATION).let { idx ->
+                        cursor.getLongOrNull(idx)
+                    }
+                    val width = cursor.getColumnIndex(MediaStore.MediaColumns.WIDTH).let { idx ->
+                        cursor.getLongOrNull(idx)?.toInt()
+                    }
+                    val height = cursor.getColumnIndex(MediaStore.MediaColumns.HEIGHT).let { idx ->
+                        cursor.getLongOrNull(idx)?.toInt()
+                    }
+                    val duplicateKey = "${normalizeCollisionName(name)}|$mime|${size ?: -1L}"
                     if (!seenKeys.add(duplicateKey)) continue
                     add(
                         DownloadItem(
@@ -146,12 +192,18 @@ class MediaStoreGalleryRepository(context: Context) : GalleryRepository {
                                 extension = name.substringAfterLast('.', "").ifBlank { null },
                                 mimeType = mime.ifBlank { null },
                                 mediaType = mediaType,
-                                fileSize = cursor.getLongOrNull(sizeIndex),
+                                width = width,
+                                height = height,
+                                fileSize = size,
                                 isProgressive = true,
                             ),
                             localUri = itemUri.toString(),
+                            durationSeconds = durationMs?.div(1000L)?.takeIf { it > 0L },
+                            totalBytes = size,
                             createdAt = cursor.getLongOrNull(dateIndex)?.times(1000L) ?: 0L,
                             completedAt = cursor.getLongOrNull(dateIndex)?.times(1000L),
+                            width = width,
+                            height = height,
                         ),
                     )
                 }
