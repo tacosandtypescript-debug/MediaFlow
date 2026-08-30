@@ -1,6 +1,7 @@
 package com.mediaflow.data.download.formats
 
 import com.mediaflow.core.model.MediaFormat
+import com.mediaflow.core.model.MediaType
 
 /**
  * UI/download catalog built only from extractor [MediaFormat]s.
@@ -19,7 +20,9 @@ object RealFormatCatalog {
     )
 
     fun listed(formats: List<MediaFormat>): List<ListedFormat> =
-        formats.map { ListedFormat(it, labelFor(it), it.height, it.fps, it.videoCodec, it.audioCodec) }
+        formats
+            .map { ListedFormat(it, labelFor(it), it.height, it.fps, it.videoCodec, it.audioCodec) }
+            .distinctBy { it.label }
 
     fun listedHeights(formats: List<MediaFormat>): List<Int> =
         formats.mapNotNull { it.height }.distinct()
@@ -34,16 +37,81 @@ object RealFormatCatalog {
         formats.mapNotNull { it.audioCodec?.takeIf { codec -> codec.isNotBlank() } }.distinct()
 
     fun labelFor(format: MediaFormat): String {
-        val heightPart = format.height?.let { "${it}p" } ?: "unknown"
-        val extras = buildList {
-            format.videoCodec?.takeIf { it.isNotBlank() }?.let(::add)
-            format.audioCodec?.takeIf { it.isNotBlank() && it != format.videoCodec }?.let(::add)
-            format.fps?.let { fps ->
-                val fpsLabel = if (fps % 1.0 == 0.0) fps.toInt().toString() else fps.toString()
-                add("${fpsLabel}fps")
-            }
+        val audioName = prettyAudioCodec(format.audioCodec)
+        val videoName = prettyVideoCodec(format.videoCodec)
+        val container = prettyContainer(format.extension ?: format.container)
+        val bitrate = format.bitrate?.takeIf { it > 0 }?.let { "$it kbps" }
+        val fpsPart = format.fps?.let { fps ->
+            val fpsLabel = if (fps % 1.0 == 0.0) fps.toInt().toString() else fps.toString()
+            "${fpsLabel}fps"
         }
-        return if (extras.isEmpty()) heightPart else "$heightPart ${extras.joinToString(" ")}"
+        val isAudioOnly = format.height == null &&
+            (format.mediaType == MediaType.AUDIO || format.videoCodec.isNullOrBlank())
+
+        val parts = buildList {
+            format.height?.let { add("${it}p") }
+            if (!isAudioOnly) {
+                videoName?.let(::add)
+            }
+            when {
+                isAudioOnly && audioName != null && bitrate != null -> {
+                    add(audioName)
+                    add(bitrate)
+                }
+                isAudioOnly && audioName != null && container != null -> {
+                    add(audioName)
+                }
+                isAudioOnly && audioName != null -> {
+                    add("Audio")
+                    add(audioName)
+                }
+                audioName != null && audioName != videoName -> add(audioName)
+            }
+            if (!isAudioOnly) {
+                bitrate?.let(::add)
+                fpsPart?.let(::add)
+            }
+            container?.let { ext ->
+                if (ext !in this) add(ext)
+            }
+            if (isEmpty()) {
+                format.formatId.takeIf { it.isNotBlank() }?.let(::add)
+            }
+            if (isEmpty()) add(if (isAudioOnly) "Audio" else "Video")
+        }
+        return parts.joinToString(" · ")
+    }
+
+    private fun prettyAudioCodec(raw: String?): String? {
+        val value = raw?.trim()?.takeIf { it.isNotBlank() } ?: return null
+        val lower = value.lowercase()
+        return when {
+            lower.contains("opus") -> "Opus"
+            lower.contains("mp4a") || lower.contains("aac") -> "AAC"
+            lower.contains("mp3") || lower.contains("mpeg") -> "MP3"
+            lower.contains("vorbis") -> "Vorbis"
+            lower.contains("flac") -> "FLAC"
+            else -> value
+        }
+    }
+
+    private fun prettyVideoCodec(raw: String?): String? {
+        val value = raw?.trim()?.takeIf { it.isNotBlank() } ?: return null
+        return value
+    }
+
+    private fun prettyContainer(raw: String?): String? {
+        val value = raw?.trim()?.takeIf { it.isNotBlank() } ?: return null
+        return when (value.lowercase()) {
+            "m4a" -> "M4A"
+            "mp4", "m4v" -> "MP4"
+            "webm" -> "WebM"
+            "mkv" -> "MKV"
+            "mp3" -> "MP3"
+            "ogg" -> "OGG"
+            "opus" -> "Opus"
+            else -> value.uppercase()
+        }
     }
 
     /**

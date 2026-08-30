@@ -450,6 +450,37 @@ class HomeViewModelTest {
         assertTrue(vm.uiState.value.isDownloadButtonEnabled)
         assertEquals("140", vm.uiState.value.selectedFormatId)
         assertEquals(ContentType.AUDIO, vm.uiState.value.mediaType)
+        val audioLabel = vm.uiState.value.formatChoices.single().label
+        assertFalse(audioLabel.contains("unknown", ignoreCase = true))
+        assertTrue(audioLabel.contains("AAC"))
+    }
+
+    @Test
+    fun `equivalent audio formats collapse to one chip without unknown`() {
+        val vm = newViewModel()
+        vm.onUrlChanged("https://example.com/audio")
+        vm.onMediaTypeSelected(ContentType.AUDIO)
+        vm.analyze(object : SourceResolver {
+            override suspend fun analyze(sourceUrl: String) = SourceInfo(
+                sourceUrl = sourceUrl,
+                title = "Audio only",
+                availableFormats = listOf(
+                    MediaFormat(
+                        "140", "m4a", "audio/mp4", MediaType.AUDIO, audioCodec = "mp4a.40.2",
+                        bitrate = 128, container = "m4a",
+                    ),
+                    MediaFormat(
+                        "140b", "m4a", "audio/mp4", MediaType.AUDIO, audioCodec = "mp4a.40.2",
+                        bitrate = 128, container = "m4a",
+                    ),
+                ),
+            )
+        })
+
+        val choices = vm.uiState.value.formatChoices
+        assertEquals(1, choices.size)
+        assertEquals("AAC · 128 kbps · M4A", choices.single().label)
+        assertFalse(choices.single().label.contains("unknown", ignoreCase = true))
     }
 
     @Test

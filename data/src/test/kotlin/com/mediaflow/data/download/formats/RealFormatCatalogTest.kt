@@ -47,7 +47,7 @@ class RealFormatCatalogTest {
     }
 
     @Test
-    fun `unknown height is labeled unknown not a fake p rung`() {
+    fun `missing height is not labeled unknown and does not invent a p rung`() {
         val format = MediaFormat(
             formatId = "mystery",
             extension = "mp4",
@@ -56,10 +56,97 @@ class RealFormatCatalogTest {
             fps = 24.0,
         )
         val label = RealFormatCatalog.labelFor(format)
-        assertEquals("unknown avc1 24fps", label)
+        assertEquals("avc1 · 24fps · MP4", label)
         assertTrue(RealFormatCatalog.listedHeights(listOf(format)).isEmpty())
         assertFalse(label.matches(Regex(".*\\d+p.*")))
-        assertTrue(label.startsWith("unknown"))
+        assertFalse(label.contains("unknown", ignoreCase = true))
+    }
+
+    @Test
+    fun `aac with abr and m4a uses extractor fields only`() {
+        val format = MediaFormat(
+            formatId = "140",
+            extension = "m4a",
+            mediaType = MediaType.AUDIO,
+            audioCodec = "mp4a.40.2",
+            bitrate = 128,
+            container = "m4a",
+        )
+        assertEquals("AAC · 128 kbps · M4A", RealFormatCatalog.labelFor(format))
+    }
+
+    @Test
+    fun `opus with abr and webm uses extractor fields only`() {
+        val format = MediaFormat(
+            formatId = "251",
+            extension = "webm",
+            mediaType = MediaType.AUDIO,
+            audioCodec = "opus",
+            bitrate = 160,
+            container = "webm",
+        )
+        assertEquals("Opus · 160 kbps · WebM", RealFormatCatalog.labelFor(format))
+    }
+
+    @Test
+    fun `aac and opus without abr do not invent kbps`() {
+        val aac = MediaFormat(
+            formatId = "140",
+            extension = "m4a",
+            mediaType = MediaType.AUDIO,
+            audioCodec = "mp4a.40.2",
+            container = "m4a",
+        )
+        val opus = MediaFormat(
+            formatId = "251",
+            extension = "webm",
+            mediaType = MediaType.AUDIO,
+            audioCodec = "opus",
+        )
+        assertEquals("AAC · M4A", RealFormatCatalog.labelFor(aac))
+        assertFalse(RealFormatCatalog.labelFor(aac).contains("kbps"))
+        val opusLabel = RealFormatCatalog.labelFor(opus)
+        assertTrue(opusLabel.contains("Opus"))
+        assertFalse(opusLabel.contains("kbps"))
+        assertFalse(opusLabel.contains("unknown", ignoreCase = true))
+    }
+
+    @Test
+    fun `audio-only with no height does not produce Unknown`() {
+        val format = MediaFormat(
+            formatId = "140",
+            extension = "m4a",
+            mediaType = MediaType.AUDIO,
+            audioCodec = "mp4a.40.2",
+        )
+        val label = RealFormatCatalog.labelFor(format)
+        assertFalse(label.contains("unknown", ignoreCase = true))
+        assertFalse(label.contains("Unknown"))
+    }
+
+    @Test
+    fun `equivalent audio streams collapse to one chip`() {
+        val formats = listOf(
+            MediaFormat(
+                formatId = "140",
+                extension = "m4a",
+                mediaType = MediaType.AUDIO,
+                audioCodec = "mp4a.40.2",
+                bitrate = 128,
+                container = "m4a",
+            ),
+            MediaFormat(
+                formatId = "140-dup",
+                extension = "m4a",
+                mediaType = MediaType.AUDIO,
+                audioCodec = "mp4a.40.2",
+                bitrate = 128,
+                container = "m4a",
+            ),
+        )
+        val listed = RealFormatCatalog.listed(formats)
+        assertEquals(1, listed.size)
+        assertEquals("AAC · 128 kbps · M4A", listed.single().label)
     }
 
     @Test
